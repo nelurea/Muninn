@@ -1,52 +1,71 @@
 package io.github.nelurea.muninn
 
+import android.content.ContentValues
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
-import android.content.Intent
-import android.net.Uri
-import android.util.Log
+
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         enableEdgeToEdge()
+
         if (intent?.action == Intent.ACTION_SEND) {
 
             val imageUri =
                 intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
 
-            Log.d("Muninn", "Shared image: $imageUri")
+            if (imageUri != null) {
+
+                Log.d("Muninn", "Shared image: $imageUri")
+
+                saveImage(imageUri)
+            }
         }
+
         setContent {
             MuninnTheme {
                 AppNavigation()
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    private fun saveImage(imageUri: Uri) {
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MuninnTheme {
-        Greeting("Android")
+        val inputStream =
+            contentResolver.openInputStream(imageUri)
+                ?: return
+
+        val values = ContentValues().apply {
+            put(
+                MediaStore.Images.Media.DISPLAY_NAME,
+                "muninn_${System.currentTimeMillis()}.jpg"
+            )
+        }
+
+        val outputUri = contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            values
+        ) ?: return
+
+        val outputStream =
+            contentResolver.openOutputStream(outputUri)
+                ?: return
+
+        inputStream.copyTo(outputStream)
+
+        inputStream.close()
+        outputStream.close()
+
+        Log.d("Muninn", "Saved image: $outputUri")
     }
 }
