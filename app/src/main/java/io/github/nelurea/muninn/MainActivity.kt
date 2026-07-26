@@ -13,11 +13,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
-
+import android.content.Intent
+import android.net.Uri
+import android.util.Log
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (intent?.action == Intent.ACTION_SEND) {
+
+            val imageUri =
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+
+            Log.d("Muninn", "Shared image: $imageUri")
+        }
         setContent {
             MuninnTheme {
                 AppNavigation()
