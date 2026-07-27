@@ -11,11 +11,27 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
+import androidx.room.Room
+import io.github.nelurea.muninn.data.db.AppDatabase
+import io.github.nelurea.muninn.data.repository.ImageRepository
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private lateinit var repository: ImageRepository
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val database = Room.databaseBuilder(
+            applicationContext,
+            AppDatabase::class.java,
+            "muninn.db"
+        ).build()
+
+        repository = ImageRepository(
+            database.imageRecordDao()
+        )
 
         enableEdgeToEdge()
 
@@ -34,7 +50,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MuninnTheme {
-                AppNavigation()
+                AppNavigation(
+                    repository = repository
+                )
             }
         }
     }
@@ -67,5 +85,11 @@ class MainActivity : ComponentActivity() {
         outputStream.close()
 
         Log.d("Muninn", "Saved image: $outputUri")
+        lifecycleScope.launch {
+
+            repository.save(
+                outputUri.toString()
+            )
+        }
     }
 }
