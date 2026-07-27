@@ -50,6 +50,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.3")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
+    implementation("io.coil-kt:coil-compose:2.7.0")
     ksp("androidx.room:room-compiler:2.8.4")
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
