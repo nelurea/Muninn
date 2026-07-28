@@ -65,9 +65,15 @@ class MainActivity : ComponentActivity() {
                 ?: return
 
         val values = ContentValues().apply {
+
             put(
                 MediaStore.Images.Media.DISPLAY_NAME,
-                "muninn_${System.currentTimeMillis()}.jpg"
+                "${System.currentTimeMillis()}.jpg"
+            )
+
+            put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                "Pictures/Muninn"
             )
         }
 

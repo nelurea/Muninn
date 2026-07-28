@@ -78,9 +78,6 @@ fun AppNavigation(
             DetailScreen(
                 imageId = imageId,
                 repository = repository,
-                onBack = {
-                    navController.popBackStack()
-                },
                 onDelete = {
                     navController.popBackStack()
                 },
