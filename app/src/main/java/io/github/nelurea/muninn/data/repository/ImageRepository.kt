@@ -23,4 +23,9 @@ class ImageRepository(
     ): ImageRecord? {
         return dao.getById(id)
     }
+    suspend fun deleteImage(
+        id: Long
+    ) {
+        dao.deleteById(id)
+    }
 }
