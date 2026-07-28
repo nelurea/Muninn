@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.ImageRecord
@@ -54,7 +55,8 @@ fun DetailScreen(
             AsyncImage(
                 model = image!!.imageUri,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
             )
         }
     }

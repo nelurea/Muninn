@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,7 +18,8 @@ import io.github.nelurea.muninn.data.repository.ImageRepository
 @Composable
 fun GalleryScreen(
     repository: ImageRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onImageClick: (Long) -> Unit
 ) {
 
     val images by repository.getImages()
@@ -30,7 +32,11 @@ fun GalleryScreen(
             AsyncImage(
                 model = image.imageUri,
                 contentDescription = null,
-                modifier = Modifier.size(200.dp)
+                modifier = Modifier
+                    .size(200.dp)
+                    .clickable {
+                        onImageClick(image.id)
+                    }
             )
         }
     }
