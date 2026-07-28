@@ -1,5 +1,8 @@
 package io.github.nelurea.muninn.ui.navigation
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -18,6 +21,7 @@ fun AppNavigation(
 ) {
 
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     NavHost(
         navController = navController,
@@ -79,6 +83,31 @@ fun AppNavigation(
                 },
                 onDelete = {
                     navController.popBackStack()
+                },
+                onShare = { uri ->
+
+                    val shareIntent = Intent(
+                        Intent.ACTION_SEND
+                    ).apply {
+
+                        type = "image/*"
+
+                        putExtra(
+                            Intent.EXTRA_STREAM,
+                            Uri.parse(uri)
+                        )
+
+                        addFlags(
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    }
+
+                    context.startActivity(
+                        Intent.createChooser(
+                            shareIntent,
+                            "Share Image"
+                        )
+                    )
                 }
             )
         }

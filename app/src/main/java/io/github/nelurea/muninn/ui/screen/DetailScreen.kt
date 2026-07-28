@@ -27,7 +27,8 @@ fun DetailScreen(
     imageId: Long,
     repository: ImageRepository,
     onBack: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShare: (String) -> Unit
 ) {
 
     var image by remember {
@@ -79,7 +80,10 @@ fun DetailScreen(
 
                     Button(
                         onClick = {
-                            // 次Stepで実装
+
+                            image?.let {
+                                onShare(it.imageUri)
+                            }
                         }
                     ) {
                         Text("Share")
