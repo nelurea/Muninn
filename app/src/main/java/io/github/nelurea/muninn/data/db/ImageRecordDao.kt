@@ -13,4 +13,11 @@ interface ImageRecordDao {
 
     @Query("SELECT * FROM images ORDER BY createdAt DESC")
     fun getAll(): Flow<List<ImageRecord>>
+
+    @Query(
+        "SELECT * FROM images WHERE id = :id"
+    )
+    suspend fun getById(
+        id: Long
+    ): ImageRecord?
 }

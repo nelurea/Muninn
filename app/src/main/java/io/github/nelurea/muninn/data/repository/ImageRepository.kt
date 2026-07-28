@@ -17,4 +17,10 @@ class ImageRepository(
             )
         )
     }
+
+    suspend fun getImage(
+        id: Long
+    ): ImageRecord? {
+        return dao.getById(id)
+    }
 }
