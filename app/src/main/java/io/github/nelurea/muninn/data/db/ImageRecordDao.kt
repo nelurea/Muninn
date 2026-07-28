@@ -20,4 +20,11 @@ interface ImageRecordDao {
     suspend fun getById(
         id: Long
     ): ImageRecord?
+
+    @Query(
+        "DELETE FROM images WHERE id = :id"
+    )
+    suspend fun deleteById(
+        id: Long
+    )
 }
