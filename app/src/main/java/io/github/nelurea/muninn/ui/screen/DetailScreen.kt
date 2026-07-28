@@ -16,18 +16,22 @@ import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.ImageRecord
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import androidx.compose.material3.ExperimentalMaterial3Api
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreen(
     imageId: Long,
     repository: ImageRepository,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onDelete: () -> Unit
 ) {
 
     var image by remember {
         mutableStateOf<ImageRecord?>(null)
     }
+
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(imageId) {
         image = repository.getImage(imageId)
@@ -67,7 +71,12 @@ fun DetailScreen(
 
                 Button(
                     onClick = {
-                        // 次Stepで実装
+                        scope.launch {
+
+                            repository.deleteImage(imageId)
+
+                            onDelete()
+                        }
                     }
                 ) {
                     Text("Delete")

@@ -76,6 +76,9 @@ fun AppNavigation(
                 repository = repository,
                 onBack = {
                     navController.popBackStack()
+                },
+                onDelete = {
+                    navController.popBackStack()
                 }
             )
         }
