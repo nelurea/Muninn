@@ -5,11 +5,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.ImageRecord
 import io.github.nelurea.muninn.data.repository.ImageRepository
@@ -52,12 +54,25 @@ fun DetailScreen(
 
         } else {
 
-            AsyncImage(
-                model = image!!.imageUri,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+
+                AsyncImage(
+                    model = image!!.imageUri,
+                    contentDescription = null,
+                    modifier = Modifier.weight(1f),
+                    contentScale = ContentScale.Fit
+                )
+
+                Button(
+                    onClick = {
+                        // 次Stepで実装
+                    }
+                ) {
+                    Text("Delete")
+                }
+            }
         }
     }
 }
