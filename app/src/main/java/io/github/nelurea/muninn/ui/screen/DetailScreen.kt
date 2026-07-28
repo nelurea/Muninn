@@ -1,6 +1,8 @@
 package io.github.nelurea.muninn.ui.screen
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
@@ -12,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.ImageRecord
 import io.github.nelurea.muninn.data.repository.ImageRepository
@@ -69,17 +72,31 @@ fun DetailScreen(
                     contentScale = ContentScale.Fit
                 )
 
-                Button(
-                    onClick = {
-                        scope.launch {
-
-                            repository.deleteImage(imageId)
-
-                            onDelete()
-                        }
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Text("Delete")
+
+                    Button(
+                        onClick = {
+                            // 次Stepで実装
+                        }
+                    ) {
+                        Text("Share")
+                    }
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+
+                                repository.deleteImage(imageId)
+
+                                onDelete()
+                            }
+                        }
+                    ) {
+                        Text("Delete")
+                    }
                 }
             }
         }
