@@ -30,7 +30,8 @@ class MainActivity : ComponentActivity() {
         ).build()
 
         repository = ImageRepository(
-            database.imageRecordDao()
+            dao = database.imageRecordDao(),
+            context = applicationContext
         )
 
         enableEdgeToEdge()

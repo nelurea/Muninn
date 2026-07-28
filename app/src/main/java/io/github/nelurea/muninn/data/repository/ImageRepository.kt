@@ -2,9 +2,12 @@ package io.github.nelurea.muninn.data.repository
 
 import io.github.nelurea.muninn.data.db.ImageRecord
 import io.github.nelurea.muninn.data.db.ImageRecordDao
+import android.content.Context
+import android.net.Uri
 
 class ImageRepository(
-    private val dao: ImageRecordDao
+    private val dao: ImageRecordDao,
+    private val context: Context
 ) {
 
     fun getImages() = dao.getAll()
@@ -26,6 +29,16 @@ class ImageRepository(
     suspend fun deleteImage(
         id: Long
     ) {
+
+        val image = dao.getById(id)
+            ?: return
+
+        context.contentResolver.delete(
+            Uri.parse(image.imageUri),
+            null,
+            null
+        )
+
         dao.deleteById(id)
     }
 }
