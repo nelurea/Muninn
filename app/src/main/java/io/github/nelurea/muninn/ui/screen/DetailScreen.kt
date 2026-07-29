@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,10 +23,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.ImageRecord
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +74,13 @@ fun DetailScreen(
 
         } else {
 
+            val formattedDate = remember(currentImage.createdAt) {
+                SimpleDateFormat(
+                    "yyyy/MM/dd HH:mm:ss",
+                    Locale.getDefault()
+                ).format(Date(currentImage.createdAt))
+            }
+
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -79,6 +91,29 @@ fun DetailScreen(
                     modifier = Modifier.weight(1f),
                     contentScale = ContentScale.Fit
                 )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+
+                    Text(
+                        text = "ID: ${currentImage.id}"
+                    )
+
+                    Text(
+                        text = "Saved: $formattedDate"
+                    )
+
+                    Text(
+                        text = "URI:"
+                    )
+
+                    Text(
+                        text = currentImage.imageUri
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -96,9 +131,7 @@ fun DetailScreen(
                     Button(
                         onClick = {
                             scope.launch {
-
                                 repository.deleteImage(imageId)
-
                                 onDelete()
                             }
                         }
