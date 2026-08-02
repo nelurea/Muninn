@@ -35,7 +35,7 @@ class SessionRepository(
             System.currentTimeMillis()
 
         val elapsed =
-            now - latest.createdAt
+            now - latest.lastActivityAt
 
         return if (
             elapsed > SESSION_TIMEOUT_MS
@@ -44,5 +44,13 @@ class SessionRepository(
         } else {
             latest.id
         }
+    }
+    suspend fun touch(
+        sessionId: Long
+    ) {
+        dao.updateActivity(
+            sessionId,
+            System.currentTimeMillis()
+        )
     }
 }

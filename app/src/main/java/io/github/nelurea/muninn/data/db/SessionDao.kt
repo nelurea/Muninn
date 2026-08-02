@@ -23,4 +23,16 @@ interface SessionDao {
     suspend fun getById(
         id: Long
     ): SessionEntity?
+
+    @Query(
+        """
+        UPDATE sessions
+        SET lastActivityAt = :timestamp
+        WHERE id = :sessionId
+        """
+    )
+    suspend fun updateActivity(
+        sessionId: Long,
+        timestamp: Long
+    )
 }
