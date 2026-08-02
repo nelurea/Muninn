@@ -9,17 +9,20 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import io.github.nelurea.muninn.ui.navigation.AppNavigation
-import io.github.nelurea.muninn.ui.theme.MuninnTheme
+import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
 import io.github.nelurea.muninn.data.db.AppDatabase
 import io.github.nelurea.muninn.data.repository.ImageRepository
-import androidx.lifecycle.lifecycleScope
+import io.github.nelurea.muninn.data.repository.SessionRepository
+import io.github.nelurea.muninn.ui.navigation.AppNavigation
+import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var repository: ImageRepository
+    private lateinit var sessionRepository: SessionRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -32,6 +35,10 @@ class MainActivity : ComponentActivity() {
         repository = ImageRepository(
             dao = database.imageRecordDao(),
             context = applicationContext
+        )
+
+        sessionRepository = SessionRepository(
+            dao = database.sessionDao()
         )
 
         enableEdgeToEdge()
@@ -92,10 +99,15 @@ class MainActivity : ComponentActivity() {
         outputStream.close()
 
         Log.d("Muninn", "Saved image: $outputUri")
+
         lifecycleScope.launch {
 
+            val sessionId =
+                sessionRepository.getOrCreateSession()
+
             repository.save(
-                outputUri.toString()
+                outputUri.toString(),
+                sessionId
             )
         }
     }

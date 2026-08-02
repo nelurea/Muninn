@@ -4,11 +4,16 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ImageRecord::class],
-    version = 1,
+    entities = [
+        ImageRecord::class,
+        SessionEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun imageRecordDao(): ImageRecordDao
+
+    abstract fun sessionDao(): SessionDao
 }
