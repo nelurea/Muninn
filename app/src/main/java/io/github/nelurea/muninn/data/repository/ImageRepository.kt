@@ -12,11 +12,15 @@ class ImageRepository(
 
     fun getImages() = dao.getAll()
 
-    suspend fun save(uri: String) {
+    suspend fun save(
+        uri: String,
+        sessionId: Long
+    ) {
 
         dao.insert(
             ImageRecord(
-                imageUri = uri
+                imageUri = uri,
+                sessionId = sessionId
             )
         )
     }
