@@ -7,6 +7,11 @@ class SessionRepository(
     private val dao: SessionDao
 ) {
 
+    companion object {
+        private const val SESSION_TIMEOUT_MS =
+            10_000L // just test
+    }
+
     suspend fun createSession(): Long {
         return dao.insert(
             SessionEntity()
@@ -19,9 +24,25 @@ class SessionRepository(
 
     suspend fun getOrCreateSession(): Long {
 
-        val latest = dao.getLatestSession()
+        val latest =
+            dao.getLatestSession()
 
-        return latest?.id
-            ?: createSession()
+        if (latest == null) {
+            return createSession()
+        }
+
+        val now =
+            System.currentTimeMillis()
+
+        val elapsed =
+            now - latest.createdAt
+
+        return if (
+            elapsed > SESSION_TIMEOUT_MS
+        ) {
+            createSession()
+        } else {
+            latest.id
+        }
     }
 }
