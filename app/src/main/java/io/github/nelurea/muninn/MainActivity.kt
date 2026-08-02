@@ -109,6 +109,10 @@ class MainActivity : ComponentActivity() {
                 outputUri.toString(),
                 sessionId
             )
+
+            sessionRepository.touch(
+                sessionId
+            )
         }
     }
 }
