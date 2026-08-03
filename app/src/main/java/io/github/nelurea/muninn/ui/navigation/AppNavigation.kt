@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.remember
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import io.github.nelurea.muninn.ui.screen.DetailScreen
@@ -14,10 +15,14 @@ import io.github.nelurea.muninn.ui.screen.GalleryScreen
 import io.github.nelurea.muninn.ui.screen.HomeScreen
 import io.github.nelurea.muninn.ui.screen.SettingsScreen
 import io.github.nelurea.muninn.data.repository.ImageRepository
+import io.github.nelurea.muninn.data.repository.SessionRepository
+import io.github.nelurea.muninn.ui.session.SessionListScreen
+import io.github.nelurea.muninn.ui.session.SessionListViewModel
 
 @Composable
 fun AppNavigation(
-    repository: ImageRepository
+    repository: ImageRepository,
+    sessionRepository: SessionRepository
 ) {
 
     val navController = rememberNavController()
@@ -31,7 +36,7 @@ fun AppNavigation(
         composable("home") {
             HomeScreen(
                 onGalleryClick = {
-                    navController.navigate("gallery")
+                    navController.navigate("sessions")
                 },
                 onSettingsClick = {
                     navController.navigate("settings")
@@ -50,6 +55,19 @@ fun AppNavigation(
                         "detail/$imageId"
                     )
                 }
+            )
+        }
+
+        composable("sessions") {
+
+            val vm = remember {
+                SessionListViewModel(
+                    sessionRepository
+                )
+            }
+
+            SessionListScreen(
+                viewModel = vm
             )
         }
 
