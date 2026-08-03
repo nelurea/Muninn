@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.remember
+import androidx.compose.material3.Text
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import io.github.nelurea.muninn.ui.screen.DetailScreen
@@ -67,7 +68,32 @@ fun AppNavigation(
             }
 
             SessionListScreen(
-                viewModel = vm
+                viewModel = vm,
+                onSessionClick = { sessionId ->
+
+                    navController.navigate(
+                        "sessionDetail/$sessionId"
+                    )
+                }
+            )
+        }
+
+        composable(
+            route = "sessionDetail/{sessionId}",
+            arguments = listOf(
+                navArgument("sessionId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+
+            val sessionId =
+                backStackEntry.arguments
+                    ?.getLong("sessionId")
+                    ?: return@composable
+
+            Text(
+                text = "Session Detail: $sessionId"
             )
         }
 

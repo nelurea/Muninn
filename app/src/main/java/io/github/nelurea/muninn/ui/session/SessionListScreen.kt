@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +21,8 @@ import java.util.Locale
 
 @Composable
 fun SessionListScreen(
-    viewModel: SessionListViewModel
+    viewModel: SessionListViewModel,
+    onSessionClick: (Long) -> Unit
 ) {
 
     val sessions by
@@ -58,6 +60,11 @@ fun SessionListScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
+                    .clickable {
+                        onSessionClick(
+                            item.session.id
+                        )
+                    }
             ) {
 
                 Column(
