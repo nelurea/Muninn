@@ -22,6 +22,15 @@ class SessionRepository(
         return dao.getLatestSession()
     }
 
+    suspend fun getSession(
+        sessionId: Long
+    ): SessionWithImages? {
+
+        return dao.getSessionWithImages(
+            sessionId
+        )
+    }
+
     suspend fun getOrCreateSession(): Long {
 
         val latest =

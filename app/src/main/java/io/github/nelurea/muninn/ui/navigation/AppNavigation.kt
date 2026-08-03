@@ -17,9 +17,10 @@ import io.github.nelurea.muninn.ui.screen.HomeScreen
 import io.github.nelurea.muninn.ui.screen.SettingsScreen
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
+import io.github.nelurea.muninn.ui.session.SessionDetailScreen
 import io.github.nelurea.muninn.ui.session.SessionListScreen
 import io.github.nelurea.muninn.ui.session.SessionListViewModel
-
+import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
 @Composable
 fun AppNavigation(
     repository: ImageRepository,
@@ -92,8 +93,16 @@ fun AppNavigation(
                     ?.getLong("sessionId")
                     ?: return@composable
 
-            Text(
-                text = "Session Detail: $sessionId"
+            val vm = remember {
+
+                SessionDetailViewModel(
+                    sessionRepository
+                )
+            }
+
+            SessionDetailScreen(
+                sessionId = sessionId,
+                viewModel = vm
             )
         }
 
