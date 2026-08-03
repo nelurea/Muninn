@@ -3,7 +3,7 @@ package io.github.nelurea.muninn.data.db
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-
+import androidx.room.Transaction
 @Dao
 interface SessionDao {
 
@@ -35,4 +35,21 @@ interface SessionDao {
         sessionId: Long,
         timestamp: Long
     )
+
+    @Transaction
+    @Query("""
+SELECT * FROM sessions
+ORDER BY lastActivityAt DESC
+""")
+    suspend fun getSessionsWithImages():
+            List<SessionWithImages>
+
+    @Transaction
+    @Query("""
+SELECT * FROM sessions
+WHERE id = :sessionId
+""")
+    suspend fun getSessionWithImages(
+        sessionId: Long
+    ): SessionWithImages?
 }
