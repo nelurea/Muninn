@@ -9,7 +9,7 @@ class SessionRepository(
 
     companion object {
         private const val SESSION_TIMEOUT_MS =
-            10_000L // just test
+            60 * 1000L // just test
     }
 
     suspend fun createSession(): Long {
