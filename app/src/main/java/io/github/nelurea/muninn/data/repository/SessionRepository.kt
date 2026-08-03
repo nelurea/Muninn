@@ -2,7 +2,7 @@ package io.github.nelurea.muninn.data.repository
 
 import io.github.nelurea.muninn.data.db.SessionDao
 import io.github.nelurea.muninn.data.db.SessionEntity
-
+import io.github.nelurea.muninn.data.db.SessionWithImages
 class SessionRepository(
     private val dao: SessionDao
 ) {
@@ -52,5 +52,9 @@ class SessionRepository(
             sessionId,
             System.currentTimeMillis()
         )
+    }
+    suspend fun getSessions():
+            List<SessionWithImages> {
+        return dao.getSessionsWithImages()
     }
 }
