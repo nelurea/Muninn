@@ -14,6 +14,7 @@ import androidx.room.Room
 import io.github.nelurea.muninn.data.db.AppDatabase
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
+import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
@@ -42,6 +43,8 @@ class MainActivity : ComponentActivity() {
         )
 
         enableEdgeToEdge()
+
+        ShareIntentInspector.inspect(intent)
 
         if (intent?.action == Intent.ACTION_SEND) {
 
