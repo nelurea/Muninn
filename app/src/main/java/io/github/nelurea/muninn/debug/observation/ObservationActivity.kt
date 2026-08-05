@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import io.github.nelurea.muninn.capture.ShareUrlExtractor
 
 class ObservationActivity : ComponentActivity() {
 
@@ -128,7 +129,7 @@ class ObservationActivity : ComponentActivity() {
                 }
             }
 
-            val uris = mutableListOf<Uri>()
+            val uris = linkedSetOf<Uri>()
 
             stream?.let {
                 uris += it
@@ -140,7 +141,6 @@ class ObservationActivity : ComponentActivity() {
 
             clipData?.let {
                 for (i in 0 until it.itemCount) {
-
                     it.getItemAt(i).uri?.let { uri ->
                         uris += uri
                     }
@@ -161,14 +161,21 @@ class ObservationActivity : ComponentActivity() {
                     appendLine()
                     appendLine("--- asset[$index] ---")
 
-                    appendLine("uri=$uri")
                     appendLine(
-                        "mimeType=${
-                            contentResolver.getType(uri)
-                        }"
+                        AssetInspector.inspect(
+                            this@ObservationActivity,
+                            uri
+                        )
                     )
                 }
             }
+
+            appendLine()
+            appendLine("=== CAPTURE REQUEST ===")
+
+            appendLine(
+                ShareUrlExtractor.extract(intent).toString()
+            )
 
             appendLine()
             appendLine("=== EXTRAS ===")
