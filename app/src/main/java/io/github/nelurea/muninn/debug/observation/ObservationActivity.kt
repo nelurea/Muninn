@@ -44,6 +44,11 @@ class ObservationActivity : ComponentActivity() {
             appendLine("referrer=$referrer")
             appendLine()
 
+            if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+                appendLine("MULTIPLE SHARE DETECTED")
+                appendLine()
+            }
+
             appendLine(
                 "EXTRA_TEXT=${
                     intent.getStringExtra(
@@ -70,6 +75,30 @@ class ObservationActivity : ComponentActivity() {
             appendLine("EXTRA_STREAM=$stream")
             appendLine()
 
+            appendLine("=== STREAMS ===")
+
+            val streams =
+                intent.getParcelableArrayListExtra<Uri>(
+                    Intent.EXTRA_STREAM
+                )
+
+            if (streams == null) {
+
+                appendLine("null")
+
+            } else {
+
+                appendLine("count=${streams.size}")
+
+                streams.forEachIndexed { index, uri ->
+
+                    appendLine(
+                        "stream[$index]=$uri"
+                    )
+                }
+            }
+
+            appendLine()
             appendLine("=== CLIP DATA ===")
 
             val clipData = intent.clipData
