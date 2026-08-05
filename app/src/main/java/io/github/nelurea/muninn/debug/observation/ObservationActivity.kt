@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 
 class ObservationActivity : ComponentActivity() {
@@ -41,6 +40,8 @@ class ObservationActivity : ComponentActivity() {
 
             appendLine("action=${intent.action}")
             appendLine("type=${intent.type}")
+            appendLine("flags=${intent.flags}")
+            appendLine("referrer=$referrer")
             appendLine()
 
             appendLine(
@@ -69,13 +70,52 @@ class ObservationActivity : ComponentActivity() {
             appendLine("EXTRA_STREAM=$stream")
             appendLine()
 
-            appendLine("=== EXTRAS ===")
+            appendLine("=== CLIP DATA ===")
 
-            intent.extras?.keySet()?.forEach { key ->
+            val clipData = intent.clipData
+
+            if (clipData == null) {
+
+                appendLine("null")
+
+            } else {
 
                 appendLine(
-                    "$key = ${intent.extras?.get(key)}"
+                    "itemCount=${clipData.itemCount}"
                 )
+
+                for (i in 0 until clipData.itemCount) {
+
+                    val item =
+                        clipData.getItemAt(i)
+
+                    appendLine(
+                        "item[$i].uri=${item.uri}"
+                    )
+
+                    appendLine(
+                        "item[$i].text=${item.text}"
+                    )
+                }
+            }
+
+            appendLine()
+            appendLine("=== EXTRAS ===")
+
+            val extras = intent.extras
+
+            if (extras == null) {
+
+                appendLine("extras=null")
+
+            } else {
+
+                for (key in extras.keySet()) {
+
+                    appendLine(
+                        "$key = ${extras.get(key)}"
+                    )
+                }
             }
         }
     }
