@@ -98,10 +98,10 @@ class ObservationActivity : ComponentActivity() {
                 }
             }
 
+            val clipData = intent.clipData
+
             appendLine()
             appendLine("=== CLIP DATA ===")
-
-            val clipData = intent.clipData
 
             if (clipData == null) {
 
@@ -124,6 +124,48 @@ class ObservationActivity : ComponentActivity() {
 
                     appendLine(
                         "item[$i].text=${item.text}"
+                    )
+                }
+            }
+
+            val uris = mutableListOf<Uri>()
+
+            stream?.let {
+                uris += it
+            }
+
+            streams?.let {
+                uris += it
+            }
+
+            clipData?.let {
+                for (i in 0 until it.itemCount) {
+
+                    it.getItemAt(i).uri?.let { uri ->
+                        uris += uri
+                    }
+                }
+            }
+
+            appendLine()
+            appendLine("=== ASSET INSPECTION ===")
+
+            if (uris.isEmpty()) {
+
+                appendLine("uri=null")
+
+            } else {
+
+                uris.forEachIndexed { index, uri ->
+
+                    appendLine()
+                    appendLine("--- asset[$index] ---")
+
+                    appendLine("uri=$uri")
+                    appendLine(
+                        "mimeType=${
+                            contentResolver.getType(uri)
+                        }"
                     )
                 }
             }
