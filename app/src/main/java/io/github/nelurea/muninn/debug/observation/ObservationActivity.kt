@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import io.github.nelurea.muninn.capture.ShareUrlExtractor
+import io.github.nelurea.muninn.capture.UrlResolver
 
 class ObservationActivity : ComponentActivity() {
 
@@ -175,6 +176,16 @@ class ObservationActivity : ComponentActivity() {
 
             appendLine(
                 ShareUrlExtractor.extract(intent).toString()
+            )
+
+            appendLine()
+            appendLine("=== RESOLVED CAPTURE ===")
+
+            appendLine(
+                ShareUrlExtractor
+                    .extract(intent)
+                    ?.let(UrlResolver::resolve)
+                    .toString()
             )
 
             appendLine()
