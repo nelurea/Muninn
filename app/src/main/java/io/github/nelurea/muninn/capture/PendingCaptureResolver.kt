@@ -4,7 +4,7 @@ import android.util.Log
 import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 
-class CaptureResolver(
+class PendingCaptureResolver(
     private val pendingRepository: PendingCaptureRepository,
     private val resolvedRepository: ResolvedCaptureRepository
 ) {
@@ -37,10 +37,12 @@ class CaptureResolver(
             val resolved =
                 UrlResolver.resolve(request)
                     ?: run {
+
                         Log.d(
                             TAG,
                             "Unsupported URL: ${pending.sourceUrl}"
                         )
+
                         return@forEach
                     }
 
@@ -58,6 +60,6 @@ class CaptureResolver(
 
     companion object {
         private const val TAG =
-            "CaptureResolver"
+            "PendingCaptureResolver"
     }
 }
