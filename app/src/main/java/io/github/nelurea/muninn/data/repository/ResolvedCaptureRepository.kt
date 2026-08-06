@@ -11,9 +11,9 @@ class ResolvedCaptureRepository(
     suspend fun save(
         pendingCaptureId: Long,
         capture: ResolvedCapture
-    ) {
+    ): Long {
 
-        dao.insert(
+        return dao.insert(
             ResolvedCaptureEntity(
                 pendingCaptureId = pendingCaptureId,
                 sourceType = capture.sourceType.name,
