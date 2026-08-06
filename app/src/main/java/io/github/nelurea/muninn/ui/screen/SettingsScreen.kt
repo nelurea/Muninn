@@ -7,10 +7,19 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onResolvedCapturesClick: () -> Unit
 ) {
+
     Column {
+
         Text("Setting")
+
+        Button(
+            onClick = onResolvedCapturesClick
+        ) {
+            Text("Resolved Captures")
+        }
 
         Button(
             onClick = onBack
