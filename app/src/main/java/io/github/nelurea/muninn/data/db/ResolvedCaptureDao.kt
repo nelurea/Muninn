@@ -10,7 +10,7 @@ interface ResolvedCaptureDao {
     @Insert
     suspend fun insert(
         entity: ResolvedCaptureEntity
-    )
+    ): Long
 
     @Query(
         """

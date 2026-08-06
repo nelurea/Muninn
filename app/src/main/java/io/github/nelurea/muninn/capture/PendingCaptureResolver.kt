@@ -1,12 +1,14 @@
 package io.github.nelurea.muninn.capture
 
 import android.util.Log
+import io.github.nelurea.muninn.data.repository.AcquisitionQueueRepository
 import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 
 class PendingCaptureResolver(
     private val pendingRepository: PendingCaptureRepository,
-    private val resolvedRepository: ResolvedCaptureRepository
+    private val resolvedRepository: ResolvedCaptureRepository,
+    private val acquisitionQueueRepository: AcquisitionQueueRepository
 ) {
 
     suspend fun resolveAll() {
@@ -46,9 +48,14 @@ class PendingCaptureResolver(
                         return@forEach
                     }
 
-            resolvedRepository.save(
-                pending.id,
-                resolved
+            val resolvedCaptureId =
+                resolvedRepository.save(
+                    pending.id,
+                    resolved
+                )
+
+            acquisitionQueueRepository.enqueue(
+                resolvedCaptureId
             )
 
             Log.d(

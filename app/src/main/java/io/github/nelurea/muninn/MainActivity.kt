@@ -14,10 +14,12 @@ import androidx.room.Room
 import io.github.nelurea.muninn.capture.PendingCaptureResolver
 import io.github.nelurea.muninn.capture.ShareUrlExtractor
 import io.github.nelurea.muninn.data.db.AppDatabase
+import io.github.nelurea.muninn.data.repository.AcquisitionQueueRepository
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
+import io.github.nelurea.muninn.debug.capture.AcquisitionQueueInspector
 import io.github.nelurea.muninn.debug.capture.PendingCaptureInspector
 import io.github.nelurea.muninn.debug.capture.ResolvedCaptureInspector
 import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
@@ -32,6 +34,8 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var pendingCaptureRepository: PendingCaptureRepository
     private lateinit var resolvedCaptureRepository: ResolvedCaptureRepository
+
+    private lateinit var acquisitionQueueRepository: AcquisitionQueueRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,10 +67,16 @@ class MainActivity : ComponentActivity() {
                 database.resolvedCaptureDao()
             )
 
+        acquisitionQueueRepository =
+            AcquisitionQueueRepository(
+                database.acquisitionQueueDao()
+            )
+
         val pendingCaptureResolver =
             PendingCaptureResolver(
                 pendingCaptureRepository,
-                resolvedCaptureRepository
+                resolvedCaptureRepository,
+                acquisitionQueueRepository
             )
 
         enableEdgeToEdge()
@@ -105,6 +115,10 @@ class MainActivity : ComponentActivity() {
 
             ResolvedCaptureInspector.inspect(
                 resolvedCaptureRepository
+            )
+
+            AcquisitionQueueInspector.inspect(
+                acquisitionQueueRepository
             )
         }
 
