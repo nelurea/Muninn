@@ -20,4 +20,13 @@ interface ResolvedCaptureDao {
         """
     )
     suspend fun getAll(): List<ResolvedCaptureEntity>
+
+    @Query("""
+SELECT COUNT(*)
+FROM resolved_capture
+WHERE pendingCaptureId = :pendingCaptureId
+""")
+    suspend fun countByPendingCaptureId(
+        pendingCaptureId: Long
+    ): Int
 }

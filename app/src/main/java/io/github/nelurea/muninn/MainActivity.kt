@@ -11,16 +11,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
+import io.github.nelurea.muninn.capture.PendingCaptureResolver
 import io.github.nelurea.muninn.capture.ShareUrlExtractor
-import io.github.nelurea.muninn.capture.UrlResolver
 import io.github.nelurea.muninn.data.db.AppDatabase
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
-import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
 import io.github.nelurea.muninn.debug.capture.PendingCaptureInspector
 import io.github.nelurea.muninn.debug.capture.ResolvedCaptureInspector
+import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
@@ -31,7 +31,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var sessionRepository: SessionRepository
 
     private lateinit var pendingCaptureRepository: PendingCaptureRepository
-
     private lateinit var resolvedCaptureRepository: ResolvedCaptureRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,6 +63,12 @@ class MainActivity : ComponentActivity() {
                 database.resolvedCaptureDao()
             )
 
+        val pendingCaptureResolver =
+            PendingCaptureResolver(
+                pendingCaptureRepository,
+                resolvedCaptureRepository
+            )
+
         enableEdgeToEdge()
 
         ShareIntentInspector.inspect(intent)
@@ -78,18 +83,7 @@ class MainActivity : ComponentActivity() {
                         imageIndex = request.imageIndex
                     )
 
-                    UrlResolver.resolve(request)
-                        ?.let { resolved ->
-
-                            resolvedCaptureRepository.save(
-                                resolved
-                            )
-                        }
-
-                    Log.d(
-                        "Muninn",
-                        "Captured URL: $request"
-                    )
+                    pendingCaptureResolver.resolveAll()
 
                     PendingCaptureInspector.inspect(
                         pendingCaptureRepository
@@ -100,6 +94,19 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+
+        lifecycleScope.launch {
+
+            pendingCaptureResolver.resolveAll()
+
+            PendingCaptureInspector.inspect(
+                pendingCaptureRepository
+            )
+
+            ResolvedCaptureInspector.inspect(
+                resolvedCaptureRepository
+            )
+        }
 
         setContent {
             MuninnTheme {

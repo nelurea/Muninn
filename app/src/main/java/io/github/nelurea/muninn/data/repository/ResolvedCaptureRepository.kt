@@ -9,11 +9,13 @@ class ResolvedCaptureRepository(
 ) {
 
     suspend fun save(
+        pendingCaptureId: Long,
         capture: ResolvedCapture
     ) {
 
         dao.insert(
             ResolvedCaptureEntity(
+                pendingCaptureId = pendingCaptureId,
                 sourceType = capture.sourceType.name,
                 sourceId = capture.sourceId,
                 imageIndex = capture.imageIndex,
@@ -24,5 +26,14 @@ class ResolvedCaptureRepository(
 
     suspend fun getAll(): List<ResolvedCaptureEntity> {
         return dao.getAll()
+    }
+
+    suspend fun isResolved(
+        pendingCaptureId: Long
+    ): Boolean {
+
+        return dao.countByPendingCaptureId(
+            pendingCaptureId
+        ) > 0
     }
 }

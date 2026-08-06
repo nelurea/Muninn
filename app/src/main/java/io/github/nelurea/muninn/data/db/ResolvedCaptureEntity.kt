@@ -9,11 +9,10 @@ data class ResolvedCaptureEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
 
+    val pendingCaptureId: Long,
+
     val sourceType: String,
-
     val sourceId: String,
-
     val imageIndex: Int?,
-
     val createdAt: Long
 )
