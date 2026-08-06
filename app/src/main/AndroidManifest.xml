@@ -33,7 +33,8 @@
 
         <activity
             android:name=".debug.observation.ObservationActivity"
-            android:exported="true" />
+            android:exported="true">
+        </activity>
     </application>
 
 </manifest>
