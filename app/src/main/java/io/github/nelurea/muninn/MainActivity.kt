@@ -112,7 +112,9 @@ class MainActivity : ComponentActivity() {
             MuninnTheme {
                 AppNavigation(
                     repository = repository,
-                    sessionRepository = sessionRepository
+                    sessionRepository = sessionRepository,
+                    resolvedCaptureRepository =
+                        resolvedCaptureRepository
                 )
             }
         }

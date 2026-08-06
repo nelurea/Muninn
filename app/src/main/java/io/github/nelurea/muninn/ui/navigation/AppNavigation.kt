@@ -21,10 +21,15 @@ import io.github.nelurea.muninn.ui.session.SessionDetailScreen
 import io.github.nelurea.muninn.ui.session.SessionListScreen
 import io.github.nelurea.muninn.ui.session.SessionListViewModel
 import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
+import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
+import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
+import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
+
 @Composable
 fun AppNavigation(
     repository: ImageRepository,
-    sessionRepository: SessionRepository
+    sessionRepository: SessionRepository,
+    resolvedCaptureRepository: ResolvedCaptureRepository
 ) {
 
     val navController = rememberNavController()
@@ -107,7 +112,32 @@ fun AppNavigation(
         }
 
         composable("settings") {
+
             SettingsScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onResolvedCapturesClick = {
+                    navController.navigate(
+                        "resolvedCaptures"
+                    )
+                }
+            )
+        }
+
+        composable(
+            route = "resolvedCaptures"
+        ) {
+
+            val vm = remember {
+
+                ResolvedCaptureViewModel(
+                    resolvedCaptureRepository
+                )
+            }
+
+            ResolvedCaptureScreen(
+                viewModel = vm,
                 onBack = {
                     navController.popBackStack()
                 }
