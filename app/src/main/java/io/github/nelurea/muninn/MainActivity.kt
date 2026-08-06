@@ -11,10 +11,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import androidx.room.Room
+import io.github.nelurea.muninn.capture.ShareUrlExtractor
 import io.github.nelurea.muninn.data.db.AppDatabase
 import io.github.nelurea.muninn.data.repository.ImageRepository
+import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
 import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
+import io.github.nelurea.muninn.debug.capture.PendingCaptureInspector
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
@@ -24,6 +27,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var repository: ImageRepository
     private lateinit var sessionRepository: SessionRepository
 
+    private lateinit var pendingCaptureRepository: PendingCaptureRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -31,7 +36,9 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             AppDatabase::class.java,
             "muninn.db"
-        ).build()
+        )
+            .fallbackToDestructiveMigration()
+            .build()
 
         repository = ImageRepository(
             dao = database.imageRecordDao(),
@@ -42,22 +49,35 @@ class MainActivity : ComponentActivity() {
             dao = database.sessionDao()
         )
 
+        pendingCaptureRepository =
+            PendingCaptureRepository(
+                database.pendingCaptureDao()
+            )
+
         enableEdgeToEdge()
 
         ShareIntentInspector.inspect(intent)
 
-        if (intent?.action == Intent.ACTION_SEND) {
+        ShareUrlExtractor.extract(intent)
+            ?.let { request ->
 
-            val imageUri =
-                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+                lifecycleScope.launch {
 
-            if (imageUri != null) {
+                    pendingCaptureRepository.save(
+                        sourceUrl = request.sourceUrl,
+                        imageIndex = request.imageIndex
+                    )
 
-                Log.d("Muninn", "Shared image: $imageUri")
+                    Log.d(
+                        "Muninn",
+                        "Captured URL: $request"
+                    )
 
-                saveImage(imageUri)
+                    PendingCaptureInspector.inspect(
+                        pendingCaptureRepository
+                    )
+                }
             }
-        }
 
         setContent {
             MuninnTheme {
