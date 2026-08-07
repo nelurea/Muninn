@@ -102,6 +102,10 @@ class MainActivity : ComponentActivity() {
                     ResolvedCaptureInspector.inspect(
                         resolvedCaptureRepository
                     )
+
+                    AcquisitionQueueInspector.inspect(
+                        acquisitionQueueRepository
+                    )
                 }
             }
 
