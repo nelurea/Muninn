@@ -36,4 +36,15 @@ class ResolvedCaptureRepository(
             pendingCaptureId
         ) > 0
     }
+
+    suspend fun exists(
+        capture: ResolvedCapture
+    ): Boolean {
+
+        return dao.countBySource(
+            sourceType = capture.sourceType.name,
+            sourceId = capture.sourceId,
+            imageIndex = capture.imageIndex
+        ) > 0
+    }
 }

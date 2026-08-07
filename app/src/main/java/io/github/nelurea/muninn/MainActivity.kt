@@ -15,11 +15,13 @@ import io.github.nelurea.muninn.capture.PendingCaptureResolver
 import io.github.nelurea.muninn.capture.ShareUrlExtractor
 import io.github.nelurea.muninn.data.db.AppDatabase
 import io.github.nelurea.muninn.data.repository.AcquisitionQueueRepository
+import io.github.nelurea.muninn.data.repository.CaptureEventRepository
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
 import io.github.nelurea.muninn.debug.capture.AcquisitionQueueInspector
+import io.github.nelurea.muninn.debug.capture.CaptureEventInspector
 import io.github.nelurea.muninn.debug.capture.PendingCaptureInspector
 import io.github.nelurea.muninn.debug.capture.ResolvedCaptureInspector
 import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
@@ -36,6 +38,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var resolvedCaptureRepository: ResolvedCaptureRepository
 
     private lateinit var acquisitionQueueRepository: AcquisitionQueueRepository
+
+    private lateinit var captureEventRepository: CaptureEventRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,11 +76,17 @@ class MainActivity : ComponentActivity() {
                 database.acquisitionQueueDao()
             )
 
+        captureEventRepository =
+            CaptureEventRepository(
+                database.captureEventDao()
+            )
+
         val pendingCaptureResolver =
             PendingCaptureResolver(
                 pendingCaptureRepository,
                 resolvedCaptureRepository,
-                acquisitionQueueRepository
+                acquisitionQueueRepository,
+                captureEventRepository
             )
 
         enableEdgeToEdge()
@@ -112,6 +122,9 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
 
             pendingCaptureResolver.resolveAll()
+            CaptureEventInspector.inspect(
+                captureEventRepository
+            )
 
             PendingCaptureInspector.inspect(
                 pendingCaptureRepository
