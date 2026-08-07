@@ -2,24 +2,35 @@ package io.github.nelurea.muninn.capture
 
 import android.util.Log
 import io.github.nelurea.muninn.data.repository.AcquisitionQueueRepository
+import io.github.nelurea.muninn.data.repository.CaptureEventRepository
 import io.github.nelurea.muninn.data.repository.PendingCaptureRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 
 class PendingCaptureResolver(
-    private val pendingRepository: PendingCaptureRepository,
-    private val resolvedRepository: ResolvedCaptureRepository,
-    private val acquisitionQueueRepository: AcquisitionQueueRepository
+
+    private val pendingCaptureRepository:
+    PendingCaptureRepository,
+
+    private val resolvedCaptureRepository:
+    ResolvedCaptureRepository,
+
+    private val acquisitionQueueRepository:
+    AcquisitionQueueRepository,
+
+    private val captureEventRepository:
+    CaptureEventRepository
+
 ) {
 
     suspend fun resolveAll() {
 
         val pendingCaptures =
-            pendingRepository.getAll()
+            pendingCaptureRepository.getAll()
 
         pendingCaptures.forEach { pending ->
 
             if (
-                resolvedRepository.isResolved(
+                resolvedCaptureRepository.isResolved(
                     pending.id
                 )
             ) {
@@ -48,21 +59,37 @@ class PendingCaptureResolver(
                         return@forEach
                     }
 
-            val resolvedCaptureId =
-                resolvedRepository.save(
-                    pending.id,
+            if (
+                resolvedCaptureRepository.exists(
                     resolved
                 )
+            ) {
 
-            if (resolvedCaptureId <= 0) {
+                captureEventRepository.save(
+                    sourceType = resolved.sourceType.name,
+                    sourceId = resolved.sourceId,
+                    imageIndex = resolved.imageIndex
+                )
 
                 Log.d(
                     TAG,
-                    "Resolved capture already exists: ${pending.id}"
+                    "Duplicate capture detected: ${resolved.sourceId}"
                 )
 
                 return@forEach
             }
+
+            val resolvedCaptureId =
+                resolvedCaptureRepository.save(
+                    pending.id,
+                    resolved
+                )
+
+            captureEventRepository.save(
+                sourceType = resolved.sourceType.name,
+                sourceId = resolved.sourceId,
+                imageIndex = resolved.imageIndex
+            )
 
             acquisitionQueueRepository.enqueue(
                 resolvedCaptureId
@@ -76,6 +103,7 @@ class PendingCaptureResolver(
     }
 
     companion object {
+
         private const val TAG =
             "PendingCaptureResolver"
     }
