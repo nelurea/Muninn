@@ -54,6 +54,16 @@ class PendingCaptureResolver(
                     resolved
                 )
 
+            if (resolvedCaptureId <= 0) {
+
+                Log.d(
+                    TAG,
+                    "Resolved capture already exists: ${pending.id}"
+                )
+
+                return@forEach
+            }
+
             acquisitionQueueRepository.enqueue(
                 resolvedCaptureId
             )
