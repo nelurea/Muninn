@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Muninn Rich Web Capture Prototype",
+  "version": "0.2.0",
+  "description": "Prototype rich web capture for Muninn.",
+
+  "action": {
+    "default_title": "Capture with Muninn"
+  },
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.pixiv.net/*"
+      ],
+      "js": [
+        "page-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.pixiv.net/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ]
+}
