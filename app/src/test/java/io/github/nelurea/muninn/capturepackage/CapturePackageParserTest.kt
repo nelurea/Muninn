@@ -79,4 +79,46 @@ class CapturePackageParserTest {
             assertEquals(index, media.index)
         }
     }
+
+    @Test
+    fun parsePackageWithoutTitle() {
+        val json = """
+        {
+          "schemaVersion": 1,
+          "source": {
+            "type": "x",
+            "id": "2017183926197055852",
+            "canonicalUrl": "https://x.com/matcha__ore_p/status/2017183926197055852"
+          },
+          "capturedAt": "2026-08-09T13:00:00.000Z",
+          "content": {
+            "author": {
+              "id": "941682926755856384",
+              "name": "test-author"
+            },
+            "title": null,
+            "caption": "test post",
+            "tags": []
+          },
+          "media": [
+            {
+              "index": 0,
+              "sourceUrl": "https://pbs.twimg.com/media/example.jpg",
+              "mimeType": "image/jpeg",
+              "fileName": "image-0.jpg"
+            }
+          ]
+        }
+    """.trimIndent()
+
+        val capturePackage =
+            CapturePackageParser.parse(json)
+
+        val errors =
+            CapturePackageValidator.validate(capturePackage)
+
+        assertTrue(errors.isEmpty())
+        assertEquals(null, capturePackage.content.title)
+        assertEquals("x", capturePackage.source.type)
+    }
 }

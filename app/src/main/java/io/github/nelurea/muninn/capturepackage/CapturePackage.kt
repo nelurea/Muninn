@@ -16,7 +16,7 @@ data class CapturePackageSource(
 
 data class CapturePackageContent(
     val author: CapturePackageAuthor,
-    val title: String,
+    val title: String?,
     val caption: String,
     val tags: List<String>
 )

@@ -28,6 +28,8 @@ import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
 import io.github.nelurea.muninn.data.db.MIGRATION_8_9
+import io.github.nelurea.muninn.data.db.MIGRATION_9_10
+
 
 class MainActivity : ComponentActivity() {
 
@@ -49,7 +51,10 @@ class MainActivity : ComponentActivity() {
             AppDatabase::class.java,
             "muninn.db"
         )
-            .addMigrations(MIGRATION_8_9)
+            .addMigrations(
+                MIGRATION_8_9,
+                MIGRATION_9_10
+            )
             .fallbackToDestructiveMigration()
             .build()
 

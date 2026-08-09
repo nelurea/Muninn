@@ -10,7 +10,8 @@
   ],
 
   "host_permissions": [
-    "https://i.pximg.net/*"
+    "https://i.pximg.net/*",
+    "https://pbs.twimg.com/*"
   ],
 
   "action": {

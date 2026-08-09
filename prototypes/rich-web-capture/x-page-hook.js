@@ -8,11 +8,6 @@
   const OriginalXhr =
     window.XMLHttpRequest;
 
-  console.log(
-    "[Muninn/X/PageHook] installed"
-  );
-
-
   window.fetch = async function (...args) {
     const response =
       await ORIGINAL_FETCH.apply(
@@ -196,10 +191,6 @@
     status,
     payload
   }) {
-    console.log(
-      `[Muninn/X/PageHook] observed ${operation}:`,
-      payload
-    );
 
     window.postMessage(
       {
