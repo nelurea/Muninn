@@ -33,10 +33,6 @@ object CapturePackageValidator {
             errors += "content.author.name is required"
         }
 
-        if (capturePackage.content.title.isBlank()) {
-            errors += "content.title is required"
-        }
-
         if (capturePackage.media.isEmpty()) {
             errors += "media must contain at least one item"
         }

@@ -48,7 +48,12 @@ object CapturePackageParser {
                     id = authorJson.getString("id"),
                     name = authorJson.getString("name")
                 ),
-                title = contentJson.getString("title"),
+                title =
+                    if (contentJson.isNull("title")) {
+                        null
+                    } else {
+                        contentJson.getString("title")
+                    },
                 caption = contentJson.getString("caption"),
                 tags = tags
             ),
