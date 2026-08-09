@@ -1,8 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Muninn Rich Web Capture Prototype",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Prototype rich web capture for Muninn.",
+
+  "permissions": [
+    "downloads",
+    "declarativeNetRequestWithHostAccess"
+  ],
+
+  "host_permissions": [
+    "https://i.pximg.net/*"
+  ],
 
   "action": {
     "default_title": "Capture with Muninn"
