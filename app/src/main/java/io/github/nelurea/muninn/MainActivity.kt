@@ -28,6 +28,8 @@ import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
+import io.github.nelurea.muninn.data.db.MIGRATION_8_9
+import io.github.nelurea.muninn.debug.capture.CapturePackageImportInspector
 
 class MainActivity : ComponentActivity() {
 
@@ -49,6 +51,7 @@ class MainActivity : ComponentActivity() {
             AppDatabase::class.java,
             "muninn.db"
         )
+            .addMigrations(MIGRATION_8_9)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -56,6 +59,13 @@ class MainActivity : ComponentActivity() {
             dao = database.imageRecordDao(),
             context = applicationContext
         )
+
+        lifecycleScope.launch {
+            CapturePackageImportInspector.run(
+                context = applicationContext,
+                dao = database.capturedWorkDao()
+            )
+        }
 
         sessionRepository = SessionRepository(
             dao = database.sessionDao()
