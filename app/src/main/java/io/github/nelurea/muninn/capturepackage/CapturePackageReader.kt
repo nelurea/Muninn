@@ -90,6 +90,9 @@ object CapturePackageReader {
                 !mediaFile.isFile ->
                     errors += "media[${media.index}] is not a file: ${media.fileName}"
 
+                mediaFile.length() == 0L ->
+                    errors += "media[${media.index}] file is empty: ${media.fileName}"
+
                 else ->
                     mediaFiles += mediaFile
             }

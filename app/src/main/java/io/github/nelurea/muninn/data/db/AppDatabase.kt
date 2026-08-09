@@ -10,9 +10,12 @@ import androidx.room.RoomDatabase
         PendingCaptureEntity::class,
         ResolvedCaptureEntity::class,
         AcquisitionQueueEntity::class,
-        CaptureEventEntity::class
+        CaptureEventEntity::class,
+        CapturedWorkEntity::class,
+        CapturedMediaEntity::class,
+        CapturedTagEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -28,4 +31,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun acquisitionQueueDao(): AcquisitionQueueDao
 
     abstract fun captureEventDao(): CaptureEventDao
+
+    abstract fun capturedWorkDao(): CapturedWorkDao
 }
