@@ -3,132 +3,392 @@ console.log(
   location.href
 );
 
+
 const MESSAGE_SOURCE =
   "MUNINN_PIXIV_PAGE_HOOK";
 
-const observedArtworkData = new Map();
+const COMMAND_SOURCE =
+  "MUNINN_CONTENT_SCRIPT";
 
 
-window.addEventListener("message", (event) => {
-  if (event.source !== window) {
-    return;
-  }
+const observedArtworkData =
+  new Map();
 
-  if (event.origin !== location.origin) {
-    return;
-  }
-
-  const message = event.data;
-
-  if (
-    !message ||
-    message.source !== MESSAGE_SOURCE ||
-    message.type !== "PIXIV_RESPONSE"
-  ) {
-    return;
-  }
-
-  if (
-    typeof message.artworkId !== "string" ||
-    !/^\d+$/.test(message.artworkId)
-  ) {
-    return;
-  }
-
-  if (
-    message.endpointType !== "detail" &&
-    message.endpointType !== "pages"
-  ) {
-    return;
-  }
-
-  const artworkId = message.artworkId;
-
-  const current =
-    observedArtworkData.get(artworkId) ?? {
-      detail: null,
-      pages: null
-    };
-
-  current[message.endpointType] =
-    message.payload;
-
-  observedArtworkData.set(
-    artworkId,
-    current
-  );
-
-  console.log(
-    `[Muninn] Received Pixiv ${message.endpointType} response for artwork ${artworkId}`
-  );
-});
+const pendingPageRequests =
+  new Map();
 
 
-chrome.runtime.onMessage.addListener(
-  (message, sender, sendResponse) => {
-    if (message.type !== "MUNINN_CAPTURE") {
+window.addEventListener(
+  "message",
+  (event) => {
+    if (
+      event.source !== window
+    ) {
       return;
     }
 
-    try {
-      const artworkId =
-        extractArtworkId(location.href);
+    if (
+      event.origin !==
+      location.origin
+    ) {
+      return;
+    }
 
-      if (!artworkId) {
-        throw new Error(
-          `This is not a Pixiv artwork page: ${location.href}`
+    const message =
+      event.data;
+
+
+    /*
+     * Handle explicit failure of a /pages request.
+     */
+    if (
+      message?.source ===
+        MESSAGE_SOURCE &&
+      message?.type ===
+        "PIXIV_PAGES_REQUEST_FAILED"
+    ) {
+      const pending =
+        pendingPageRequests.get(
+          message.artworkId
+        );
+
+      if (pending) {
+        clearTimeout(
+          pending.timeoutId
+        );
+
+        pendingPageRequests.delete(
+          message.artworkId
+        );
+
+        pending.reject(
+          new Error(
+            message.error ??
+            "Pixiv pages request failed."
+          )
         );
       }
 
-      const observed =
-        observedArtworkData.get(artworkId);
+      return;
+    }
 
-      if (!observed?.detail) {
-        throw new Error(
-          `No observed Pixiv detail response for artwork ${artworkId}.`
+
+    /*
+     * Ignore unrelated window messages.
+     */
+    if (
+      !message ||
+      message.source !==
+        MESSAGE_SOURCE ||
+      message.type !==
+        "PIXIV_RESPONSE"
+    ) {
+      return;
+    }
+
+
+    if (
+      typeof message.artworkId !==
+        "string" ||
+      !/^\d+$/.test(
+        message.artworkId
+      )
+    ) {
+      return;
+    }
+
+
+    if (
+      message.endpointType !==
+        "detail" &&
+      message.endpointType !==
+        "pages"
+    ) {
+      return;
+    }
+
+
+    const artworkId =
+      message.artworkId;
+
+
+    const current =
+      observedArtworkData.get(
+        artworkId
+      ) ?? {
+        detail: null,
+        pages: null
+      };
+
+
+    current[
+      message.endpointType
+    ] =
+      message.payload;
+
+
+    observedArtworkData.set(
+      artworkId,
+      current
+    );
+
+
+    console.log(
+      `[Muninn] Received Pixiv ${message.endpointType} response for artwork ${artworkId}`
+    );
+
+
+    /*
+     * Resolve an outstanding /pages request.
+     */
+    if (
+      message.endpointType ===
+      "pages"
+    ) {
+      const pending =
+        pendingPageRequests.get(
+          artworkId
+        );
+
+      if (pending) {
+        clearTimeout(
+          pending.timeoutId
+        );
+
+        pendingPageRequests.delete(
+          artworkId
+        );
+
+        pending.resolve(
+          message.payload
         );
       }
-
-      const capturePackage =
-        createCapturePackage(
-          artworkId,
-          observed
-        );
-
-      console.log(
-        "[Muninn] CapturePackage:",
-        capturePackage
-      );
-
-      console.log(
-        "[Muninn] CapturePackage JSON:\n" +
-        JSON.stringify(
-          capturePackage,
-          null,
-          2
-        )
-      );
-
-      sendResponse({
-        ok: true,
-        capturePackage
-      });
-    } catch (error) {
-      console.error(
-        "[Muninn] Capture failed:",
-        error
-      );
-
-      sendResponse({
-        ok: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : String(error)
-      });
     }
   }
 );
+
+
+chrome.runtime.onMessage.addListener(
+  (
+    message,
+    sender,
+    sendResponse
+  ) => {
+    if (
+      message.type !==
+      "MUNINN_CAPTURE"
+    ) {
+      return;
+    }
+
+
+    captureCurrentArtwork()
+      .then(
+        (capturePackage) => {
+          console.log(
+            "[Muninn] CapturePackage:",
+            capturePackage
+          );
+
+          console.log(
+            "[Muninn] CapturePackage JSON:\n" +
+            JSON.stringify(
+              capturePackage,
+              null,
+              2
+            )
+          );
+
+          sendResponse({
+            ok: true,
+            capturePackage
+          });
+        }
+      )
+      .catch(
+        (error) => {
+          console.error(
+            "[Muninn] Capture failed:",
+            error
+          );
+
+          sendResponse({
+            ok: false,
+
+            error:
+              error instanceof Error
+                ? error.message
+                : String(error)
+          });
+        }
+      );
+
+
+    /*
+     * Keep the Chrome message channel open
+     * because multi-image capture may need
+     * an asynchronous /pages request.
+     */
+    return true;
+  }
+);
+
+
+async function captureCurrentArtwork() {
+  const artworkId =
+    extractArtworkId(
+      location.href
+    );
+
+
+  if (!artworkId) {
+    throw new Error(
+      `This is not a Pixiv artwork page: ${location.href}`
+    );
+  }
+
+
+  let observed =
+    observedArtworkData.get(
+      artworkId
+    );
+
+
+  if (!observed?.detail) {
+    throw new Error(
+      `No observed Pixiv detail response for artwork ${artworkId}.`
+    );
+  }
+
+
+  const pageCount =
+    Number(
+      observed.detail.body
+        ?.pageCount ??
+      1
+    );
+
+
+  if (
+    !Number.isInteger(
+      pageCount
+    ) ||
+    pageCount < 1
+  ) {
+    throw new Error(
+      `Invalid pageCount for artwork ${artworkId}.`
+    );
+  }
+
+
+  /*
+   * Pixiv does not necessarily request /pages
+   * just by opening a multi-image artwork.
+   *
+   * If it has not already been observed,
+   * request it at capture time.
+   */
+  if (
+    pageCount > 1 &&
+    !observed.pages
+  ) {
+    console.log(
+      `[Muninn] Artwork ${artworkId} has ${pageCount} images; requesting pages data.`
+    );
+
+    await requestPixivPages(
+      artworkId
+    );
+
+
+    observed =
+      observedArtworkData.get(
+        artworkId
+      );
+
+
+    if (!observed?.pages) {
+      throw new Error(
+        `Pixiv pages data was not retained for artwork ${artworkId}.`
+      );
+    }
+  }
+
+
+  return createCapturePackage(
+    artworkId,
+    observed
+  );
+}
+
+
+function requestPixivPages(
+  artworkId
+) {
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
+      const existing =
+        pendingPageRequests.get(
+          artworkId
+        );
+
+
+      if (existing) {
+        reject(
+          new Error(
+            `Pages request already pending for artwork ${artworkId}.`
+          )
+        );
+
+        return;
+      }
+
+
+      const timeoutId =
+        setTimeout(
+          () => {
+            pendingPageRequests.delete(
+              artworkId
+            );
+
+            reject(
+              new Error(
+                `Timed out waiting for Pixiv pages data for artwork ${artworkId}.`
+              )
+            );
+          },
+          5000
+        );
+
+
+      pendingPageRequests.set(
+        artworkId,
+        {
+          resolve,
+          reject,
+          timeoutId
+        }
+      );
+
+
+      window.postMessage(
+        {
+          source:
+            COMMAND_SOURCE,
+
+          type:
+            "REQUEST_PIXIV_PAGES",
+
+          artworkId
+        },
+        location.origin
+      );
+    }
+  );
+}
 
 
 function createCapturePackage(
@@ -137,6 +397,7 @@ function createCapturePackage(
 ) {
   const detailResponse =
     observed.detail;
+
 
   if (
     detailResponse.error ||
@@ -147,14 +408,22 @@ function createCapturePackage(
     );
   }
 
+
   const body =
     detailResponse.body;
 
+
   const pageCount =
-    Number(body.pageCount ?? 1);
+    Number(
+      body.pageCount ??
+      1
+    );
+
 
   if (
-    !Number.isInteger(pageCount) ||
+    !Number.isInteger(
+      pageCount
+    ) ||
     pageCount < 1
   ) {
     throw new Error(
@@ -162,19 +431,25 @@ function createCapturePackage(
     );
   }
 
+
   const media =
     buildMediaList({
       artworkId,
       pageCount,
-      detailBody: body,
-      pagesResponse: observed.pages
+      detailBody:
+        body,
+      pagesResponse:
+        observed.pages
     });
+
 
   return {
     schemaVersion: 1,
 
     source: {
-      type: "pixiv",
+      type:
+        "pixiv",
+
       id:
         String(
           body.illustId ??
@@ -193,11 +468,14 @@ function createCapturePackage(
       author: {
         id:
           body.userId != null
-            ? String(body.userId)
+            ? String(
+                body.userId
+              )
             : null,
 
         name:
-          body.userName ?? null
+          body.userName ??
+          null
       },
 
       title:
@@ -211,7 +489,9 @@ function createCapturePackage(
         null,
 
       tags:
-        extractTags(body)
+        extractTags(
+          body
+        )
     },
 
     media
@@ -219,27 +499,39 @@ function createCapturePackage(
 }
 
 
-function extractTags(body) {
+function extractTags(
+  body
+) {
   const rawTags =
     body.tags?.tags;
 
-  if (!Array.isArray(rawTags)) {
+
+  if (
+    !Array.isArray(
+      rawTags
+    )
+  ) {
     return [];
   }
 
-  return rawTags
-    .map((tag) => {
-      if (
-        typeof tag === "string"
-      ) {
-        return tag;
-      }
 
-      return tag?.tag;
-    })
+  return rawTags
+    .map(
+      (tag) => {
+        if (
+          typeof tag ===
+          "string"
+        ) {
+          return tag;
+        }
+
+        return tag?.tag;
+      }
+    )
     .filter(
       (tag) =>
-        typeof tag === "string" &&
+        typeof tag ===
+          "string" &&
         tag.length > 0
     );
 }
@@ -252,12 +544,15 @@ function buildMediaList({
   pagesResponse
 }) {
   /*
-   * Single-image artwork:
-   * detail response already contains the original URL.
+   * Single-image artwork.
    */
-  if (pageCount === 1) {
+  if (
+    pageCount === 1
+  ) {
     const originalUrl =
-      detailBody.urls?.original;
+      detailBody.urls
+        ?.original;
+
 
     if (!originalUrl) {
       throw new Error(
@@ -265,39 +560,45 @@ function buildMediaList({
       );
     }
 
+
     return [
       createMediaEntry(
-        artworkId,
         0,
         originalUrl
       )
     ];
   }
 
+
   /*
-   * Multi-image artwork:
-   * Do not guess URLs by replacing _p0 with _p1.
+   * Multi-image artwork.
    *
-   * Each page may theoretically have different
-   * characteristics, so use Pixiv's observed pages
-   * response when available.
+   * Do not guess URLs by changing _p0 into _p1, etc.
+   * Use Pixiv's /pages response instead.
    */
   if (
     !pagesResponse ||
     pagesResponse.error ||
-    !Array.isArray(pagesResponse.body)
+    !Array.isArray(
+      pagesResponse.body
+    )
   ) {
     throw new Error(
-      `Artwork ${artworkId} has ${pageCount} images, ` +
-      "but Pixiv pages data has not been observed."
+      `Artwork ${artworkId} has ${pageCount} images, but valid Pixiv pages data is unavailable.`
     );
   }
 
+
   const media =
     pagesResponse.body.map(
-      (page, index) => {
+      (
+        page,
+        index
+      ) => {
         const originalUrl =
-          page?.urls?.original;
+          page?.urls
+            ?.original;
+
 
         if (!originalUrl) {
           throw new Error(
@@ -305,37 +606,48 @@ function buildMediaList({
           );
         }
 
+
         return createMediaEntry(
-          artworkId,
           index,
           originalUrl
         );
       }
     );
 
-  if (media.length !== pageCount) {
+
+  if (
+    media.length !==
+    pageCount
+  ) {
     throw new Error(
       `Expected ${pageCount} images but observed ${media.length}.`
     );
   }
+
 
   return media;
 }
 
 
 function createMediaEntry(
-  artworkId,
   index,
   sourceUrl
 ) {
   const extension =
-    getFileExtension(sourceUrl);
+    getFileExtension(
+      sourceUrl
+    );
+
 
   return {
     index,
+
     sourceUrl,
+
     mimeType:
-      inferMimeType(extension),
+      inferMimeType(
+        extension
+      ),
 
     fileName:
       extension
@@ -345,8 +657,12 @@ function createMediaEntry(
 }
 
 
-function inferMimeType(extension) {
-  switch (extension) {
+function inferMimeType(
+  extension
+) {
+  switch (
+    extension
+  ) {
     case "jpg":
     case "jpeg":
       return "image/jpeg";
@@ -366,18 +682,25 @@ function inferMimeType(extension) {
 }
 
 
-function getFileExtension(url) {
+function getFileExtension(
+  url
+) {
   try {
     const pathname =
-      new URL(url).pathname;
+      new URL(
+        url
+      ).pathname;
+
 
     const match =
       pathname.match(
         /\.([a-zA-Z0-9]+)$/
       );
 
+
     return (
-      match?.[1]?.toLowerCase() ??
+      match?.[1]
+        ?.toLowerCase() ??
       null
     );
   } catch {
@@ -386,9 +709,16 @@ function getFileExtension(url) {
 }
 
 
-function extractArtworkId(url) {
+function extractArtworkId(
+  url
+) {
   const match =
-    url.match(/\/artworks\/(\d+)/);
+    url.match(
+      /\/artworks\/(\d+)/
+    );
 
-  return match?.[1] ?? null;
+  return (
+    match?.[1] ??
+    null
+  );
 }
