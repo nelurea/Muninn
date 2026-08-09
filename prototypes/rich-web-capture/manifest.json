@@ -41,6 +41,26 @@
       ],
       "run_at": "document_start",
       "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "x-page-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://x.com/*"
+      ],
+      "js": [
+        "x-content.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
     }
   ]
 }
