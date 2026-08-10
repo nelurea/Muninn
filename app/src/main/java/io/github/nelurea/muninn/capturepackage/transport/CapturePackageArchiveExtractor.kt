@@ -5,8 +5,20 @@ import java.util.UUID
 import java.util.zip.ZipInputStream
 
 class CapturePackageArchiveExtractor(
-    private val cacheDirectory: File
+    private val cacheDirectory: File,
+    private val maxEntryCount: Int = DEFAULT_MAX_ENTRY_COUNT,
+    private val maxExtractedBytes: Long = DEFAULT_MAX_EXTRACTED_BYTES
 ) {
+
+    init {
+        require(maxEntryCount > 0) {
+            "maxEntryCount must be greater than zero"
+        }
+
+        require(maxExtractedBytes > 0) {
+            "maxExtractedBytes must be greater than zero"
+        }
+    }
 
     fun extract(
         archiveFile: File
@@ -61,7 +73,7 @@ class CapturePackageArchiveExtractor(
 
                         entryCount++
 
-                        require(entryCount <= MAX_ENTRY_COUNT) {
+                        require(entryCount <= maxEntryCount) {
                             "CapturePackage contains too many ZIP entries"
                         }
 
@@ -123,7 +135,7 @@ class CapturePackageArchiveExtractor(
 
                                         require(
                                             totalBytes <=
-                                                    MAX_EXTRACTED_BYTES
+                                                    maxExtractedBytes
                                         ) {
                                             "CapturePackage is too large"
                                         }
@@ -148,9 +160,10 @@ class CapturePackageArchiveExtractor(
     }
 
     companion object {
-        private const val MAX_ENTRY_COUNT = 100
+        private const val DEFAULT_MAX_ENTRY_COUNT =
+            100
 
-        private const val MAX_EXTRACTED_BYTES =
+        private const val DEFAULT_MAX_EXTRACTED_BYTES =
             250L * 1024L * 1024L
     }
 }

@@ -6,20 +6,15 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.room.Room
 import io.github.nelurea.muninn.capturepackage.CapturePackageImportResult
 import io.github.nelurea.muninn.capturepackage.CapturePackageImporter
-import io.github.nelurea.muninn.data.db.AppDatabase
+import io.github.nelurea.muninn.data.db.AppDatabaseProvider
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
-import io.github.nelurea.muninn.data.db.MIGRATION_8_9
-import io.github.nelurea.muninn.data.db.MIGRATION_9_10
-
-
 class CapturePackageReceiveActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,39 +115,27 @@ class CapturePackageReceiveActivity : ComponentActivity() {
                         )
 
                         val database =
-                            Room.databaseBuilder(
-                                applicationContext,
-                                AppDatabase::class.java,
-                                "muninn.db"
+                            AppDatabaseProvider.get(
+                                applicationContext
                             )
-                                .addMigrations(
-                                    MIGRATION_8_9,
-                                    MIGRATION_9_10
-                                )
-                                .fallbackToDestructiveMigration()
-                                .build()
 
-                        try {
-                            val repository =
-                                CapturedWorkRepository(
-                                    dao =
-                                        database.capturedWorkDao()
-                                )
-
-                            val importer =
-                                CapturePackageImporter(
-                                    context =
-                                        applicationContext,
-                                    repository =
-                                        repository
-                                )
-
-                            importer.import(
-                                extractedDirectory!!
+                        val repository =
+                            CapturedWorkRepository(
+                                dao =
+                                    database.capturedWorkDao()
                             )
-                        } finally {
-                            database.close()
-                        }
+
+                        val importer =
+                            CapturePackageImporter(
+                                context =
+                                    applicationContext,
+                                repository =
+                                    repository
+                            )
+
+                        importer.import(
+                            extractedDirectory!!
+                        )
                     }
 
                 when (importResult) {
