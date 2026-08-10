@@ -76,9 +76,14 @@ fun SessionListScreen(
                             "Session ${item.session.id}"
                     )
 
+                    val imageCount =
+                        item.images.size +
+                                item.capturedWorks.sumOf {
+                                    it.media.size
+                                }
+
                     Text(
-                        text =
-                            "Images: ${item.images.size}"
+                        text = "Images: $imageCount"
                     )
 
                     Text(

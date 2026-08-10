@@ -4,7 +4,6 @@ import androidx.room.Embedded
 import androidx.room.Relation
 
 data class SessionWithImages(
-
     @Embedded
     val session: SessionEntity,
 
@@ -12,5 +11,12 @@ data class SessionWithImages(
         parentColumn = "id",
         entityColumn = "sessionId"
     )
-    val images: List<ImageRecord>
+    val images: List<ImageRecord>,
+
+    @Relation(
+        entity = CapturedWorkEntity::class,
+        parentColumn = "id",
+        entityColumn = "sessionId"
+    )
+    val capturedWorks: List<CapturedWorkWithMedia>
 )

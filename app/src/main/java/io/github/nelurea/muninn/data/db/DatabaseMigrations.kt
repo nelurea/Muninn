@@ -315,3 +315,25 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         )
     }
 }
+val MIGRATION_10_11 =
+    object : Migration(10, 11) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                ALTER TABLE captured_works
+                ADD COLUMN sessionId INTEGER
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS
+                index_captured_works_sessionId
+                ON captured_works(sessionId)
+                """.trimIndent()
+            )
+        }
+    }

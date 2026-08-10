@@ -10,6 +10,7 @@ import io.github.nelurea.muninn.capturepackage.CapturePackageImportResult
 import io.github.nelurea.muninn.capturepackage.CapturePackageImporter
 import io.github.nelurea.muninn.data.db.AppDatabaseProvider
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.data.repository.SessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -121,16 +122,19 @@ class CapturePackageReceiveActivity : ComponentActivity() {
 
                         val repository =
                             CapturedWorkRepository(
-                                dao =
-                                    database.capturedWorkDao()
+                                dao = database.capturedWorkDao()
+                            )
+
+                        val sessionRepository =
+                            SessionRepository(
+                                dao = database.sessionDao()
                             )
 
                         val importer =
                             CapturePackageImporter(
-                                context =
-                                    applicationContext,
-                                repository =
-                                    repository
+                                context = applicationContext,
+                                repository = repository,
+                                sessionRepository = sessionRepository
                             )
 
                         importer.import(

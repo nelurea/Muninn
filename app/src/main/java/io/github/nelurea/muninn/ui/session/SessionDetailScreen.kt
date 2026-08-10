@@ -3,14 +3,13 @@ package io.github.nelurea.muninn.ui.session
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +60,12 @@ fun SessionDetailScreen(
             )
         )
 
+    val totalImageCount =
+        data.images.size +
+                data.capturedWorks.sumOf {
+                    it.media.size
+                }
+
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.padding(16.dp),
@@ -75,7 +80,6 @@ fun SessionDetailScreen(
                 GridItemSpan(maxLineSpan)
             }
         ) {
-
             Text(
                 text =
                     "Session ${data.session.id}"
@@ -87,10 +91,9 @@ fun SessionDetailScreen(
                 GridItemSpan(maxLineSpan)
             }
         ) {
-
             Text(
                 text =
-                    "Images: ${data.images.size}"
+                    "Images: $totalImageCount"
             )
         }
 
@@ -99,28 +102,90 @@ fun SessionDetailScreen(
                 GridItemSpan(maxLineSpan)
             }
         ) {
-
             Text(
                 text = formattedDate
             )
         }
 
-        items(data.images) { image ->
+        if (data.images.isNotEmpty()) {
 
-            Image(
-                painter =
-                    rememberAsyncImagePainter(
-                        model = Uri.parse(
-                            image.imageUri
-                        )
-                    ),
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
-                contentScale =
-                    ContentScale.Crop
-            )
+            item(
+                span = {
+                    GridItemSpan(maxLineSpan)
+                }
+            ) {
+                Text(
+                    text = "Images"
+                )
+            }
+
+            items(data.images) { image ->
+
+                Image(
+                    painter =
+                        rememberAsyncImagePainter(
+                            model = Uri.parse(
+                                image.imageUri
+                            )
+                        ),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f),
+                    contentScale =
+                        ContentScale.Crop
+                )
+            }
         }
+
+        data.capturedWorks
+            .sortedBy {
+                it.work.id
+            }
+            .forEach { capturedWork ->
+
+                item(
+                    span = {
+                        GridItemSpan(maxLineSpan)
+                    }
+                ) {
+
+                    val title =
+                        capturedWork.work.title
+                            ?.takeIf {
+                                it.isNotBlank()
+                            }
+                            ?: capturedWork.work.authorName
+
+                    Text(
+                        text =
+                            "$title · ${capturedWork.work.sourceType}"
+                    )
+                }
+
+                items(
+                    capturedWork.media
+                        .sortedBy {
+                            it.mediaIndex
+                        }
+                ) { media ->
+
+                    Image(
+                        painter =
+                            rememberAsyncImagePainter(
+                                model =
+                                    Uri.parse(
+                                        media.localUri
+                                    )
+                            ),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f),
+                        contentScale =
+                            ContentScale.Crop
+                    )
+                }
+            }
     }
 }

@@ -8,6 +8,7 @@ import io.github.nelurea.muninn.data.db.CapturedWorkEntity
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import java.io.File
 import java.util.UUID
+import io.github.nelurea.muninn.data.repository.SessionRepository
 
 sealed interface CapturePackageImportResult {
 
@@ -23,7 +24,8 @@ sealed interface CapturePackageImportResult {
 
 class CapturePackageImporter(
     private val context: Context,
-    private val repository: CapturedWorkRepository
+    private val repository: CapturedWorkRepository,
+    private val sessionRepository: SessionRepository
 ) {
 
     suspend fun import(
@@ -80,6 +82,19 @@ class CapturePackageImporter(
             )
         }
 
+        val sessionId = try {
+            sessionRepository.getOrCreateSession()
+        } catch (exception: Exception) {
+
+            destinationDirectory.deleteRecursively()
+
+            return CapturePackageImportResult.Failure(
+                listOf(
+                    "Could not resolve session: ${exception.message}"
+                )
+            )
+        }
+
         val work = CapturedWorkEntity(
             sourceType = capturePackage.source.type,
             sourceId = capturePackage.source.id,
@@ -88,7 +103,8 @@ class CapturePackageImporter(
             authorId = capturePackage.content.author.id,
             authorName = capturePackage.content.author.name,
             title = capturePackage.content.title,
-            caption = capturePackage.content.caption
+            caption = capturePackage.content.caption,
+            sessionId = sessionId
         )
 
         val media = capturePackage.media.mapIndexed { index, item ->
@@ -110,28 +126,37 @@ class CapturePackageImporter(
             )
         }
 
-        return try {
+        val workId = try {
 
-            val workId = repository.saveCapture(
+            repository.saveCapture(
                 work = work,
                 media = media,
                 tags = tags
-            )
-
-            CapturePackageImportResult.Success(
-                workId = workId,
-                mediaCount = media.size
             )
 
         } catch (exception: Exception) {
 
             destinationDirectory.deleteRecursively()
 
-            CapturePackageImportResult.Failure(
+            return CapturePackageImportResult.Failure(
                 listOf(
                     "Could not persist capture: ${exception.message}"
                 )
             )
         }
+
+        try {
+            sessionRepository.touch(
+                sessionId
+            )
+        } catch (exception: Exception) {
+            // Capture itself has already been persisted successfully.
+            // Failure to update session activity must not delete captured media.
+        }
+
+        return CapturePackageImportResult.Success(
+            workId = workId,
+            mediaCount = media.size
+        )
     }
 }
