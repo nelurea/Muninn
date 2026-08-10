@@ -28,7 +28,8 @@ class SessionListViewModel(
                 repository
                     .getSessions()
                     .filter {
-                        it.images.isNotEmpty()
+                        it.images.isNotEmpty() ||
+                                it.capturedWorks.isNotEmpty()
                     }
         }
     }

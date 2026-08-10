@@ -7,7 +7,10 @@ import androidx.room.PrimaryKey
 @Entity(
     tableName = "captured_works",
     indices = [
-        Index(value = ["sourceType", "sourceId"])
+        Index(
+            value = ["sourceType", "sourceId"]
+        ),
+        Index("sessionId")
     ]
 )
 data class CapturedWorkEntity(
@@ -22,5 +25,7 @@ data class CapturedWorkEntity(
     val authorId: String,
     val authorName: String,
     val title: String?,
-    val caption: String
+    val caption: String,
+
+    val sessionId: Long?
 )

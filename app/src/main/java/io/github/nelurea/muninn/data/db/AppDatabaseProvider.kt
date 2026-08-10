@@ -21,7 +21,8 @@ object AppDatabaseProvider {
                     )
                         .addMigrations(
                             MIGRATION_8_9,
-                            MIGRATION_9_10
+                            MIGRATION_9_10,
+                            MIGRATION_10_11
                         )
                         .fallbackToDestructiveMigration()
                         .build()
