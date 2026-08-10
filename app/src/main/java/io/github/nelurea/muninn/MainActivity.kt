@@ -9,10 +9,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
-import androidx.room.Room
 import io.github.nelurea.muninn.capture.PendingCaptureResolver
 import io.github.nelurea.muninn.capture.ShareUrlExtractor
 import io.github.nelurea.muninn.data.db.AppDatabase
+import io.github.nelurea.muninn.data.db.AppDatabaseProvider
 import io.github.nelurea.muninn.data.repository.AcquisitionQueueRepository
 import io.github.nelurea.muninn.data.repository.CaptureEventRepository
 import io.github.nelurea.muninn.data.repository.ImageRepository
@@ -27,9 +27,6 @@ import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
-import io.github.nelurea.muninn.data.db.MIGRATION_8_9
-import io.github.nelurea.muninn.data.db.MIGRATION_9_10
-
 
 class MainActivity : ComponentActivity() {
 
@@ -46,17 +43,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val database = Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java,
-            "muninn.db"
-        )
-            .addMigrations(
-                MIGRATION_8_9,
-                MIGRATION_9_10
+        val database =
+            AppDatabaseProvider.get(
+                applicationContext
             )
-            .fallbackToDestructiveMigration()
-            .build()
 
         repository = ImageRepository(
             dao = database.imageRecordDao(),
