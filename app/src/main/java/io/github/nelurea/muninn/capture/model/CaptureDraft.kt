@@ -1,0 +1,16 @@
+package io.github.nelurea.muninn.capture.model
+
+data class CaptureDraft(
+    val sourceType: String,
+    val sourceId: String,
+    val canonicalUrl: String,
+    val capturedAt: String,
+
+    val authorId: String,
+    val authorName: String,
+    val title: String?,
+    val caption: String,
+
+    val tags: List<String>,
+    val media: List<CaptureMediaDraft>
+)
