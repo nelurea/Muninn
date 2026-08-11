@@ -43,7 +43,9 @@ class CapturePackageImporter(
         val loadedPackage =
             (readResult as CapturePackageReadResult.Success).loadedPackage
 
-        val capturePackage = loadedPackage.capturePackage
+        val draft = CapturePackageMapper.toCaptureDraft(
+            loadedPackage
+        )
 
         val destinationDirectory = File(
             context.filesDir,
@@ -57,14 +59,14 @@ class CapturePackageImporter(
         }
 
         val localUris = try {
-            loadedPackage.mediaFiles.map { sourceFile ->
+            draft.media.map { item ->
 
                 val destinationFile = File(
                     destinationDirectory,
-                    sourceFile.name
+                    item.fileName
                 )
 
-                sourceFile.copyTo(
+                item.sourceFile.copyTo(
                     target = destinationFile,
                     overwrite = false
                 )
@@ -96,21 +98,21 @@ class CapturePackageImporter(
         }
 
         val work = CapturedWorkEntity(
-            sourceType = capturePackage.source.type,
-            sourceId = capturePackage.source.id,
-            canonicalUrl = capturePackage.source.canonicalUrl,
-            capturedAt = capturePackage.capturedAt,
-            authorId = capturePackage.content.author.id,
-            authorName = capturePackage.content.author.name,
-            title = capturePackage.content.title,
-            caption = capturePackage.content.caption,
+            sourceType = draft.sourceType,
+            sourceId = draft.sourceId,
+            canonicalUrl = draft.canonicalUrl,
+            capturedAt = draft.capturedAt,
+            authorId = draft.authorId,
+            authorName = draft.authorName,
+            title = draft.title,
+            caption = draft.caption,
             sessionId = sessionId
         )
 
-        val media = capturePackage.media.mapIndexed { index, item ->
+        val media = draft.media.mapIndexed { index, item ->
             CapturedMediaEntity(
                 workId = 0,
-                mediaIndex = item.index,
+                mediaIndex = item.mediaIndex,
                 localUri = localUris[index],
                 sourceUrl = item.sourceUrl,
                 mimeType = item.mimeType,
@@ -118,7 +120,7 @@ class CapturePackageImporter(
             )
         }
 
-        val tags = capturePackage.content.tags.mapIndexed { index, tag ->
+        val tags = draft.tags.mapIndexed { index, tag ->
             CapturedTagEntity(
                 workId = 0,
                 position = index,
