@@ -65,6 +65,14 @@ fun WebCaptureScreen(
         mutableStateOf<WebView?>(null)
     }
 
+    var isCapturing by remember {
+        mutableStateOf(false)
+    }
+
+    var captureStatus by remember {
+        mutableStateOf<String?>(null)
+    }
+
     val coroutineScope =
         rememberCoroutineScope()
 
@@ -366,6 +374,9 @@ fun WebCaptureScreen(
                                                                 )
                                                     ) {
                                                         is SaveCaptureResult.Success -> {
+                                                            isCapturing = false
+                                                            captureStatus =
+                                                                "Saved ${saveResult.mediaCount} image(s)"
 
                                                             Log.d(
                                                                 "MuninnPixivCapture",
@@ -376,18 +387,27 @@ fun WebCaptureScreen(
                                                         }
 
                                                         is SaveCaptureResult.Failure -> {
+                                                            isCapturing = false
+                                                            captureStatus =
+                                                                "Capture failed: " +
+                                                                        saveResult.errors.joinToString()
 
                                                             Log.e(
                                                                 "MuninnPixivCapture",
                                                                 "Save failed: " +
-                                                                        saveResult.errors
-                                                                            .joinToString()
+                                                                        saveResult.errors.joinToString()
                                                             )
                                                         }
                                                     }
-                                                } catch (
-                                                    exception: Exception
-                                                ) {
+                                                } catch (exception: Exception) {
+                                                    isCapturing = false
+                                                    captureStatus =
+                                                        "Capture failed: " +
+                                                                (
+                                                                        exception.message
+                                                                            ?: "unknown error"
+                                                                        )
+
                                                     Log.e(
                                                         "MuninnPixivCapture",
                                                         "Capture persistence failed",
@@ -400,6 +420,10 @@ fun WebCaptureScreen(
                                             }
 
                                             is PixivMediaDownloadResult.Failure -> {
+                                                isCapturing = false
+
+                                                captureStatus =
+                                                    "Capture failed: ${downloadResult.error}"
 
                                                 Log.e(
                                                     "MuninnPixivCapture",
@@ -412,11 +436,13 @@ fun WebCaptureScreen(
                                 }
 
                                 is PixivCaptureParseResult.Failure -> {
+                                    isCapturing = false
+                                    captureStatus =
+                                        "Capture failed: ${parseResult.error}"
 
                                     Log.e(
                                         "MuninnPixivCapture",
-                                        "Parse failed: " +
-                                                parseResult.error
+                                        "Parse failed: ${parseResult.error}"
                                     )
                                 }
                             }
@@ -455,25 +481,51 @@ fun WebCaptureScreen(
 
         Button(
             enabled =
-                currentUrl.contains(
-                    "pixiv.net/artworks/"
-                ),
+                !isCapturing &&
+                        currentUrl.contains(
+                            "pixiv.net/artworks/"
+                        ),
             modifier =
                 Modifier.fillMaxWidth(),
             onClick = {
+                isCapturing = true
+                captureStatus = "Capturing..."
+
                 webView?.evaluateJavascript(
                     """
+    if (
+        typeof window.__muninnCapturePixiv === "function"
+    ) {
+        window.__muninnCapturePixiv();
+        "started";
+    } else {
+        "unavailable";
+    }
+    """.trimIndent()
+                ) { result ->
                     if (
-                        typeof window.__muninnCapturePixiv === "function"
+                        result.contains(
+                            "unavailable"
+                        )
                     ) {
-                        window.__muninnCapturePixiv();
+                        isCapturing = false
+                        captureStatus =
+                            "Capture is unavailable on this page"
                     }
-                    """.trimIndent(),
-                    null
-                )
+                }
             }
         ) {
-            Text("Capture")
+            Text(
+                if (isCapturing) {
+                    "Capturing..."
+                } else {
+                    "Capture"
+                }
+            )
+        }
+
+        captureStatus?.let { status ->
+            Text(status)
         }
     }
 }
