@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
+import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
 import io.github.nelurea.muninn.capturepackage.CapturePackageImportResult
 import io.github.nelurea.muninn.capturepackage.CapturePackageImporter
 import io.github.nelurea.muninn.data.db.AppDatabaseProvider
@@ -130,12 +131,15 @@ class CapturePackageReceiveActivity : ComponentActivity() {
                                 dao = database.sessionDao()
                             )
 
-                        val importer =
-                            CapturePackageImporter(
-                                context = applicationContext,
-                                repository = repository,
-                                sessionRepository = sessionRepository
-                            )
+                        val saveCaptureUseCase = SaveCaptureUseCase(
+                            context = this@CapturePackageReceiveActivity,
+                            repository = repository,
+                            sessionRepository = sessionRepository
+                        )
+
+                        val importer = CapturePackageImporter(
+                            saveCaptureUseCase = saveCaptureUseCase
+                        )
 
                         importer.import(
                             extractedDirectory!!
