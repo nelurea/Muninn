@@ -27,6 +27,7 @@ import io.github.nelurea.muninn.debug.observation.ShareIntentInspector
 import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
+import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 
 class MainActivity : ComponentActivity() {
 
@@ -39,6 +40,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var acquisitionQueueRepository: AcquisitionQueueRepository
 
     private lateinit var captureEventRepository: CaptureEventRepository
+
+    private lateinit var capturedWorkRepository: CapturedWorkRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +78,11 @@ class MainActivity : ComponentActivity() {
         captureEventRepository =
             CaptureEventRepository(
                 database.captureEventDao()
+            )
+
+        capturedWorkRepository =
+            CapturedWorkRepository(
+                database.capturedWorkDao()
             )
 
         val pendingCaptureResolver =
@@ -141,7 +149,9 @@ class MainActivity : ComponentActivity() {
                     repository = repository,
                     sessionRepository = sessionRepository,
                     resolvedCaptureRepository =
-                        resolvedCaptureRepository
+                        resolvedCaptureRepository,
+                    capturedWorkRepository =
+                        capturedWorkRepository
                 )
             }
         }
