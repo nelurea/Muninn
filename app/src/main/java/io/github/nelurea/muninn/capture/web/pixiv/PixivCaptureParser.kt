@@ -109,12 +109,9 @@ object PixivCaptureParser {
                                     ),
 
                                 mimeType =
-                                    item.optString(
+                                    item.optNullableString(
                                         "mimeType"
-                                    ).takeIf {
-                                        it.isNotBlank() &&
-                                                it != "null"
-                                    },
+                                    ),
 
                                 fileName =
                                     item.getString(
@@ -148,25 +145,22 @@ object PixivCaptureParser {
                         ),
 
                     authorId =
-                        author.optString(
+                        author.optNullableString(
                             "id"
                         ),
 
                     authorName =
-                        author.optString(
+                        author.optNullableString(
                             "name"
                         ),
 
                     title =
-                        content.optString(
+                        content.optNullableString(
                             "title"
-                        ).takeIf {
-                            it.isNotBlank() &&
-                                    it != "null"
-                        },
+                        ),
 
                     caption =
-                        content.optString(
+                        content.optNullableString(
                             "caption"
                         ),
 
@@ -186,5 +180,18 @@ object PixivCaptureParser {
                     ?: "Could not parse Pixiv capture message"
             )
         }
+    }
+
+    private fun JSONObject.optNullableString(
+        name: String
+    ): String? {
+        if (
+            !has(name) ||
+            isNull(name)
+        ) {
+            return null
+        }
+
+        return getString(name)
     }
 }

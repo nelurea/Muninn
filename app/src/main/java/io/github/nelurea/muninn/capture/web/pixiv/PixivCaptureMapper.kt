@@ -56,16 +56,19 @@ object PixivCaptureMapper {
                 payload.capturedAt,
 
             authorId =
-                payload.authorId,
+                payload.authorId
+                    ?: "",
 
             authorName =
-                payload.authorName,
+                payload.authorName
+                    ?: "",
 
             title =
                 payload.title,
 
             caption =
-                payload.caption,
+                payload.caption
+                    ?: "",
 
             tags =
                 payload.tags,
