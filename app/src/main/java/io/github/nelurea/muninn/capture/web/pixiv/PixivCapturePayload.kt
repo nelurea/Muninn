@@ -6,10 +6,10 @@ data class PixivCapturePayload(
     val canonicalUrl: String,
     val capturedAt: String,
 
-    val authorId: String,
-    val authorName: String,
+    val authorId: String?,
+    val authorName: String?,
     val title: String?,
-    val caption: String,
+    val caption: String?,
 
     val tags: List<String>,
     val media: List<PixivCaptureMediaPayload>
