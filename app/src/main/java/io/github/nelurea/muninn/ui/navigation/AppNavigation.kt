@@ -24,6 +24,7 @@ import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
+import io.github.nelurea.muninn.ui.browser.WebCaptureScreen
 
 @Composable
 fun AppNavigation(
@@ -44,6 +45,9 @@ fun AppNavigation(
             HomeScreen(
                 onGalleryClick = {
                     navController.navigate("sessions")
+                },
+                onWebCaptureClick = {
+                    navController.navigate("webCapture")
                 },
                 onSettingsClick = {
                     navController.navigate("settings")
@@ -188,6 +192,13 @@ fun AppNavigation(
                             "Share Image"
                         )
                     )
+                }
+            )
+        }
+        composable("webCapture") {
+            WebCaptureScreen(
+                onBack = {
+                    navController.popBackStack()
                 }
             )
         }
