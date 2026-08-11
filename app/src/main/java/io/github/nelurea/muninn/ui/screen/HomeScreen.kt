@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 @Composable
 fun HomeScreen(
     onGalleryClick: () -> Unit,
+    onWebCaptureClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Column {
@@ -18,6 +19,12 @@ fun HomeScreen(
             onClick = onGalleryClick
         ) {
             Text("Gallery")
+        }
+
+        Button(
+            onClick = onWebCaptureClick
+        ) {
+            Text("Web Capture")
         }
 
         Button(
