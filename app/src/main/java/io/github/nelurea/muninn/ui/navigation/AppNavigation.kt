@@ -25,22 +25,39 @@ import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
 import io.github.nelurea.muninn.ui.browser.WebCaptureScreen
+import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
+import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 
 @Composable
 fun AppNavigation(
     repository: ImageRepository,
     sessionRepository: SessionRepository,
-    resolvedCaptureRepository: ResolvedCaptureRepository
+    resolvedCaptureRepository: ResolvedCaptureRepository,
+    capturedWorkRepository: CapturedWorkRepository
 ) {
 
-    val navController = rememberNavController()
-    val context = LocalContext.current
+    val navController =
+        rememberNavController()
+
+    val context =
+        LocalContext.current
+
+    val saveCaptureUseCase =
+        remember {
+            SaveCaptureUseCase(
+                context =
+                    context.applicationContext,
+                repository =
+                    capturedWorkRepository,
+                sessionRepository =
+                    sessionRepository
+            )
+        }
 
     NavHost(
         navController = navController,
         startDestination = "home"
     ) {
-
         composable("home") {
             HomeScreen(
                 onGalleryClick = {
@@ -197,6 +214,7 @@ fun AppNavigation(
         }
         composable("webCapture") {
             WebCaptureScreen(
+                saveCaptureUseCase = saveCaptureUseCase,
                 onBack = {
                     navController.popBackStack()
                 }

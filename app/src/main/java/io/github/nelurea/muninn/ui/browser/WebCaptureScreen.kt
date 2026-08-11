@@ -1,5 +1,6 @@
 package io.github.nelurea.muninn.ui.browser
 
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -18,21 +19,32 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import android.util.Log
 import androidx.webkit.JavaScriptExecutionWorld
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureParseResult
+import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureParser
+import io.github.nelurea.muninn.capture.web.pixiv.PixivMediaDownloadResult
+import io.github.nelurea.muninn.capture.web.pixiv.PixivMediaDownloader
+import kotlinx.coroutines.launch
+import io.github.nelurea.muninn.capture.model.CaptureDraft
+import io.github.nelurea.muninn.capture.usecase.SaveCaptureResult
+import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
+import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureMapper
 
 @Composable
 fun WebCaptureScreen(
+    saveCaptureUseCase: SaveCaptureUseCase,
     onBack: () -> Unit
 ) {
-    val initialUrl = "https://www.pixiv.net/"
+    val initialUrl =
+        "https://www.pixiv.net/"
 
     var address by rememberSaveable {
         mutableStateOf(initialUrl)
@@ -54,6 +66,9 @@ fun WebCaptureScreen(
         mutableStateOf<WebView?>(null)
     }
 
+    val coroutineScope =
+        rememberCoroutineScope()
+
     fun loadAddress() {
         val normalizedUrl =
             if (
@@ -65,8 +80,12 @@ fun WebCaptureScreen(
                 "https://$address"
             }
 
-        address = normalizedUrl
-        webView?.loadUrl(normalizedUrl)
+        address =
+            normalizedUrl
+
+        webView?.loadUrl(
+            normalizedUrl
+        )
     }
 
     DisposableEffect(Unit) {
@@ -78,13 +97,16 @@ fun WebCaptureScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
     ) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
             Button(
                 onClick = onBack
@@ -93,7 +115,8 @@ fun WebCaptureScreen(
             }
 
             Button(
-                enabled = canGoBack,
+                enabled =
+                    canGoBack,
                 onClick = {
                     webView?.goBack()
                 }
@@ -102,7 +125,8 @@ fun WebCaptureScreen(
             }
 
             Button(
-                enabled = canGoForward,
+                enabled =
+                    canGoForward,
                 onClick = {
                     webView?.goForward()
                 }
@@ -120,16 +144,21 @@ fun WebCaptureScreen(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = address,
+                value =
+                    address,
                 onValueChange = {
                     address = it
                 },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
+                modifier =
+                    Modifier.weight(1f),
+                singleLine =
+                    true,
                 label = {
                     Text("URL")
                 }
@@ -145,25 +174,35 @@ fun WebCaptureScreen(
         }
 
         Text(
-            text = currentUrl,
-            modifier = Modifier.fillMaxWidth()
+            text =
+                currentUrl,
+            modifier =
+                Modifier.fillMaxWidth()
         )
 
         AndroidView(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
             factory = { context ->
 
                 WebView(context).apply {
 
-                    webView = this
+                    webView =
+                        this
 
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
+                    settings.javaScriptEnabled =
+                        true
 
-                    settings.allowFileAccess = false
-                    settings.allowContentAccess = false
+                    settings.domStorageEnabled =
+                        true
+
+                    settings.allowFileAccess =
+                        false
+
+                    settings.allowContentAccess =
+                        false
 
                     settings.mixedContentMode =
                         WebSettings.MIXED_CONTENT_NEVER_ALLOW
@@ -175,6 +214,25 @@ fun WebCaptureScreen(
                     webViewClient =
                         object : WebViewClient() {
 
+                            private fun updateNavigationState(
+                                view: WebView,
+                                url: String?
+                            ) {
+                                if (url != null) {
+                                    currentUrl =
+                                        url
+
+                                    address =
+                                        url
+                                }
+
+                                canGoBack =
+                                    view.canGoBack()
+
+                                canGoForward =
+                                    view.canGoForward()
+                            }
+
                             override fun onPageFinished(
                                 view: WebView,
                                 url: String?
@@ -184,16 +242,27 @@ fun WebCaptureScreen(
                                     url
                                 )
 
-                                if (url != null) {
-                                    currentUrl = url
-                                    address = url
-                                }
+                                updateNavigationState(
+                                    view,
+                                    url
+                                )
+                            }
 
-                                canGoBack =
-                                    view.canGoBack()
+                            override fun doUpdateVisitedHistory(
+                                view: WebView,
+                                url: String?,
+                                isReload: Boolean
+                            ) {
+                                super.doUpdateVisitedHistory(
+                                    view,
+                                    url,
+                                    isReload
+                                )
 
-                                canGoForward =
-                                    view.canGoForward()
+                                updateNavigationState(
+                                    view,
+                                    url
+                                )
                             }
                         }
 
@@ -233,10 +302,129 @@ fun WebCaptureScreen(
                                 return@addWebMessageListener
                             }
 
-                            Log.d(
-                                "MuninnPixivCapture",
-                                message.data ?: "<null>"
-                            )
+                            val rawMessage =
+                                message.data
+                                    ?: return@addWebMessageListener
+
+                            when (
+                                val result =
+                                    PixivCaptureParser.parse(
+                                        rawMessage
+                                    )
+                            ) {
+                                is PixivCaptureParseResult.Success -> {
+
+                                    val payload =
+                                        result.payload
+
+                                    Log.d(
+                                        "MuninnPixivCapture",
+                                        "Parsed capture: " +
+                                                "sourceId=${payload.sourceId}, " +
+                                                "title=${payload.title}, " +
+                                                "author=${payload.authorName}, " +
+                                                "mediaCount=${payload.media.size}"
+                                    )
+
+                                    val currentWebView =
+                                        webView
+                                            ?: return@addWebMessageListener
+
+                                    val userAgent =
+                                        currentWebView
+                                            .settings
+                                            .userAgentString
+
+                                    coroutineScope.launch {
+
+                                        val downloader =
+                                            PixivMediaDownloader(
+                                                context
+                                            )
+
+                                        when (
+                                            val downloadResult =
+                                                downloader.download(
+                                                    payload =
+                                                        payload,
+                                                    userAgent =
+                                                        userAgent
+                                                )
+                                        ) {
+                                            is PixivMediaDownloadResult.Success -> {
+
+                                                val draft =
+                                                    try {
+                                                        PixivCaptureMapper.toCaptureDraft(
+                                                            payload = payload,
+                                                            downloadedFiles =
+                                                                downloadResult.files
+                                                        )
+                                                    } catch (exception: Exception) {
+                                                        Log.e(
+                                                            "MuninnPixivCapture",
+                                                            "Could not create CaptureDraft: " +
+                                                                    (
+                                                                            exception.message
+                                                                                ?: "unknown error"
+                                                                            )
+                                                        )
+
+                                                        return@launch
+                                                    }
+
+                                                when (
+                                                    val saveResult =
+                                                        saveCaptureUseCase.save(
+                                                            draft
+                                                        )
+                                                ) {
+                                                    is SaveCaptureResult.Success -> {
+
+                                                        Log.d(
+                                                            "MuninnPixivCapture",
+                                                            "Saved capture: " +
+                                                                    "workId=${saveResult.workId}, " +
+                                                                    "mediaCount=${saveResult.mediaCount}"
+                                                        )
+                                                    }
+
+                                                    is SaveCaptureResult.Failure -> {
+
+                                                        Log.e(
+                                                            "MuninnPixivCapture",
+                                                            "Save failed: " +
+                                                                    saveResult.errors.joinToString()
+                                                        )
+                                                    }
+                                                }
+
+                                                downloadResult.files
+                                                    .firstOrNull()
+                                                    ?.parentFile
+                                                    ?.deleteRecursively()
+                                            }
+
+                                            is PixivMediaDownloadResult.Failure -> {
+
+                                                Log.e(
+                                                    "MuninnPixivCapture",
+                                                    "Media download failed: " +
+                                                            downloadResult.error
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                is PixivCaptureParseResult.Failure -> {
+
+                                    Log.e(
+                                        "MuninnPixivCapture",
+                                        "Parse failed: ${result.error}"
+                                    )
+                                }
+                            }
                         }
 
                         val captureHook =
@@ -263,7 +451,9 @@ fun WebCaptureScreen(
                         )
                     }
 
-                    loadUrl(initialUrl)
+                    loadUrl(
+                        initialUrl
+                    )
                 }
             }
         )
@@ -278,12 +468,12 @@ fun WebCaptureScreen(
             onClick = {
                 webView?.evaluateJavascript(
                     """
-            if (
-                typeof window.__muninnCapturePixiv === "function"
-            ) {
-                window.__muninnCapturePixiv();
-            }
-            """.trimIndent(),
+                    if (
+                        typeof window.__muninnCapturePixiv === "function"
+                    ) {
+                        window.__muninnCapturePixiv();
+                    }
+                    """.trimIndent(),
                     null
                 )
             }
