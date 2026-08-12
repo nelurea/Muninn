@@ -6,15 +6,23 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
+import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 import kotlinx.coroutines.launch
 
 class DiscoveryViewModel(
-    private val source: DiscoverySource
+    private val source: DiscoverySource,
+    initialMode: DiscoveryMode =
+        DiscoveryMode.LATEST
 ) : ViewModel() {
 
     var uiState by mutableStateOf(
         DiscoveryUiState()
+    )
+        private set
+
+    var mode by mutableStateOf(
+        initialMode
     )
         private set
 
@@ -28,6 +36,21 @@ class DiscoveryViewModel(
         false
 
     init {
+        loadInitial()
+    }
+
+    fun selectMode(
+        newMode: DiscoveryMode
+    ) {
+        if (
+            mode == newMode
+        ) {
+            return
+        }
+
+        mode =
+            newMode
+
         loadInitial()
     }
 
@@ -109,7 +132,9 @@ class DiscoveryViewModel(
 
         viewModelScope.launch {
             runCatching {
-                source.loadLatest(
+                source.load(
+                    mode =
+                        mode,
                     page =
                         page
                 )
