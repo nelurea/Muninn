@@ -40,6 +40,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.OutlinedButton
+import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 
 @Composable
 fun DiscoveryScreen(
@@ -121,6 +123,71 @@ fun DiscoveryScreen(
                         .typography
                         .titleLarge
             )
+        }
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 8.dp
+                    ),
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    8.dp
+                )
+        ) {
+            if (
+                viewModel.mode ==
+                DiscoveryMode.LATEST
+            ) {
+                Button(
+                    onClick = {
+                    }
+                ) {
+                    Text(
+                        "Latest"
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.selectMode(
+                            DiscoveryMode.LATEST
+                        )
+                    }
+                ) {
+                    Text(
+                        "Latest"
+                    )
+                }
+            }
+
+            if (
+                viewModel.mode ==
+                DiscoveryMode.BOOKMARKS
+            ) {
+                Button(
+                    onClick = {
+                    }
+                ) {
+                    Text(
+                        "Bookmarks"
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.selectMode(
+                            DiscoveryMode.BOOKMARKS
+                        )
+                    }
+                ) {
+                    Text(
+                        "Bookmarks"
+                    )
+                }
+            }
         }
 
         Box(
