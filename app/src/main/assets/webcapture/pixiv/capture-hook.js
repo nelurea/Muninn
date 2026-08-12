@@ -201,31 +201,31 @@
       );
     }
 
-let observed =
-  observedArtworkData.get(
-    artworkId
-  );
+    let observed =
+      observedArtworkData.get(
+        artworkId
+      );
 
-if (!observed?.detail) {
-  console.log(
-    `[Muninn/Pixiv] detail data was not observed; requesting detail for ${artworkId}.`
-  );
+    if (!observed?.detail) {
+      console.log(
+        `[Muninn/Pixiv] detail data was not observed; requesting detail for ${artworkId}.`
+      );
 
-  await requestPixivDetail(
-    artworkId
-  );
+      await requestPixivDetail(
+        artworkId
+      );
 
-  observed =
-    observedArtworkData.get(
-      artworkId
-    );
+      observed =
+        observedArtworkData.get(
+          artworkId
+        );
 
-  if (!observed?.detail) {
-    throw new Error(
-      `Pixiv detail data was not retained for artwork ${artworkId}.`
-    );
-  }
-}
+      if (!observed?.detail) {
+        throw new Error(
+          `Pixiv detail data was not retained for artwork ${artworkId}.`
+        );
+      }
+    }
 
     const pageCount =
       Number(
@@ -271,87 +271,87 @@ if (!observed?.detail) {
     );
   }
 
-async function requestPixivDetail(
-  artworkId
-) {
-  const response =
-    await ORIGINAL_FETCH.call(
-      window,
-      `/ajax/illust/${artworkId}?lang=ja`,
-      {
-        credentials:
-          "same-origin"
-      }
-    );
+  async function requestPixivDetail(
+    artworkId
+  ) {
+    const response =
+      await ORIGINAL_FETCH.call(
+        window,
+        `/ajax/illust/${artworkId}?lang=ja`,
+        {
+          credentials:
+            "same-origin"
+        }
+      );
 
-  if (!response.ok) {
-    throw new Error(
-      `Pixiv detail request failed for artwork ${artworkId}: HTTP ${response.status}`
-    );
-  }
+    if (!response.ok) {
+      throw new Error(
+        `Pixiv detail request failed for artwork ${artworkId}: HTTP ${response.status}`
+      );
+    }
 
-  let payload;
+    let payload;
 
-  try {
-    payload =
-      await response.json();
-  } catch (error) {
-    throw new Error(
-      `Could not parse Pixiv detail response for artwork ${artworkId}: ${
-        error instanceof Error
-          ? error.message
-          : String(error)
-      }`
-    );
-  }
+    try {
+      payload =
+        await response.json();
+    } catch (error) {
+      throw new Error(
+        `Could not parse Pixiv detail response for artwork ${artworkId}: ${
+          error instanceof Error
+            ? error.message
+            : String(error)
+        }`
+      );
+    }
 
-  retainObservedResponse(
-    "detail",
-    artworkId,
-    payload
-  );
-}
-
-async function requestPixivPages(
-  artworkId
-) {
-  const response =
-    await ORIGINAL_FETCH.call(
-      window,
-      `/ajax/illust/${artworkId}/pages?lang=ja`,
-      {
-        credentials:
-          "same-origin"
-      }
-    );
-
-  if (!response.ok) {
-    throw new Error(
-      `Pixiv pages request failed for artwork ${artworkId}: HTTP ${response.status}`
+    retainObservedResponse(
+      "detail",
+      artworkId,
+      payload
     );
   }
 
-  let payload;
+  async function requestPixivPages(
+    artworkId
+  ) {
+    const response =
+      await ORIGINAL_FETCH.call(
+        window,
+        `/ajax/illust/${artworkId}/pages?lang=ja`,
+        {
+          credentials:
+            "same-origin"
+        }
+      );
 
-  try {
-    payload =
-      await response.json();
-  } catch (error) {
-    throw new Error(
-      `Could not parse Pixiv pages response for artwork ${artworkId}: ${
-        error instanceof Error
-          ? error.message
-          : String(error)
-      }`
+    if (!response.ok) {
+      throw new Error(
+        `Pixiv pages request failed for artwork ${artworkId}: HTTP ${response.status}`
+      );
+    }
+
+    let payload;
+
+    try {
+      payload =
+        await response.json();
+    } catch (error) {
+      throw new Error(
+        `Could not parse Pixiv pages response for artwork ${artworkId}: ${
+          error instanceof Error
+            ? error.message
+            : String(error)
+        }`
+      );
+    }
+
+    retainObservedResponse(
+      "pages",
+      artworkId,
+      payload
     );
   }
-
-  retainObservedResponse(
-    "pages",
-    artworkId,
-    payload
-  );
-}
 
   function createCapturePackage(
     artworkId,

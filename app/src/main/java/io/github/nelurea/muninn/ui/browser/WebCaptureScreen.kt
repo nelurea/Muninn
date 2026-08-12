@@ -1,16 +1,20 @@
 package io.github.nelurea.muninn.ui.browser
 
 import android.util.Log
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -35,6 +39,8 @@ import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureParseResult
 import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureParser
 import io.github.nelurea.muninn.capture.web.pixiv.PixivMediaDownloadResult
 import io.github.nelurea.muninn.capture.web.pixiv.PixivMediaDownloader
+import io.github.nelurea.muninn.ui.browser.cosmetic.BuiltInCosmeticRules
+import io.github.nelurea.muninn.ui.browser.cosmetic.CosmeticRuleInjector
 import kotlinx.coroutines.launch
 
 @Composable
@@ -44,6 +50,15 @@ fun WebCaptureScreen(
 ) {
     val initialUrl =
         "https://www.pixiv.net/"
+
+    val pixivFollowingUrl =
+        "https://www.pixiv.net/bookmark_new_illust.php"
+
+    val pixivBookmarksUrl =
+        "https://www.pixiv.net/bookmark.php"
+
+    val xForYouUrl =
+        "https://x.com/home"
 
     var address by rememberSaveable {
         mutableStateOf(initialUrl)
@@ -75,6 +90,17 @@ fun WebCaptureScreen(
 
     val coroutineScope =
         rememberCoroutineScope()
+
+    fun navigateTo(
+        url: String
+    ) {
+        address =
+            url
+
+        webView?.loadUrl(
+            url
+        )
+    }
 
     fun loadAddress() {
         val normalizedUrl =
@@ -180,6 +206,62 @@ fun WebCaptureScreen(
             }
         }
 
+        LazyRow(
+            modifier =
+                Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp),
+            contentPadding =
+                PaddingValues(
+                    horizontal = 8.dp
+                )
+        ) {
+            item {
+                Button(
+                    onClick = {
+                        navigateTo(
+                            pixivFollowingUrl
+                        )
+                    }
+                ) {
+                    Text(
+                        text = "Pixiv Following",
+                        maxLines = 1
+                    )
+                }
+            }
+
+            item {
+                Button(
+                    onClick = {
+                        navigateTo(
+                            pixivBookmarksUrl
+                        )
+                    }
+                ) {
+                    Text(
+                        text = "Pixiv Bookmarks",
+                        maxLines = 1
+                    )
+                }
+            }
+
+            item {
+                Button(
+                    onClick = {
+                        navigateTo(
+                            xForYouUrl
+                        )
+                    }
+                ) {
+                    Text(
+                        text = "X For You",
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
         Text(
             text =
                 currentUrl,
@@ -198,6 +280,67 @@ fun WebCaptureScreen(
 
                     webView =
                         this
+
+                    val touchSlop =
+                        ViewConfiguration
+                            .get(context)
+                            .scaledTouchSlop
+
+                    val swipeThreshold =
+                        touchSlop * 6
+
+                    var touchDownX = 0f
+                    var touchDownY = 0f
+
+                    setOnTouchListener { view, event ->
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN -> {
+                                touchDownX =
+                                    event.x
+                                touchDownY =
+                                    event.y
+                            }
+
+                            MotionEvent.ACTION_UP -> {
+                                val deltaX =
+                                    event.x - touchDownX
+
+                                val deltaY =
+                                    event.y - touchDownY
+
+                                val horizontalDistance =
+                                    kotlin.math.abs(deltaX)
+
+                                val verticalDistance =
+                                    kotlin.math.abs(deltaY)
+
+                                val isHorizontalSwipe =
+                                    horizontalDistance >=
+                                            swipeThreshold &&
+                                            horizontalDistance >
+                                            verticalDistance * 1.5f
+
+                                if (isHorizontalSwipe) {
+                                    val currentWebView =
+                                        view as WebView
+
+                                    if (
+                                        deltaX > 0 &&
+                                        currentWebView.canGoBack()
+                                    ) {
+                                        currentWebView.goBack()
+                                    } else if (
+                                        deltaX < 0 &&
+                                        currentWebView.canGoForward()
+                                    ) {
+                                        currentWebView.goForward()
+                                    }
+                                }
+                            }
+                        }
+
+                        false
+                    }
 
                     settings.javaScriptEnabled =
                         true
@@ -253,6 +396,15 @@ fun WebCaptureScreen(
                                     view,
                                     url
                                 )
+
+                                url?.let { currentPageUrl ->
+                                    CosmeticRuleInjector.apply(
+                                        webView = view,
+                                        url = currentPageUrl,
+                                        rules =
+                                            BuiltInCosmeticRules.rules
+                                    )
+                                }
                             }
 
                             override fun doUpdateVisitedHistory(
