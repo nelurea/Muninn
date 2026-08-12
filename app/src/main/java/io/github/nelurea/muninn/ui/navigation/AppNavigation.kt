@@ -295,6 +295,10 @@ fun AppNavigation(
                                     item.canonicalUrl
                                 )
                     )
+                },
+                onBack = {
+                    navController
+                        .popBackStack()
                 }
             )
         }
