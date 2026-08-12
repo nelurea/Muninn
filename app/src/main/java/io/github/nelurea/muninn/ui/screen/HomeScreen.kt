@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 @Composable
 fun HomeScreen(
     onGalleryClick: () -> Unit,
+    onDiscoveryClick: () -> Unit,
     onWebCaptureClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
@@ -31,6 +32,14 @@ fun HomeScreen(
             onClick = onSettingsClick
         ) {
             Text("Settings")
+        }
+        Button(
+            onClick =
+                onDiscoveryClick
+        ) {
+            Text(
+                "Discovery"
+            )
         }
     }
 }

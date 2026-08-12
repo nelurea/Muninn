@@ -2,31 +2,34 @@ package io.github.nelurea.muninn.ui.navigation
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.runtime.remember
-import androidx.compose.material3.Text
-import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
+import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.data.repository.ImageRepository
+import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
+import io.github.nelurea.muninn.data.repository.SessionRepository
+import io.github.nelurea.muninn.discovery.DiscoveryViewModel
+import io.github.nelurea.muninn.discovery.pixiv.PixivDiscoverySource
+import io.github.nelurea.muninn.ui.browser.WebCaptureScreen
+import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
+import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
+import io.github.nelurea.muninn.ui.discovery.DiscoveryScreen
 import io.github.nelurea.muninn.ui.screen.DetailScreen
 import io.github.nelurea.muninn.ui.screen.GalleryScreen
 import io.github.nelurea.muninn.ui.screen.HomeScreen
 import io.github.nelurea.muninn.ui.screen.SettingsScreen
-import io.github.nelurea.muninn.data.repository.ImageRepository
-import io.github.nelurea.muninn.data.repository.SessionRepository
 import io.github.nelurea.muninn.ui.session.SessionDetailScreen
+import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
 import io.github.nelurea.muninn.ui.session.SessionListScreen
 import io.github.nelurea.muninn.ui.session.SessionListViewModel
-import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
-import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
-import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
-import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
-import io.github.nelurea.muninn.ui.browser.WebCaptureScreen
-import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
-import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 
 @Composable
 fun AppNavigation(
@@ -35,7 +38,6 @@ fun AppNavigation(
     resolvedCaptureRepository: ResolvedCaptureRepository,
     capturedWorkRepository: CapturedWorkRepository
 ) {
-
     val navController =
         rememberNavController()
 
@@ -55,30 +57,51 @@ fun AppNavigation(
         }
 
     NavHost(
-        navController = navController,
-        startDestination = "home"
+        navController =
+            navController,
+        startDestination =
+            "home"
     ) {
-        composable("home") {
+        composable(
+            "home"
+        ) {
             HomeScreen(
                 onGalleryClick = {
-                    navController.navigate("sessions")
+                    navController.navigate(
+                        "sessions"
+                    )
+                },
+                onDiscoveryClick = {
+                    navController.navigate(
+                        "discovery"
+                    )
                 },
                 onWebCaptureClick = {
-                    navController.navigate("webCapture")
+                    navController.navigate(
+                        "webCapture"
+                    )
                 },
                 onSettingsClick = {
-                    navController.navigate("settings")
+                    navController.navigate(
+                        "settings"
+                    )
                 }
             )
         }
 
-        composable("gallery") {
+        composable(
+            "gallery"
+        ) {
             GalleryScreen(
-                repository = repository,
+                repository =
+                    repository,
                 onBack = {
-                    navController.popBackStack()
+                    navController
+                        .popBackStack()
                 },
-                onImageClick = { imageId ->
+                onImageClick = {
+                        imageId ->
+
                     navController.navigate(
                         "detail/$imageId"
                     )
@@ -86,17 +109,21 @@ fun AppNavigation(
             )
         }
 
-        composable("sessions") {
-
-            val vm = remember {
-                SessionListViewModel(
-                    sessionRepository
-                )
-            }
+        composable(
+            "sessions"
+        ) {
+            val vm =
+                remember {
+                    SessionListViewModel(
+                        sessionRepository
+                    )
+                }
 
             SessionListScreen(
-                viewModel = vm,
-                onSessionClick = { sessionId ->
+                viewModel =
+                    vm,
+                onSessionClick = {
+                        sessionId ->
 
                     navController.navigate(
                         "sessionDetail/$sessionId"
@@ -106,37 +133,50 @@ fun AppNavigation(
         }
 
         composable(
-            route = "sessionDetail/{sessionId}",
-            arguments = listOf(
-                navArgument("sessionId") {
-                    type = NavType.LongType
-                }
-            )
-        ) { backStackEntry ->
+            route =
+                "sessionDetail/{sessionId}",
+            arguments =
+                listOf(
+                    navArgument(
+                        "sessionId"
+                    ) {
+                        type =
+                            NavType.LongType
+                    }
+                )
+        ) {
+                backStackEntry ->
 
             val sessionId =
-                backStackEntry.arguments
-                    ?.getLong("sessionId")
+                backStackEntry
+                    .arguments
+                    ?.getLong(
+                        "sessionId"
+                    )
                     ?: return@composable
 
-            val vm = remember {
-
-                SessionDetailViewModel(
-                    sessionRepository
-                )
-            }
+            val vm =
+                remember {
+                    SessionDetailViewModel(
+                        sessionRepository
+                    )
+                }
 
             SessionDetailScreen(
-                sessionId = sessionId,
-                viewModel = vm
+                sessionId =
+                    sessionId,
+                viewModel =
+                    vm
             )
         }
 
-        composable("settings") {
-
+        composable(
+            "settings"
+        ) {
             SettingsScreen(
                 onBack = {
-                    navController.popBackStack()
+                    navController
+                        .popBackStack()
                 },
                 onResolvedCapturesClick = {
                     navController.navigate(
@@ -147,61 +187,79 @@ fun AppNavigation(
         }
 
         composable(
-            route = "resolvedCaptures"
+            route =
+                "resolvedCaptures"
         ) {
-
-            val vm = remember {
-
-                ResolvedCaptureViewModel(
-                    resolvedCaptureRepository
-                )
-            }
+            val vm =
+                remember {
+                    ResolvedCaptureViewModel(
+                        resolvedCaptureRepository
+                    )
+                }
 
             ResolvedCaptureScreen(
-                viewModel = vm,
+                viewModel =
+                    vm,
                 onBack = {
-                    navController.popBackStack()
+                    navController
+                        .popBackStack()
                 }
             )
         }
 
         composable(
-            route = "detail/{imageId}",
-            arguments = listOf(
-                navArgument("imageId") {
-                    type = NavType.LongType
-                }
-            )
-        ) { backStackEntry ->
+            route =
+                "detail/{imageId}",
+            arguments =
+                listOf(
+                    navArgument(
+                        "imageId"
+                    ) {
+                        type =
+                            NavType.LongType
+                    }
+                )
+        ) {
+                backStackEntry ->
 
             val imageId =
-                backStackEntry.arguments
-                    ?.getLong("imageId")
+                backStackEntry
+                    .arguments
+                    ?.getLong(
+                        "imageId"
+                    )
                     ?: return@composable
 
             DetailScreen(
-                imageId = imageId,
-                repository = repository,
+                imageId =
+                    imageId,
+                repository =
+                    repository,
                 onDelete = {
-                    navController.popBackStack()
+                    navController
+                        .popBackStack()
                 },
-                onShare = { uri ->
+                onShare = {
+                        uri ->
 
-                    val shareIntent = Intent(
-                        Intent.ACTION_SEND
-                    ).apply {
+                    val shareIntent =
+                        Intent(
+                            Intent.ACTION_SEND
+                        ).apply {
+                            type =
+                                "image/*"
 
-                        type = "image/*"
+                            putExtra(
+                                Intent.EXTRA_STREAM,
+                                Uri.parse(
+                                    uri
+                                )
+                            )
 
-                        putExtra(
-                            Intent.EXTRA_STREAM,
-                            Uri.parse(uri)
-                        )
-
-                        addFlags(
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        )
-                    }
+                            addFlags(
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                            )
+                        }
 
                     context.startActivity(
                         Intent.createChooser(
@@ -212,11 +270,91 @@ fun AppNavigation(
                 }
             )
         }
-        composable("webCapture") {
+
+        composable(
+            route =
+                "discovery"
+        ) {
+            val discoveryViewModel =
+                remember {
+                    DiscoveryViewModel(
+                        source =
+                            PixivDiscoverySource()
+                    )
+                }
+
+            DiscoveryScreen(
+                viewModel =
+                    discoveryViewModel,
+                onItemClick = {
+                        item ->
+
+                    navController.navigate(
+                        "webCapture?url=" +
+                                Uri.encode(
+                                    item.canonicalUrl
+                                )
+                    )
+                }
+            )
+        }
+
+        composable(
+            route =
+                "webCapture"
+        ) {
             WebCaptureScreen(
-                saveCaptureUseCase = saveCaptureUseCase,
+                saveCaptureUseCase =
+                    saveCaptureUseCase,
+                initialUrl =
+                    "https://www.pixiv.net/",
                 onBack = {
-                    navController.popBackStack()
+                    navController
+                        .popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route =
+                "webCapture?url={url}",
+            arguments =
+                listOf(
+                    navArgument(
+                        "url"
+                    ) {
+                        type =
+                            NavType.StringType
+
+                        nullable =
+                            true
+
+                        defaultValue =
+                            null
+                    }
+                )
+        ) {
+                backStackEntry ->
+
+            val initialUrl =
+                backStackEntry
+                    .arguments
+                    ?.getString(
+                        "url"
+                    )
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+                    ?: "https://www.pixiv.net/"
+
+            WebCaptureScreen(
+                saveCaptureUseCase =
+                    saveCaptureUseCase,
+                initialUrl =
+                    initialUrl,
+                onBack = {
+                    navController
+                        .popBackStack()
                 }
             )
         }

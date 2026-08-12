@@ -8,7 +8,6 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,52 +45,60 @@ import kotlinx.coroutines.launch
 @Composable
 fun WebCaptureScreen(
     saveCaptureUseCase: SaveCaptureUseCase,
+    initialUrl: String =
+        "https://www.pixiv.net/",
     onBack: () -> Unit
 ) {
-    val initialUrl =
-        "https://www.pixiv.net/"
-
-    val pixivFollowingUrl =
-        "https://www.pixiv.net/bookmark_new_illust.php"
-
-    val pixivBookmarksUrl =
-        "https://www.pixiv.net/bookmark.php"
-
-    val xForYouUrl =
-        "https://x.com/home"
-
-    var address by rememberSaveable {
-        mutableStateOf(initialUrl)
+    var address by rememberSaveable(
+        initialUrl
+    ) {
+        mutableStateOf(
+            initialUrl
+        )
     }
 
-    var currentUrl by rememberSaveable {
-        mutableStateOf(initialUrl)
+    var currentUrl by rememberSaveable(
+        initialUrl
+    ) {
+        mutableStateOf(
+            initialUrl
+        )
     }
 
     var canGoBack by remember {
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
     }
 
     var canGoForward by remember {
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
     }
 
     var webView by remember {
-        mutableStateOf<WebView?>(null)
+        mutableStateOf<WebView?>(
+            null
+        )
     }
 
     var isCapturing by remember {
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
     }
 
     var captureStatus by remember {
-        mutableStateOf<String?>(null)
+        mutableStateOf<String?>(
+            null
+        )
     }
 
     val coroutineScope =
         rememberCoroutineScope()
 
-    fun navigateTo(
+    fun loadUrl(
         url: String
     ) {
         address =
@@ -105,27 +112,35 @@ fun WebCaptureScreen(
     fun loadAddress() {
         val normalizedUrl =
             if (
-                address.startsWith("http://") ||
-                address.startsWith("https://")
+                address.startsWith(
+                    "http://"
+                ) ||
+                address.startsWith(
+                    "https://"
+                )
             ) {
                 address
             } else {
                 "https://$address"
             }
 
-        address =
-            normalizedUrl
-
-        webView?.loadUrl(
+        loadUrl(
             normalizedUrl
         )
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(
+        Unit
+    ) {
         onDispose {
-            webView?.stopLoading()
-            webView?.destroy()
-            webView = null
+            webView
+                ?.stopLoading()
+
+            webView
+                ?.destroy()
+
+            webView =
+                null
         }
     }
 
@@ -133,46 +148,64 @@ fun WebCaptureScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(
+                    8.dp
+                ),
         verticalArrangement =
-            Arrangement.spacedBy(8.dp)
+            Arrangement.spacedBy(
+                8.dp
+            )
     ) {
         Row(
             horizontalArrangement =
-                Arrangement.spacedBy(8.dp)
+                Arrangement.spacedBy(
+                    8.dp
+                )
         ) {
             Button(
-                onClick = onBack
+                onClick =
+                    onBack
             ) {
-                Text("Close")
+                Text(
+                    "Close"
+                )
             }
 
             Button(
                 enabled =
                     canGoBack,
                 onClick = {
-                    webView?.goBack()
+                    webView
+                        ?.goBack()
                 }
             ) {
-                Text("←")
+                Text(
+                    "←"
+                )
             }
 
             Button(
                 enabled =
                     canGoForward,
                 onClick = {
-                    webView?.goForward()
+                    webView
+                        ?.goForward()
                 }
             ) {
-                Text("→")
+                Text(
+                    "→"
+                )
             }
 
             Button(
                 onClick = {
-                    webView?.reload()
+                    webView
+                        ?.reload()
                 }
             ) {
-                Text("Reload")
+                Text(
+                    "Reload"
+                )
             }
         }
 
@@ -180,20 +213,27 @@ fun WebCaptureScreen(
             modifier =
                 Modifier.fillMaxWidth(),
             horizontalArrangement =
-                Arrangement.spacedBy(8.dp)
+                Arrangement.spacedBy(
+                    8.dp
+                )
         ) {
             OutlinedTextField(
                 value =
                     address,
                 onValueChange = {
-                    address = it
+                    address =
+                        it
                 },
                 modifier =
-                    Modifier.weight(1f),
+                    Modifier.weight(
+                        1f
+                    ),
                 singleLine =
                     true,
                 label = {
-                    Text("URL")
+                    Text(
+                        "URL"
+                    )
                 }
             )
 
@@ -202,7 +242,9 @@ fun WebCaptureScreen(
                     loadAddress()
                 }
             ) {
-                Text("Open")
+                Text(
+                    "Open"
+                )
             }
         }
 
@@ -210,23 +252,23 @@ fun WebCaptureScreen(
             modifier =
                 Modifier.fillMaxWidth(),
             horizontalArrangement =
-                Arrangement.spacedBy(8.dp),
-            contentPadding =
-                PaddingValues(
-                    horizontal = 8.dp
+                Arrangement.spacedBy(
+                    8.dp
                 )
         ) {
             item {
                 Button(
                     onClick = {
-                        navigateTo(
-                            pixivFollowingUrl
+                        loadUrl(
+                            "https://www.pixiv.net/bookmark_new_illust.php"
                         )
                     }
                 ) {
                     Text(
-                        text = "Pixiv Following",
-                        maxLines = 1
+                        text =
+                            "Pixiv Following",
+                        maxLines =
+                            1
                     )
                 }
             }
@@ -234,14 +276,16 @@ fun WebCaptureScreen(
             item {
                 Button(
                     onClick = {
-                        navigateTo(
-                            pixivBookmarksUrl
+                        loadUrl(
+                            "https://www.pixiv.net/bookmark.php"
                         )
                     }
                 ) {
                     Text(
-                        text = "Pixiv Bookmarks",
-                        maxLines = 1
+                        text =
+                            "Pixiv Bookmarks",
+                        maxLines =
+                            1
                     )
                 }
             }
@@ -249,14 +293,16 @@ fun WebCaptureScreen(
             item {
                 Button(
                     onClick = {
-                        navigateTo(
-                            xForYouUrl
+                        loadUrl(
+                            "https://x.com/home"
                         )
                     }
                 ) {
                     Text(
-                        text = "X For You",
-                        maxLines = 1
+                        text =
+                            "X For You",
+                        maxLines =
+                            1
                     )
                 }
             }
@@ -273,74 +319,17 @@ fun WebCaptureScreen(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-            factory = { context ->
+                    .weight(
+                        1f
+                    ),
+            factory = {
+                    context ->
 
-                WebView(context).apply {
-
+                WebView(
+                    context
+                ).apply {
                     webView =
                         this
-
-                    val touchSlop =
-                        ViewConfiguration
-                            .get(context)
-                            .scaledTouchSlop
-
-                    val swipeThreshold =
-                        touchSlop * 6
-
-                    var touchDownX = 0f
-                    var touchDownY = 0f
-
-                    setOnTouchListener { view, event ->
-                        when (event.actionMasked) {
-                            MotionEvent.ACTION_DOWN -> {
-                                touchDownX =
-                                    event.x
-                                touchDownY =
-                                    event.y
-                            }
-
-                            MotionEvent.ACTION_UP -> {
-                                val deltaX =
-                                    event.x - touchDownX
-
-                                val deltaY =
-                                    event.y - touchDownY
-
-                                val horizontalDistance =
-                                    kotlin.math.abs(deltaX)
-
-                                val verticalDistance =
-                                    kotlin.math.abs(deltaY)
-
-                                val isHorizontalSwipe =
-                                    horizontalDistance >=
-                                            swipeThreshold &&
-                                            horizontalDistance >
-                                            verticalDistance * 1.5f
-
-                                if (isHorizontalSwipe) {
-                                    val currentWebView =
-                                        view as WebView
-
-                                    if (
-                                        deltaX > 0 &&
-                                        currentWebView.canGoBack()
-                                    ) {
-                                        currentWebView.goBack()
-                                    } else if (
-                                        deltaX < 0 &&
-                                        currentWebView.canGoForward()
-                                    ) {
-                                        currentWebView.goForward()
-                                    }
-                                }
-                            }
-                        }
-
-                        false
-                    }
 
                     settings.javaScriptEnabled =
                         true
@@ -355,20 +344,111 @@ fun WebCaptureScreen(
                         false
 
                     settings.mixedContentMode =
-                        WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        WebSettings
+                            .MIXED_CONTENT_NEVER_ALLOW
 
                     CookieManager
                         .getInstance()
-                        .setAcceptCookie(true)
+                        .setAcceptCookie(
+                            true
+                        )
+
+                    val touchSlop =
+                        ViewConfiguration
+                            .get(
+                                context
+                            )
+                            .scaledTouchSlop
+
+                    val swipeThreshold =
+                        touchSlop * 6f
+
+                    var downX =
+                        0f
+
+                    var downY =
+                        0f
+
+                    setOnTouchListener {
+                            view,
+                            event ->
+
+                        when (
+                            event.actionMasked
+                        ) {
+                            MotionEvent.ACTION_DOWN -> {
+                                downX =
+                                    event.x
+
+                                downY =
+                                    event.y
+                            }
+
+                            MotionEvent.ACTION_UP -> {
+                                val deltaX =
+                                    event.x -
+                                            downX
+
+                                val deltaY =
+                                    event.y -
+                                            downY
+
+                                val horizontalDistance =
+                                    kotlin.math.abs(
+                                        deltaX
+                                    )
+
+                                val verticalDistance =
+                                    kotlin.math.abs(
+                                        deltaY
+                                    )
+
+                                val isHorizontalSwipe =
+                                    horizontalDistance >=
+                                            swipeThreshold &&
+                                            horizontalDistance >
+                                            verticalDistance *
+                                            1.5f
+
+                                if (
+                                    isHorizontalSwipe
+                                ) {
+                                    val currentWebView =
+                                        view as WebView
+
+                                    if (
+                                        deltaX > 0 &&
+                                        currentWebView
+                                            .canGoBack()
+                                    ) {
+                                        currentWebView
+                                            .goBack()
+                                    } else if (
+                                        deltaX < 0 &&
+                                        currentWebView
+                                            .canGoForward()
+                                    ) {
+                                        currentWebView
+                                            .goForward()
+                                    }
+                                }
+                            }
+                        }
+
+                        false
+                    }
 
                     webViewClient =
-                        object : WebViewClient() {
+                        object :
+                            WebViewClient() {
 
                             private fun updateNavigationState(
                                 view: WebView,
                                 url: String?
                             ) {
-                                if (url != null) {
+                                if (
+                                    url != null
+                                ) {
                                     currentUrl =
                                         url
 
@@ -397,14 +477,18 @@ fun WebCaptureScreen(
                                     url
                                 )
 
-                                url?.let { currentPageUrl ->
-                                    CosmeticRuleInjector.apply(
-                                        webView = view,
-                                        url = currentPageUrl,
-                                        rules =
-                                            BuiltInCosmeticRules.rules
-                                    )
-                                }
+                                val loadedUrl =
+                                    url
+                                        ?: return
+
+                                CosmeticRuleInjector.apply(
+                                    webView =
+                                        view,
+                                    url =
+                                        loadedUrl,
+                                    rules =
+                                        BuiltInCosmeticRules.rules
+                                )
                             }
 
                             override fun doUpdateVisitedHistory(
@@ -431,174 +515,194 @@ fun WebCaptureScreen(
                         )
 
                     if (
-                        WebViewFeature.isFeatureSupported(
-                            WebViewFeature.JS_INJECTION_IN_FRAME_AND_WORLD
-                        )
+                        WebViewFeature
+                            .isFeatureSupported(
+                                WebViewFeature
+                                    .JS_INJECTION_IN_FRAME_AND_WORLD
+                            )
                     ) {
                         val pageWorld =
-                            WebViewCompat.getExecutionWorld(
+                            WebViewCompat
+                                .getExecutionWorld(
+                                    this,
+                                    JavaScriptExecutionWorld
+                                        .PAGE_WORLD_NAME
+                                )
+
+                        WebViewCompat
+                            .addWebMessageListener(
                                 this,
-                                JavaScriptExecutionWorld.PAGE_WORLD_NAME
-                            )
-
-                        WebViewCompat.addWebMessageListener(
-                            this,
-                            "MuninnBridge",
-                            pixivOrigins,
-                            pageWorld
-                        ) {
-                                _,
-                                message,
-                                sourceOrigin,
-                                isMainFrame,
-                                _ ->
-
-                            if (
-                                !isMainFrame ||
-                                sourceOrigin.toString() !=
-                                "https://www.pixiv.net"
+                                "MuninnBridge",
+                                pixivOrigins,
+                                pageWorld
                             ) {
-                                return@addWebMessageListener
-                            }
+                                    _,
+                                    message,
+                                    sourceOrigin,
+                                    isMainFrame,
+                                    _ ->
 
-                            val rawMessage =
-                                message.data
-                                    ?: return@addWebMessageListener
+                                if (
+                                    !isMainFrame ||
+                                    sourceOrigin
+                                        .toString() !=
+                                    "https://www.pixiv.net"
+                                ) {
+                                    return@addWebMessageListener
+                                }
 
-                            when (
-                                val parseResult =
-                                    PixivCaptureParser.parse(
-                                        rawMessage
-                                    )
-                            ) {
-                                is PixivCaptureParseResult.Success -> {
+                                val rawMessage =
+                                    message.data
+                                        ?: return@addWebMessageListener
 
-                                    val payload =
-                                        parseResult.payload
-
-                                    val currentWebView =
-                                        webView
-                                            ?: return@addWebMessageListener
-
-                                    val userAgent =
-                                        currentWebView
-                                            .settings
-                                            .userAgentString
-
-                                    coroutineScope.launch {
-
-                                        val downloader =
-                                            PixivMediaDownloader(
-                                                context
+                                when (
+                                    val parseResult =
+                                        PixivCaptureParser
+                                            .parse(
+                                                rawMessage
                                             )
+                                ) {
+                                    is PixivCaptureParseResult.Success -> {
+                                        val payload =
+                                            parseResult.payload
 
-                                        when (
-                                            val downloadResult =
-                                                downloader.download(
-                                                    payload =
-                                                        payload,
-                                                    userAgent =
-                                                        userAgent
-                                                )
-                                        ) {
-                                            is PixivMediaDownloadResult.Success -> {
+                                        val currentWebView =
+                                            webView
+                                                ?: return@addWebMessageListener
 
-                                                val temporaryDirectory =
-                                                    downloadResult.files
-                                                        .firstOrNull()
-                                                        ?.parentFile
+                                        val userAgent =
+                                            currentWebView
+                                                .settings
+                                                .userAgentString
 
-                                                try {
-                                                    val draft =
-                                                        PixivCaptureMapper
-                                                            .toCaptureDraft(
+                                        coroutineScope
+                                            .launch {
+                                                val downloader =
+                                                    PixivMediaDownloader(
+                                                        context
+                                                    )
+
+                                                when (
+                                                    val downloadResult =
+                                                        downloader
+                                                            .download(
                                                                 payload =
                                                                     payload,
-                                                                downloadedFiles =
-                                                                    downloadResult.files
+                                                                userAgent =
+                                                                    userAgent
                                                             )
+                                                ) {
+                                                    is PixivMediaDownloadResult.Success -> {
+                                                        val temporaryDirectory =
+                                                            downloadResult
+                                                                .files
+                                                                .firstOrNull()
+                                                                ?.parentFile
 
-                                                    when (
-                                                        val saveResult =
-                                                            saveCaptureUseCase
-                                                                .save(
-                                                                    draft
-                                                                )
-                                                    ) {
-                                                        is SaveCaptureResult.Success -> {
-                                                            isCapturing = false
-                                                            captureStatus =
-                                                                "Saved ${saveResult.mediaCount} image(s)"
+                                                        try {
+                                                            val draft =
+                                                                PixivCaptureMapper
+                                                                    .toCaptureDraft(
+                                                                        payload =
+                                                                            payload,
+                                                                        downloadedFiles =
+                                                                            downloadResult.files
+                                                                    )
 
-                                                            Log.d(
-                                                                "MuninnPixivCapture",
-                                                                "Saved capture: " +
-                                                                        "workId=${saveResult.workId}, " +
-                                                                        "mediaCount=${saveResult.mediaCount}"
-                                                            )
-                                                        }
+                                                            when (
+                                                                val saveResult =
+                                                                    saveCaptureUseCase
+                                                                        .save(
+                                                                            draft
+                                                                        )
+                                                            ) {
+                                                                is SaveCaptureResult.Success -> {
+                                                                    isCapturing =
+                                                                        false
 
-                                                        is SaveCaptureResult.Failure -> {
-                                                            isCapturing = false
+                                                                    captureStatus =
+                                                                        "Saved ${saveResult.mediaCount} image(s)"
+
+                                                                    Log.d(
+                                                                        "MuninnPixivCapture",
+                                                                        "Saved capture: " +
+                                                                                "workId=${saveResult.workId}, " +
+                                                                                "mediaCount=${saveResult.mediaCount}"
+                                                                    )
+                                                                }
+
+                                                                is SaveCaptureResult.Failure -> {
+                                                                    isCapturing =
+                                                                        false
+
+                                                                    captureStatus =
+                                                                        "Capture failed: " +
+                                                                                saveResult.errors
+                                                                                    .joinToString()
+
+                                                                    Log.e(
+                                                                        "MuninnPixivCapture",
+                                                                        "Save failed: " +
+                                                                                saveResult.errors
+                                                                                    .joinToString()
+                                                                    )
+                                                                }
+                                                            }
+                                                        } catch (
+                                                            exception: Exception
+                                                        ) {
+                                                            isCapturing =
+                                                                false
+
                                                             captureStatus =
                                                                 "Capture failed: " +
-                                                                        saveResult.errors.joinToString()
+                                                                        (
+                                                                                exception.message
+                                                                                    ?: "unknown error"
+                                                                                )
 
                                                             Log.e(
                                                                 "MuninnPixivCapture",
-                                                                "Save failed: " +
-                                                                        saveResult.errors.joinToString()
+                                                                "Capture persistence failed",
+                                                                exception
                                                             )
+                                                        } finally {
+                                                            temporaryDirectory
+                                                                ?.deleteRecursively()
                                                         }
                                                     }
-                                                } catch (exception: Exception) {
-                                                    isCapturing = false
-                                                    captureStatus =
-                                                        "Capture failed: " +
-                                                                (
-                                                                        exception.message
-                                                                            ?: "unknown error"
-                                                                        )
 
-                                                    Log.e(
-                                                        "MuninnPixivCapture",
-                                                        "Capture persistence failed",
-                                                        exception
-                                                    )
-                                                } finally {
-                                                    temporaryDirectory
-                                                        ?.deleteRecursively()
+                                                    is PixivMediaDownloadResult.Failure -> {
+                                                        isCapturing =
+                                                            false
+
+                                                        captureStatus =
+                                                            "Capture failed: ${downloadResult.error}"
+
+                                                        Log.e(
+                                                            "MuninnPixivCapture",
+                                                            "Media download failed: " +
+                                                                    downloadResult.error
+                                                        )
+                                                    }
                                                 }
                                             }
+                                    }
 
-                                            is PixivMediaDownloadResult.Failure -> {
-                                                isCapturing = false
+                                    is PixivCaptureParseResult.Failure -> {
+                                        isCapturing =
+                                            false
 
-                                                captureStatus =
-                                                    "Capture failed: ${downloadResult.error}"
+                                        captureStatus =
+                                            "Capture failed: ${parseResult.error}"
 
-                                                Log.e(
-                                                    "MuninnPixivCapture",
-                                                    "Media download failed: " +
-                                                            downloadResult.error
-                                                )
-                                            }
-                                        }
+                                        Log.e(
+                                            "MuninnPixivCapture",
+                                            "Parse failed: ${parseResult.error}"
+                                        )
                                     }
                                 }
-
-                                is PixivCaptureParseResult.Failure -> {
-                                    isCapturing = false
-                                    captureStatus =
-                                        "Capture failed: ${parseResult.error}"
-
-                                    Log.e(
-                                        "MuninnPixivCapture",
-                                        "Parse failed: ${parseResult.error}"
-                                    )
-                                }
                             }
-                        }
 
                         val captureHook =
                             context.assets
@@ -610,13 +714,15 @@ fun WebCaptureScreen(
                                     it.readText()
                                 }
 
-                        WebViewCompat.addJavaScriptOnEvent(
-                            this,
-                            captureHook,
-                            WebViewCompat.INJECTION_EVENT_DOCUMENT_START,
-                            pixivOrigins,
-                            pageWorld
-                        )
+                        WebViewCompat
+                            .addJavaScriptOnEvent(
+                                this,
+                                captureHook,
+                                WebViewCompat
+                                    .INJECTION_EVENT_DOCUMENT_START,
+                                pixivOrigins,
+                                pageWorld
+                            )
                     } else {
                         Log.e(
                             "MuninnPixivCapture",
@@ -640,35 +746,45 @@ fun WebCaptureScreen(
             modifier =
                 Modifier.fillMaxWidth(),
             onClick = {
-                isCapturing = true
-                captureStatus = "Capturing..."
+                isCapturing =
+                    true
 
-                webView?.evaluateJavascript(
-                    """
-    if (
-        typeof window.__muninnCapturePixiv === "function"
-    ) {
-        window.__muninnCapturePixiv();
-        "started";
-    } else {
-        "unavailable";
-    }
-    """.trimIndent()
-                ) { result ->
-                    if (
-                        result.contains(
-                            "unavailable"
-                        )
+                captureStatus =
+                    "Capturing..."
+
+                webView
+                    ?.evaluateJavascript(
+                        """
+                        if (
+                            typeof window.__muninnCapturePixiv === "function"
+                        ) {
+                            window.__muninnCapturePixiv();
+                            "started";
+                        } else {
+                            "unavailable";
+                        }
+                        """.trimIndent()
                     ) {
-                        isCapturing = false
-                        captureStatus =
-                            "Capture is unavailable on this page"
+                            result ->
+
+                        if (
+                            result.contains(
+                                "unavailable"
+                            )
+                        ) {
+                            isCapturing =
+                                false
+
+                            captureStatus =
+                                "Capture is unavailable on this page"
+                        }
                     }
-                }
             }
         ) {
             Text(
-                if (isCapturing) {
+                if (
+                    isCapturing
+                ) {
                     "Capturing..."
                 } else {
                     "Capture"
@@ -676,8 +792,13 @@ fun WebCaptureScreen(
             )
         }
 
-        captureStatus?.let { status ->
-            Text(status)
-        }
+        captureStatus
+            ?.let {
+                    status ->
+
+                Text(
+                    status
+                )
+            }
     }
 }
