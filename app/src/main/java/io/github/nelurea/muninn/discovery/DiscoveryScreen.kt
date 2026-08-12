@@ -39,11 +39,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.Row
 
 @Composable
 fun DiscoveryScreen(
     viewModel: DiscoveryViewModel,
     onItemClick: (DiscoveryItem) -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state =
@@ -83,164 +85,212 @@ fun DiscoveryScreen(
             }
     }
 
-    when {
-        state.isLoading &&
-                state.items.isEmpty() -> {
-
-            Box(
-                modifier =
-                    modifier.fillMaxSize(),
-                contentAlignment =
-                    Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        }
-
-        state.error != null &&
-                state.items.isEmpty() -> {
-
-            Column(
-                modifier =
-                    modifier
-                        .fillMaxSize()
-                        .padding(
-                            24.dp
-                        ),
-                verticalArrangement =
-                    Arrangement.Center,
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
+    Column(
+        modifier =
+            modifier.fillMaxSize()
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 8.dp,
+                        vertical = 8.dp
+                    ),
+            verticalAlignment =
+                Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    12.dp
+                )
+        ) {
+            Button(
+                onClick =
+                    onBack
             ) {
                 Text(
-                    text =
-                        state.error
+                    "Back"
                 )
-
-                Button(
-                    onClick = {
-                        viewModel.retry()
-                    },
-                    modifier =
-                        Modifier.padding(
-                            top =
-                                16.dp
-                        )
-                ) {
-                    Text(
-                        "Retry"
-                    )
-                }
             }
+
+            Text(
+                text =
+                    "Discovery",
+                style =
+                    MaterialTheme
+                        .typography
+                        .titleLarge
+            )
         }
 
-        else -> {
-            LazyVerticalGrid(
-                columns =
-                    GridCells.Fixed(
-                        2
-                    ),
-                state =
-                    gridState,
-                modifier =
-                    modifier.fillMaxSize(),
-                contentPadding =
-                    PaddingValues(
-                        8.dp
-                    ),
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(
+                        1f
                     )
-            ) {
-                items(
-                    items =
-                        state.items,
-                    key = {
-                        "${it.source}:${it.sourceItemId}"
-                    }
-                ) {
-                        item ->
+        ) {
 
-                    DiscoveryGridItem(
-                        item =
-                            item,
-                        onClick = {
-                            onItemClick(
-                                item
-                            )
-                        }
-                    )
-                }
+            when {
+                state.isLoading &&
+                        state.items.isEmpty() -> {
 
-                if (
-                    state.isLoadingMore
-                ) {
-                    item(
-                        span = {
-                            GridItemSpan(
-                                maxLineSpan
-                            )
-                        }
+                    Box(
+                        modifier =
+                            modifier.fillMaxSize(),
+                        contentAlignment =
+                            Alignment.Center
                     ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        24.dp
-                                    ),
-                            contentAlignment =
-                                Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
+                        CircularProgressIndicator()
                     }
                 }
 
-                if (
-                    state.error != null &&
-                    state.items.isNotEmpty()
-                ) {
-                    item(
-                        span = {
-                            GridItemSpan(
-                                maxLineSpan
-                            )
-                        }
+                state.error != null &&
+                        state.items.isEmpty() -> {
+
+                    Column(
+                        modifier =
+                            modifier
+                                .fillMaxSize()
+                                .padding(
+                                    24.dp
+                                ),
+                        verticalArrangement =
+                            Arrangement.Center,
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
                     ) {
-                        Column(
+                        Text(
+                            text =
+                                state.error
+                        )
+
+                        Button(
+                            onClick = {
+                                viewModel.retry()
+                            },
                             modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(
+                                Modifier.padding(
+                                    top =
                                         16.dp
-                                    ),
-                            horizontalAlignment =
-                                Alignment.CenterHorizontally
+                                )
                         ) {
                             Text(
-                                text =
-                                    state.error
+                                "Retry"
                             )
+                        }
+                    }
+                }
 
-                            Button(
+                else -> {
+                    LazyVerticalGrid(
+                        columns =
+                            GridCells.Fixed(
+                                2
+                            ),
+                        state =
+                            gridState,
+                        modifier =
+                            modifier.fillMaxSize(),
+                        contentPadding =
+                            PaddingValues(
+                                8.dp
+                            ),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            ),
+                        verticalArrangement =
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
+                    ) {
+                        items(
+                            items =
+                                state.items,
+                            key = {
+                                "${it.source}:${it.sourceItemId}"
+                            }
+                        ) { item ->
+
+                            DiscoveryGridItem(
+                                item =
+                                    item,
                                 onClick = {
-                                    viewModel.retry()
-                                },
-                                modifier =
-                                    Modifier.padding(
-                                        top =
-                                            8.dp
+                                    onItemClick(
+                                        item
                                     )
+                                }
+                            )
+                        }
+
+                        if (
+                            state.isLoadingMore
+                        ) {
+                            item(
+                                span = {
+                                    GridItemSpan(
+                                        maxLineSpan
+                                    )
+                                }
                             ) {
-                                Text(
-                                    "Retry"
-                                )
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(
+                                                24.dp
+                                            ),
+                                    contentAlignment =
+                                        Alignment.Center
+                                ) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                        }
+
+                        if (
+                            state.error != null &&
+                            state.items.isNotEmpty()
+                        ) {
+                            item(
+                                span = {
+                                    GridItemSpan(
+                                        maxLineSpan
+                                    )
+                                }
+                            ) {
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(
+                                                16.dp
+                                            ),
+                                    horizontalAlignment =
+                                        Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text =
+                                            state.error
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.retry()
+                                        },
+                                        modifier =
+                                            Modifier.padding(
+                                                top =
+                                                    8.dp
+                                            )
+                                    ) {
+                                        Text(
+                                            "Retry"
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
