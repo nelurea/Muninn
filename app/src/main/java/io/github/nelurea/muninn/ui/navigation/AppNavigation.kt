@@ -30,6 +30,11 @@ import io.github.nelurea.muninn.ui.session.SessionDetailScreen
 import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
 import io.github.nelurea.muninn.ui.session.SessionListScreen
 import io.github.nelurea.muninn.ui.session.SessionListViewModel
+import io.github.nelurea.muninn.discovery.pixiv.PixivArtworkPreviewSource
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.Modifier
 
 @Composable
 fun AppNavigation(
@@ -60,7 +65,9 @@ fun AppNavigation(
         remember {
             DiscoveryViewModel(
                 source =
-                    PixivDiscoverySource()
+                    PixivDiscoverySource(),
+                previewSource =
+                    PixivArtworkPreviewSource()
             )
         }
 
@@ -68,7 +75,11 @@ fun AppNavigation(
         navController =
             navController,
         startDestination =
-            "home"
+            "home",
+        modifier =
+            Modifier.windowInsetsPadding(
+                WindowInsets.safeDrawing
+            )
     ) {
         composable(
             "home"
