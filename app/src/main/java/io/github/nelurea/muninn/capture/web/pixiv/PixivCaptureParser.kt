@@ -144,6 +144,11 @@ object PixivCaptureParser {
                             "capturedAt"
                         ),
 
+                    publishedAt =
+                        capturePackage.optNullableString(
+                            "publishedAt"
+                        ),
+
                     authorId =
                         author.optNullableString(
                             "id"

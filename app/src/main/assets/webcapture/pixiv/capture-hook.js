@@ -409,6 +409,10 @@
       capturedAt:
         new Date().toISOString(),
 
+      publishedAt:
+        body.createDate ??
+        null,
+
       content: {
         author: {
           id:

@@ -289,11 +289,59 @@ fun AppNavigation(
                 onItemClick = {
                         item ->
 
+                    val discoveryMode =
+                        discoveryViewModel
+                            .mode
+                            .name
+
+                    val discoveryQuery =
+                        discoveryViewModel
+                            .searchQuery
+                            .takeIf {
+                                discoveryViewModel
+                                    .mode
+                                    .name ==
+                                        "SEARCH" &&
+                                        it.isNotBlank()
+                            }
+
                     navController.navigate(
-                        "webCapture?url=" +
+                        buildString {
+                            append(
+                                "webCapture?url="
+                            )
+
+                            append(
                                 Uri.encode(
                                     item.canonicalUrl
                                 )
+                            )
+
+                            append(
+                                "&discoveryMode="
+                            )
+
+                            append(
+                                Uri.encode(
+                                    discoveryMode
+                                )
+                            )
+
+                            discoveryQuery
+                                ?.let {
+                                        query ->
+
+                                    append(
+                                        "&discoveryQuery="
+                                    )
+
+                                    append(
+                                        Uri.encode(
+                                            query
+                                        )
+                                    )
+                                }
+                        }
                     )
                 },
                 onBack = {
@@ -321,11 +369,39 @@ fun AppNavigation(
 
         composable(
             route =
-                "webCapture?url={url}",
+                "webCapture?url={url}" +
+                        "&discoveryMode={discoveryMode}" +
+                        "&discoveryQuery={discoveryQuery}",
             arguments =
                 listOf(
                     navArgument(
                         "url"
+                    ) {
+                        type =
+                            NavType.StringType
+
+                        nullable =
+                            true
+
+                        defaultValue =
+                            null
+                    },
+
+                    navArgument(
+                        "discoveryMode"
+                    ) {
+                        type =
+                            NavType.StringType
+
+                        nullable =
+                            true
+
+                        defaultValue =
+                            null
+                    },
+
+                    navArgument(
+                        "discoveryQuery"
                     ) {
                         type =
                             NavType.StringType
@@ -351,11 +427,35 @@ fun AppNavigation(
                     }
                     ?: "https://www.pixiv.net/"
 
+            val discoveryMode =
+                backStackEntry
+                    .arguments
+                    ?.getString(
+                        "discoveryMode"
+                    )
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+
+            val discoveryQuery =
+                backStackEntry
+                    .arguments
+                    ?.getString(
+                        "discoveryQuery"
+                    )
+                    ?.takeIf {
+                        it.isNotBlank()
+                    }
+
             WebCaptureScreen(
                 saveCaptureUseCase =
                     saveCaptureUseCase,
                 initialUrl =
                     initialUrl,
+                discoveryMode =
+                    discoveryMode,
+                discoveryQuery =
+                    discoveryQuery,
                 onBack = {
                     navController
                         .popBackStack()

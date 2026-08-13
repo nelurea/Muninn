@@ -8,7 +8,9 @@ object PixivCaptureMapper {
 
     fun toCaptureDraft(
         payload: PixivCapturePayload,
-        downloadedFiles: List<File>
+        downloadedFiles: List<File>,
+        discoveryMode: String? = null,
+        discoveryQuery: String? = null
     ): CaptureDraft {
 
         require(
@@ -74,7 +76,16 @@ object PixivCaptureMapper {
                 payload.tags,
 
             media =
-                media
+                media,
+
+            publishedAt =
+                payload.publishedAt,
+
+            discoveryMode =
+                discoveryMode,
+
+            discoveryQuery =
+                discoveryQuery,
         )
     }
 }

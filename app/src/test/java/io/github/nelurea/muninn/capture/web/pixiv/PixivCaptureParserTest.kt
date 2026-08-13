@@ -22,6 +22,7 @@ class PixivCaptureParserTest {
                   "canonicalUrl": "https://www.pixiv.net/artworks/123456"
                 },
                 "capturedAt": "2026-08-11T12:00:00.000Z",
+                "publishedAt": "2026-08-10T03:30:00.000Z",
                 "content": {
                   "author": {
                     "id": "42",
@@ -72,6 +73,16 @@ class PixivCaptureParserTest {
         assertEquals(
             "https://www.pixiv.net/artworks/123456",
             payload.canonicalUrl
+        )
+
+        assertEquals(
+            "2026-08-11T12:00:00.000Z",
+            payload.capturedAt
+        )
+
+        assertEquals(
+            "2026-08-10T03:30:00.000Z",
+            payload.publishedAt
         )
 
         assertEquals(
@@ -161,6 +172,10 @@ class PixivCaptureParserTest {
         val payload =
             (result as PixivCaptureParseResult.Success)
                 .payload
+
+        assertNull(
+            payload.publishedAt
+        )
 
         assertNull(
             payload.authorId

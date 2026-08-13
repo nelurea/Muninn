@@ -337,3 +337,32 @@ val MIGRATION_10_11 =
             )
         }
     }
+
+val MIGRATION_11_12 =
+    object : Migration(11, 12) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                ALTER TABLE captured_works
+                ADD COLUMN publishedAt TEXT
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                ALTER TABLE captured_works
+                ADD COLUMN discoveryMode TEXT
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                ALTER TABLE captured_works
+                ADD COLUMN discoveryQuery TEXT
+                """.trimIndent()
+            )
+        }
+    }

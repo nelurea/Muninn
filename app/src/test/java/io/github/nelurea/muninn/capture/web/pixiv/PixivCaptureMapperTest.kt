@@ -28,6 +28,9 @@ class PixivCaptureMapperTest {
                 capturedAt =
                     "2026-08-11T12:00:00.000Z",
 
+                publishedAt =
+                    "2026-08-10T03:30:00.000Z",
+
                 authorId =
                     "42",
 
@@ -71,7 +74,11 @@ class PixivCaptureMapperTest {
                 downloadedFiles =
                     listOf(
                         sourceFile
-                    )
+                    ),
+                discoveryMode =
+                    "SEARCH",
+                discoveryQuery =
+                    "synthetic-query"
             )
 
         assertEquals(
@@ -82,6 +89,26 @@ class PixivCaptureMapperTest {
         assertEquals(
             "123456",
             draft.sourceId
+        )
+
+        assertEquals(
+            "2026-08-11T12:00:00.000Z",
+            draft.capturedAt
+        )
+
+        assertEquals(
+            "2026-08-10T03:30:00.000Z",
+            draft.publishedAt
+        )
+
+        assertEquals(
+            "SEARCH",
+            draft.discoveryMode
+        )
+
+        assertEquals(
+            "synthetic-query",
+            draft.discoveryQuery
         )
 
         assertEquals(
@@ -191,6 +218,18 @@ class PixivCaptureMapperTest {
                         sourceFile
                     )
             )
+
+        assertNull(
+            draft.publishedAt
+        )
+
+        assertNull(
+            draft.discoveryMode
+        )
+
+        assertNull(
+            draft.discoveryQuery
+        )
 
         assertEquals(
             "",

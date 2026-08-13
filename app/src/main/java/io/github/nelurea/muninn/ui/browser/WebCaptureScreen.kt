@@ -47,6 +47,8 @@ fun WebCaptureScreen(
     saveCaptureUseCase: SaveCaptureUseCase,
     initialUrl: String =
         "https://www.pixiv.net/",
+    discoveryMode: String? = null,
+    discoveryQuery: String? = null,
     onBack: () -> Unit
 ) {
     var address by rememberSaveable(
@@ -606,7 +608,11 @@ fun WebCaptureScreen(
                                                                         payload =
                                                                             payload,
                                                                         downloadedFiles =
-                                                                            downloadResult.files
+                                                                            downloadResult.files,
+                                                                        discoveryMode =
+                                                                            discoveryMode,
+                                                                        discoveryQuery =
+                                                                            discoveryQuery
                                                                     )
 
                                                             when (

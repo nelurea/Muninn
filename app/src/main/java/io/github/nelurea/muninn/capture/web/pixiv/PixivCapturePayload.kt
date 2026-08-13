@@ -5,6 +5,7 @@ data class PixivCapturePayload(
     val sourceId: String,
     val canonicalUrl: String,
     val capturedAt: String,
+    val publishedAt: String? = null,
 
     val authorId: String?,
     val authorName: String?,
