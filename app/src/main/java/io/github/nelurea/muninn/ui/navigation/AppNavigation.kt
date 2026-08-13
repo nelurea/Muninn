@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Modifier
+import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
 
 @Composable
 fun AppNavigation(
@@ -61,13 +62,25 @@ fun AppNavigation(
             )
         }
 
+    val pixivDiscoverySaveUseCase =
+        remember {
+            PixivDiscoverySaveUseCase(
+                context =
+                    context.applicationContext,
+                saveCaptureUseCase =
+                    saveCaptureUseCase
+            )
+        }
+
     val discoveryViewModel =
         remember {
             DiscoveryViewModel(
                 source =
                     PixivDiscoverySource(),
                 previewSource =
-                    PixivArtworkPreviewSource()
+                    PixivArtworkPreviewSource(),
+                saveUseCase =
+                    pixivDiscoverySaveUseCase
             )
         }
 

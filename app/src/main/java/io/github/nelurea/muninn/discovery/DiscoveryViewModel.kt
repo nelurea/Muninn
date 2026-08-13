@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.nelurea.muninn.capture.discovery.DiscoveryArtworkSaveMode
+import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
+import io.github.nelurea.muninn.capture.usecase.SaveCaptureResult
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
@@ -14,6 +17,7 @@ import kotlinx.coroutines.launch
 class DiscoveryViewModel(
     private val source: DiscoverySource,
     private val previewSource: ArtworkPreviewSource,
+    private val saveUseCase: PixivDiscoverySaveUseCase,
     initialMode: DiscoveryMode =
         DiscoveryMode.LATEST
 ) : ViewModel() {
@@ -180,6 +184,12 @@ class DiscoveryViewModel(
                             isLoading =
                                 false,
                             error =
+                                null,
+                            isSaving =
+                                false,
+                            saveMessage =
+                                null,
+                            saveError =
                                 null
                         )
                 }
@@ -203,7 +213,13 @@ class DiscoveryViewModel(
                                 false,
                             error =
                                 error.message
-                                    ?: "Failed to load artwork preview."
+                                    ?: "Failed to load artwork preview.",
+                            isSaving =
+                                false,
+                            saveMessage =
+                                null,
+                            saveError =
+                                null
                         )
                 }
         }
@@ -254,7 +270,11 @@ class DiscoveryViewModel(
                 selectedMediaIndices =
                     previewState
                         .selectedMediaIndices +
-                            mediaIndex
+                            mediaIndex,
+                saveMessage =
+                    null,
+                saveError =
+                    null
             )
     }
 
@@ -273,8 +293,143 @@ class DiscoveryViewModel(
                 selectedMediaIndices =
                     previewState
                         .selectedMediaIndices -
-                            mediaIndex
+                            mediaIndex,
+                saveMessage =
+                    null,
+                saveError =
+                    null
             )
+    }
+
+    fun saveAll() {
+        savePreview(
+            saveMode =
+                DiscoveryArtworkSaveMode.ALL
+        )
+    }
+
+    fun saveSelected() {
+        savePreview(
+            saveMode =
+                DiscoveryArtworkSaveMode.SELECTED
+        )
+    }
+
+    private fun savePreview(
+        saveMode: DiscoveryArtworkSaveMode
+    ) {
+        if (
+            previewState.isSaving
+        ) {
+            return
+        }
+
+        val preview =
+            previewState.preview
+                ?: return
+
+        val selectedMediaIndices =
+            previewState.selectedMediaIndices
+
+        if (
+            saveMode ==
+            DiscoveryArtworkSaveMode.SELECTED &&
+            selectedMediaIndices.isEmpty()
+        ) {
+            previewState =
+                previewState.copy(
+                    saveMessage =
+                        null,
+                    saveError =
+                        "Select at least one page first."
+                )
+
+            return
+        }
+
+        val requestGeneration =
+            previewGeneration
+
+        val discoveryMode =
+            mode.name
+
+        val discoveryQuery =
+            searchQuery
+                .takeIf {
+                    mode ==
+                            DiscoveryMode.SEARCH &&
+                            it.isNotBlank()
+                }
+
+        previewState =
+            previewState.copy(
+                isSaving =
+                    true,
+                saveMessage =
+                    null,
+                saveError =
+                    null
+            )
+
+        viewModelScope.launch {
+            val result =
+                saveUseCase.save(
+                    preview =
+                        preview,
+                    selectedMediaIndices =
+                        selectedMediaIndices,
+                    mode =
+                        saveMode,
+                    discoveryMode =
+                        discoveryMode,
+                    discoveryQuery =
+                        discoveryQuery
+                )
+
+            if (
+                requestGeneration !=
+                previewGeneration
+            ) {
+                return@launch
+            }
+
+            when (
+                result
+            ) {
+                is SaveCaptureResult.Success -> {
+                    previewState =
+                        previewState.copy(
+                            isSaving =
+                                false,
+                            saveMessage =
+                                if (
+                                    result.mediaCount == 1
+                                ) {
+                                    "Saved 1 page."
+                                } else {
+                                    "Saved ${result.mediaCount} pages."
+                                },
+                            saveError =
+                                null
+                        )
+                }
+
+                is SaveCaptureResult.Failure -> {
+                    previewState =
+                        previewState.copy(
+                            isSaving =
+                                false,
+                            saveMessage =
+                                null,
+                            saveError =
+                                result.errors
+                                    .joinToString(
+                                        separator = "\n"
+                                    )
+                        )
+                }
+            }
+        }
     }
 
     fun loadInitial() {
@@ -550,5 +705,14 @@ data class ArtworkPreviewUiState(
         false,
 
     val error: String? =
+        null,
+
+    val isSaving: Boolean =
+        false,
+
+    val saveMessage: String? =
+        null,
+
+    val saveError: String? =
         null
 )

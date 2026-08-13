@@ -366,3 +366,18 @@ val MIGRATION_11_12 =
             )
         }
     }
+
+val MIGRATION_12_13 =
+    object : Migration(12, 13) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                ALTER TABLE captured_media
+                ADD COLUMN isHighlighted INTEGER NOT NULL DEFAULT 0
+                """.trimIndent()
+            )
+        }
+    }

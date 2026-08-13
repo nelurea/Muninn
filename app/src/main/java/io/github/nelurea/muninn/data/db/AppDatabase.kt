@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         CapturedMediaEntity::class,
         CapturedTagEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

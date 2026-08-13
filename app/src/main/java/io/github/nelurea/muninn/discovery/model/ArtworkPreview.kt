@@ -5,6 +5,8 @@ data class ArtworkPreview(
     val sourceItemId: String,
     val canonicalUrl: String,
 
+    val publishedAt: String?,
+
     val title: String?,
     val caption: String?,
 

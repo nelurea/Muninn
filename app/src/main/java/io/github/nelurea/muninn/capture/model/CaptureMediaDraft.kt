@@ -8,5 +8,7 @@ data class CaptureMediaDraft(
     val mimeType: String,
     val fileName: String,
 
-    val sourceFile: File
+    val sourceFile: File,
+
+    val isHighlighted: Boolean = false
 )

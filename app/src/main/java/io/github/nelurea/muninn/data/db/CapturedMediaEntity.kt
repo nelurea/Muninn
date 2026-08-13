@@ -33,5 +33,7 @@ data class CapturedMediaEntity(
     val localUri: String,
     val sourceUrl: String,
     val mimeType: String,
-    val fileName: String
+    val fileName: String,
+
+    val isHighlighted: Boolean
 )
