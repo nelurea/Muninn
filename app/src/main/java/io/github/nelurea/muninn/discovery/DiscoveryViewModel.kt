@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
@@ -12,12 +13,18 @@ import kotlinx.coroutines.launch
 
 class DiscoveryViewModel(
     private val source: DiscoverySource,
+    private val previewSource: ArtworkPreviewSource,
     initialMode: DiscoveryMode =
         DiscoveryMode.LATEST
 ) : ViewModel() {
 
     var uiState by mutableStateOf(
         DiscoveryUiState()
+    )
+        private set
+
+    var previewState by mutableStateOf(
+        ArtworkPreviewUiState()
     )
         private set
 
@@ -43,6 +50,9 @@ class DiscoveryViewModel(
     private var generation =
         0
 
+    private var previewGeneration =
+        0
+
     init {
         loadInitial()
     }
@@ -55,6 +65,8 @@ class DiscoveryViewModel(
         ) {
             return
         }
+
+        closePreview()
 
         mode =
             newMode
@@ -92,6 +104,8 @@ class DiscoveryViewModel(
         searchQuery =
             normalizedQuery
 
+        closePreview()
+
         if (
             normalizedQuery.isBlank()
         ) {
@@ -100,6 +114,167 @@ class DiscoveryViewModel(
         }
 
         loadInitial()
+    }
+
+    fun searchByTag(
+        tag: String
+    ) {
+        val normalizedTag =
+            tag.trim()
+
+        if (
+            normalizedTag.isBlank()
+        ) {
+            return
+        }
+
+        closePreview()
+
+        mode =
+            DiscoveryMode.SEARCH
+
+        searchQuery =
+            normalizedTag
+
+        loadInitial()
+    }
+
+    fun openPreview(
+        item: DiscoveryItem
+    ) {
+        previewGeneration += 1
+
+        val requestGeneration =
+            previewGeneration
+
+        previewState =
+            ArtworkPreviewUiState(
+                item =
+                    item,
+                isLoading =
+                    true
+            )
+
+        viewModelScope.launch {
+            runCatching {
+                previewSource.load(
+                    item
+                )
+            }
+                .onSuccess {
+                        preview ->
+
+                    if (
+                        requestGeneration !=
+                        previewGeneration
+                    ) {
+                        return@onSuccess
+                    }
+
+                    previewState =
+                        previewState.copy(
+                            preview =
+                                preview,
+                            selectedMediaIndices =
+                                emptySet(),
+                            isLoading =
+                                false,
+                            error =
+                                null
+                        )
+                }
+                .onFailure {
+                        error ->
+
+                    if (
+                        requestGeneration !=
+                        previewGeneration
+                    ) {
+                        return@onFailure
+                    }
+
+                    previewState =
+                        previewState.copy(
+                            preview =
+                                null,
+                            selectedMediaIndices =
+                                emptySet(),
+                            isLoading =
+                                false,
+                            error =
+                                error.message
+                                    ?: "Failed to load artwork preview."
+                        )
+                }
+        }
+    }
+
+    fun closePreview() {
+        previewGeneration += 1
+
+        previewState =
+            ArtworkPreviewUiState()
+    }
+
+    fun retryPreview() {
+        val item =
+            previewState.item
+                ?: return
+
+        openPreview(
+            item
+        )
+    }
+
+    fun selectMedia(
+        mediaIndex: Int
+    ) {
+        val preview =
+            previewState.preview
+                ?: return
+
+        if (
+            preview.media.none {
+                it.mediaIndex ==
+                        mediaIndex
+            }
+        ) {
+            return
+        }
+
+        if (
+            mediaIndex in
+            previewState.selectedMediaIndices
+        ) {
+            return
+        }
+
+        previewState =
+            previewState.copy(
+                selectedMediaIndices =
+                    previewState
+                        .selectedMediaIndices +
+                            mediaIndex
+            )
+    }
+
+    fun deselectMedia(
+        mediaIndex: Int
+    ) {
+        if (
+            mediaIndex !in
+            previewState.selectedMediaIndices
+        ) {
+            return
+        }
+
+        previewState =
+            previewState.copy(
+                selectedMediaIndices =
+                    previewState
+                        .selectedMediaIndices -
+                            mediaIndex
+            )
     }
 
     fun loadInitial() {
@@ -356,6 +531,23 @@ data class DiscoveryUiState(
 
     val hasNextPage: Boolean =
         true,
+
+    val error: String? =
+        null
+)
+
+data class ArtworkPreviewUiState(
+    val item: DiscoveryItem? =
+        null,
+
+    val preview: ArtworkPreview? =
+        null,
+
+    val selectedMediaIndices: Set<Int> =
+        emptySet(),
+
+    val isLoading: Boolean =
+        false,
 
     val error: String? =
         null
