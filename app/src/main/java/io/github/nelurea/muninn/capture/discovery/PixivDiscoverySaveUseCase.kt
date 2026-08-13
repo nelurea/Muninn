@@ -39,29 +39,30 @@ class PixivDiscoverySaveUseCase(
         withContext(
             Dispatchers.IO
         ) {
-            val mediaToSave =
-                when (
-                    mode
-                ) {
-                    DiscoveryArtworkSaveMode.ALL ->
-                        preview.media
-
-                    DiscoveryArtworkSaveMode.SELECTED ->
-                        preview.media.filter {
-                            it.mediaIndex in
-                                    selectedMediaIndices
-                        }
-                }
-
-            if (
-                mediaToSave.isEmpty()
-            ) {
-                return@withContext SaveCaptureResult.Failure(
-                    listOf(
-                        "No artwork pages were selected."
-                    )
+            val savePlan =
+                buildDiscoveryArtworkSavePlan(
+                    preview =
+                        preview,
+                    selectedMediaIndices =
+                        selectedMediaIndices,
+                    mode =
+                        mode
                 )
-            }
+
+            val planItems =
+                when (
+                    savePlan
+                ) {
+                    is DiscoveryArtworkSavePlan.Ready ->
+                        savePlan.items
+
+                    is DiscoveryArtworkSavePlan.Failure ->
+                        return@withContext SaveCaptureResult.Failure(
+                            listOf(
+                                savePlan.error
+                            )
+                        )
+                }
 
             val temporaryDirectory =
                 File(
@@ -81,15 +82,15 @@ class PixivDiscoverySaveUseCase(
 
             try {
                 val mediaDrafts =
-                    mediaToSave.map {
-                            media ->
+                    planItems.map {
+                            planItem ->
 
                         val fileName =
                             resolveFileName(
                                 sourceUrl =
-                                    media.originalUrl,
+                                    planItem.originalUrl,
                                 mediaIndex =
-                                    media.mediaIndex
+                                    planItem.mediaIndex
                             )
 
                         val destination =
@@ -100,17 +101,17 @@ class PixivDiscoverySaveUseCase(
 
                         downloadOne(
                             sourceUrl =
-                                media.originalUrl,
+                                planItem.originalUrl,
                             destination =
                                 destination
                         )
 
                         CaptureMediaDraft(
                             mediaIndex =
-                                media.mediaIndex,
+                                planItem.mediaIndex,
 
                             sourceUrl =
-                                media.originalUrl,
+                                planItem.originalUrl,
 
                             mimeType =
                                 URLConnection
@@ -126,8 +127,7 @@ class PixivDiscoverySaveUseCase(
                                 destination,
 
                             isHighlighted =
-                                media.mediaIndex in
-                                        selectedMediaIndices
+                                planItem.isHighlighted
                         )
                     }
 
@@ -340,4 +340,68 @@ class PixivDiscoverySaveUseCase(
                     "(KHTML, like Gecko) " +
                     "Chrome/120.0 Mobile Safari/537.36"
     }
+}
+
+data class DiscoveryArtworkSavePlanItem(
+    val mediaIndex: Int,
+    val originalUrl: String,
+    val isHighlighted: Boolean
+)
+
+sealed interface DiscoveryArtworkSavePlan {
+
+    data class Ready(
+        val items: List<DiscoveryArtworkSavePlanItem>
+    ) : DiscoveryArtworkSavePlan
+
+    data class Failure(
+        val error: String
+    ) : DiscoveryArtworkSavePlan
+}
+
+internal fun buildDiscoveryArtworkSavePlan(
+    preview: ArtworkPreview,
+    selectedMediaIndices: Set<Int>,
+    mode: DiscoveryArtworkSaveMode
+): DiscoveryArtworkSavePlan {
+
+    val mediaToSave =
+        when (
+            mode
+        ) {
+            DiscoveryArtworkSaveMode.ALL ->
+                preview.media
+
+            DiscoveryArtworkSaveMode.SELECTED ->
+                preview.media.filter {
+                    it.mediaIndex in
+                            selectedMediaIndices
+                }
+        }
+
+    if (
+        mediaToSave.isEmpty()
+    ) {
+        return DiscoveryArtworkSavePlan.Failure(
+            error =
+                "No artwork pages were selected."
+        )
+    }
+
+    return DiscoveryArtworkSavePlan.Ready(
+        items =
+            mediaToSave.map {
+                    media ->
+
+                DiscoveryArtworkSavePlanItem(
+                    mediaIndex =
+                        media.mediaIndex,
+                    originalUrl =
+                        media.originalUrl,
+                    isHighlighted =
+                        media.mediaIndex in
+                                selectedMediaIndices
+                )
+            }
+    )
 }
