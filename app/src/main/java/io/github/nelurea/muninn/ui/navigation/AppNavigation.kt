@@ -56,6 +56,14 @@ fun AppNavigation(
             )
         }
 
+    val discoveryViewModel =
+        remember {
+            DiscoveryViewModel(
+                source =
+                    PixivDiscoverySource()
+            )
+        }
+
     NavHost(
         navController =
             navController,
@@ -275,14 +283,6 @@ fun AppNavigation(
             route =
                 "discovery"
         ) {
-            val discoveryViewModel =
-                remember {
-                    DiscoveryViewModel(
-                        source =
-                            PixivDiscoverySource()
-                    )
-                }
-
             DiscoveryScreen(
                 viewModel =
                     discoveryViewModel,
