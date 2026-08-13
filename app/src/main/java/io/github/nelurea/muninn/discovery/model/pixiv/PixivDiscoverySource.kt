@@ -1,5 +1,6 @@
 package io.github.nelurea.muninn.discovery.pixiv
 
+import android.net.Uri
 import android.webkit.CookieManager
 import io.github.nelurea.muninn.discovery.DiscoveryPage
 import io.github.nelurea.muninn.discovery.DiscoverySource
@@ -25,7 +26,8 @@ class PixivDiscoverySource(
 
     override suspend fun load(
         mode: DiscoveryMode,
-        page: Int
+        page: Int,
+        query: String?
     ): DiscoveryPage {
         return when (
             mode
@@ -39,6 +41,25 @@ class PixivDiscoverySource(
 
             DiscoveryMode.BOOKMARKS -> {
                 loadBookmarks(
+                    page =
+                        page
+                )
+            }
+
+            DiscoveryMode.SEARCH -> {
+                val searchQuery =
+                    query
+                        ?.trim()
+                        ?.takeIf {
+                            it.isNotBlank()
+                        }
+                        ?: throw PixivDiscoveryException(
+                            "Search query must not be blank."
+                        )
+
+                loadSearch(
+                    query =
+                        searchQuery,
                     page =
                         page
                 )
@@ -65,17 +86,7 @@ class PixivDiscoverySource(
                 )
 
             val cookie =
-                cookieManager.getCookie(
-                    PIXIV_ORIGIN
-                )
-
-            if (
-                cookie.isNullOrBlank()
-            ) {
-                throw PixivDiscoveryException(
-                    "No authenticated Pixiv session is available."
-                )
-            }
+                requireCookie()
 
             val connection =
                 URL(
@@ -99,37 +110,13 @@ class PixivDiscoverySource(
                 if (
                     status !in 200..299
                 ) {
-                    val errorBody =
-                        connection.errorStream
-                            ?.bufferedReader()
-                            ?.use {
-                                it.readText()
-                            }
-
-                    throw PixivDiscoveryException(
-                        buildString {
-                            append(
-                                "Pixiv Following request failed: HTTP "
-                            )
-
-                            append(
-                                status
-                            )
-
-                            if (
-                                !errorBody.isNullOrBlank()
-                            ) {
-                                append(
-                                    " - "
-                                )
-
-                                append(
-                                    errorBody.take(
-                                        300
-                                    )
-                                )
-                            }
-                        }
+                    throwRequestError(
+                        connection =
+                            connection,
+                        label =
+                            "Pixiv Following",
+                        status =
+                            status
                     )
                 }
 
@@ -213,17 +200,7 @@ class PixivDiscoverySource(
                     )
 
             val cookie =
-                cookieManager.getCookie(
-                    PIXIV_ORIGIN
-                )
-
-            if (
-                cookie.isNullOrBlank()
-            ) {
-                throw PixivDiscoveryException(
-                    "No authenticated Pixiv session is available."
-                )
-            }
+                requireCookie()
 
             val requestUrl =
                 buildBookmarksUrl(
@@ -255,37 +232,13 @@ class PixivDiscoverySource(
                 if (
                     status !in 200..299
                 ) {
-                    val errorBody =
-                        connection.errorStream
-                            ?.bufferedReader()
-                            ?.use {
-                                it.readText()
-                            }
-
-                    throw PixivDiscoveryException(
-                        buildString {
-                            append(
-                                "Pixiv Bookmarks request failed: HTTP "
-                            )
-
-                            append(
-                                status
-                            )
-
-                            if (
-                                !errorBody.isNullOrBlank()
-                            ) {
-                                append(
-                                    " - "
-                                )
-
-                                append(
-                                    errorBody.take(
-                                        300
-                                    )
-                                )
-                            }
-                        }
+                    throwRequestError(
+                        connection =
+                            connection,
+                        label =
+                            "Pixiv Bookmarks",
+                        status =
+                            status
                     )
                 }
 
@@ -354,6 +307,140 @@ class PixivDiscoverySource(
             }
         }
 
+    private suspend fun loadSearch(
+        query: String,
+        page: Int
+    ): DiscoveryPage =
+        withContext(
+            Dispatchers.IO
+        ) {
+            require(
+                page >= 1
+            ) {
+                "page must be >= 1"
+            }
+
+            val cookie =
+                requireCookie()
+
+            val requestUrl =
+                buildSearchUrl(
+                    query =
+                        query,
+                    page =
+                        page
+                )
+
+            val connection =
+                URL(
+                    requestUrl
+                ).openConnection()
+                        as HttpURLConnection
+
+            try {
+                configureConnection(
+                    connection =
+                        connection,
+                    cookie =
+                        cookie,
+                    referer =
+                        buildSearchReferer(
+                            query =
+                                query
+                        )
+                )
+
+                val status =
+                    connection.responseCode
+
+                if (
+                    status !in 200..299
+                ) {
+                    throwRequestError(
+                        connection =
+                            connection,
+                        label =
+                            "Pixiv Search",
+                        status =
+                            status
+                    )
+                }
+
+                val json =
+                    connection.inputStream
+                        .bufferedReader()
+                        .use {
+                            it.readText()
+                        }
+
+                val response =
+                    try {
+                        PixivSearchParser.parse(
+                            json
+                        )
+                    } catch (
+                        error: Exception
+                    ) {
+                        throw PixivDiscoveryException(
+                            message =
+                                "Failed to parse Pixiv Search response.",
+                            cause =
+                                error
+                        )
+                    }
+
+                if (
+                    response.error
+                ) {
+                    throw PixivDiscoveryException(
+                        response.message
+                            ?: "Pixiv returned a Search error."
+                    )
+                }
+
+                val illustManga =
+                    response.body
+                        ?.illustManga
+                        ?: throw PixivDiscoveryException(
+                            "Pixiv Search response has no illustration data."
+                        )
+
+                val items =
+                    PixivSearchMapper.mapAll(
+                        illustManga.data
+                    )
+
+                DiscoveryPage(
+                    items =
+                        items,
+                    page =
+                        page,
+                    hasNextPage =
+                        illustManga.lastPage
+                            ?.let {
+                                    lastPage ->
+
+                                page < lastPage
+                            }
+                            ?: items.isNotEmpty()
+                )
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+    private fun requireCookie(): String {
+        return cookieManager.getCookie(
+            PIXIV_ORIGIN
+        )
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?: throw PixivDiscoveryException(
+                "No authenticated Pixiv session is available."
+            )
+    }
+
     private fun configureConnection(
         connection: HttpURLConnection,
         cookie: String,
@@ -389,6 +476,49 @@ class PixivDiscoverySource(
         connection.setRequestProperty(
             "User-Agent",
             USER_AGENT
+        )
+    }
+
+    private fun throwRequestError(
+        connection: HttpURLConnection,
+        label: String,
+        status: Int
+    ): Nothing {
+        val errorBody =
+            connection.errorStream
+                ?.bufferedReader()
+                ?.use {
+                    it.readText()
+                }
+
+        throw PixivDiscoveryException(
+            buildString {
+                append(
+                    label
+                )
+
+                append(
+                    " request failed: HTTP "
+                )
+
+                append(
+                    status
+                )
+
+                if (
+                    !errorBody.isNullOrBlank()
+                ) {
+                    append(
+                        " - "
+                    )
+
+                    append(
+                        errorBody.take(
+                            300
+                        )
+                    )
+                }
+            }
         )
     }
 
@@ -473,6 +603,94 @@ class PixivDiscoverySource(
 
             append(
                 "&lang=ja"
+            )
+        }
+    }
+
+    private fun buildSearchUrl(
+        query: String,
+        page: Int
+    ): String {
+        val encodedQuery =
+            Uri.encode(
+                query
+            )
+
+        return buildString {
+            append(
+                PIXIV_ORIGIN
+            )
+
+            append(
+                "/ajax/search/artworks/"
+            )
+
+            append(
+                encodedQuery
+            )
+
+            append(
+                "?order=date_d"
+            )
+
+            append(
+                "&mode=all"
+            )
+
+            append(
+                "&p="
+            )
+
+            append(
+                page
+            )
+
+            append(
+                "&ai_type=0"
+            )
+
+            append(
+                "&csw=1"
+            )
+
+            append(
+                "&s_mode=s_tag"
+            )
+
+            append(
+                "&ratio="
+            )
+
+            append(
+                "&lang=ja"
+            )
+        }
+    }
+
+    private fun buildSearchReferer(
+        query: String
+    ): String {
+        return buildString {
+            append(
+                PIXIV_ORIGIN
+            )
+
+            append(
+                "/search?q="
+            )
+
+            append(
+                Uri.encode(
+                    query
+                )
+            )
+
+            append(
+                "&s_mode=tag"
+            )
+
+            append(
+                "&type=artwork"
             )
         }
     }

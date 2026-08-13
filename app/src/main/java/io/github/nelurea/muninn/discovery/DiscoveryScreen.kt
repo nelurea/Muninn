@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,33 +17,34 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.nelurea.muninn.discovery.DiscoveryViewModel
 import io.github.nelurea.muninn.discovery.model.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
-import kotlinx.coroutines.flow.distinctUntilChanged
-import androidx.compose.foundation.layout.aspectRatio
-import coil.compose.AsyncImage
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.OutlinedButton
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun DiscoveryScreen(
@@ -137,54 +140,106 @@ fun DiscoveryScreen(
                     8.dp
                 )
         ) {
-            if (
-                viewModel.mode ==
-                DiscoveryMode.LATEST
-            ) {
-                Button(
-                    onClick = {
-                    }
-                ) {
-                    Text(
-                        "Latest"
+            DiscoveryModeButton(
+                label =
+                    "Latest",
+                selected =
+                    viewModel.mode ==
+                            DiscoveryMode.LATEST,
+                onClick = {
+                    viewModel.selectMode(
+                        DiscoveryMode.LATEST
                     )
                 }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        viewModel.selectMode(
-                            DiscoveryMode.LATEST
-                        )
-                    }
-                ) {
-                    Text(
-                        "Latest"
-                    )
-                }
-            }
+            )
 
-            if (
-                viewModel.mode ==
-                DiscoveryMode.BOOKMARKS
-            ) {
-                Button(
-                    onClick = {
-                    }
-                ) {
-                    Text(
-                        "Bookmarks"
+            DiscoveryModeButton(
+                label =
+                    "Bookmarks",
+                selected =
+                    viewModel.mode ==
+                            DiscoveryMode.BOOKMARKS,
+                onClick = {
+                    viewModel.selectMode(
+                        DiscoveryMode.BOOKMARKS
                     )
                 }
-            } else {
-                OutlinedButton(
-                    onClick = {
-                        viewModel.selectMode(
-                            DiscoveryMode.BOOKMARKS
+            )
+
+            DiscoveryModeButton(
+                label =
+                    "Search",
+                selected =
+                    viewModel.mode ==
+                            DiscoveryMode.SEARCH,
+                onClick = {
+                    viewModel.selectMode(
+                        DiscoveryMode.SEARCH
+                    )
+                }
+            )
+        }
+
+        if (
+            viewModel.mode ==
+            DiscoveryMode.SEARCH
+        ) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 8.dp,
+                            vertical = 8.dp
+                        ),
+                verticalAlignment =
+                    Alignment.CenterVertically,
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                OutlinedTextField(
+                    value =
+                        viewModel.searchQuery,
+                    onValueChange =
+                        viewModel::updateSearchQuery,
+                    modifier =
+                        Modifier.weight(
+                            1f
+                        ),
+                    singleLine =
+                        true,
+                    label = {
+                        Text(
+                            "Search Pixiv"
                         )
-                    }
+                    },
+                    keyboardOptions =
+                        KeyboardOptions(
+                            imeAction =
+                                ImeAction.Search
+                        ),
+                    keyboardActions =
+                        KeyboardActions(
+                            onSearch = {
+                                viewModel
+                                    .submitSearch()
+                            }
+                        )
+                )
+
+                Button(
+                    onClick = {
+                        viewModel
+                            .submitSearch()
+                    },
+                    enabled =
+                        viewModel.searchQuery
+                            .isNotBlank()
                 ) {
                     Text(
-                        "Bookmarks"
+                        "Search"
                     )
                 }
             }
@@ -198,14 +253,13 @@ fun DiscoveryScreen(
                         1f
                     )
         ) {
-
             when {
                 state.isLoading &&
                         state.items.isEmpty() -> {
 
                     Box(
                         modifier =
-                            modifier.fillMaxSize(),
+                            Modifier.fillMaxSize(),
                         contentAlignment =
                             Alignment.Center
                     ) {
@@ -218,7 +272,7 @@ fun DiscoveryScreen(
 
                     Column(
                         modifier =
-                            modifier
+                            Modifier
                                 .fillMaxSize()
                                 .padding(
                                     24.dp
@@ -259,7 +313,7 @@ fun DiscoveryScreen(
                         state =
                             gridState,
                         modifier =
-                            modifier.fillMaxSize(),
+                            Modifier.fillMaxSize(),
                         contentPadding =
                             PaddingValues(
                                 8.dp
@@ -366,6 +420,36 @@ fun DiscoveryScreen(
         }
     }
 }
+
+@Composable
+private fun DiscoveryModeButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    if (
+        selected
+    ) {
+        Button(
+            onClick = {
+            }
+        ) {
+            Text(
+                label
+            )
+        }
+    } else {
+        OutlinedButton(
+            onClick =
+                onClick
+        ) {
+            Text(
+                label
+            )
+        }
+    }
+}
+
 @Composable
 private fun DiscoveryBadge(
     text: String,
