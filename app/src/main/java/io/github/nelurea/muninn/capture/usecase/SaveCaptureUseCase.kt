@@ -88,6 +88,11 @@ class SaveCaptureUseCase(
             sourceId = draft.sourceId,
             canonicalUrl = draft.canonicalUrl,
             capturedAt = draft.capturedAt,
+
+            publishedAt = draft.publishedAt,
+            discoveryMode = draft.discoveryMode,
+            discoveryQuery = draft.discoveryQuery,
+
             authorId = draft.authorId,
             authorName = draft.authorName,
             title = draft.title,

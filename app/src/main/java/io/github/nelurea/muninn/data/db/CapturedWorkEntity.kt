@@ -22,6 +22,10 @@ data class CapturedWorkEntity(
     val canonicalUrl: String,
     val capturedAt: String,
 
+    val publishedAt: String?,
+    val discoveryMode: String?,
+    val discoveryQuery: String?,
+
     val authorId: String,
     val authorName: String,
     val title: String?,

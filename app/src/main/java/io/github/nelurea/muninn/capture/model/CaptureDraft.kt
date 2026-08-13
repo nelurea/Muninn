@@ -6,6 +6,10 @@ data class CaptureDraft(
     val canonicalUrl: String,
     val capturedAt: String,
 
+    val publishedAt: String? = null,
+    val discoveryMode: String? = null,
+    val discoveryQuery: String? = null,
+
     val authorId: String,
     val authorName: String,
     val title: String?,
