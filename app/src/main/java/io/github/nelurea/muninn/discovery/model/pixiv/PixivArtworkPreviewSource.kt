@@ -130,6 +130,11 @@ class PixivArtworkPreviewSource(
                 canonicalUrl =
                     item.canonicalUrl,
 
+                publishedAt =
+                    body.optNullableString(
+                        "createDate"
+                    ),
+
                 title =
                     body.optNullableString(
                         "illustTitle"

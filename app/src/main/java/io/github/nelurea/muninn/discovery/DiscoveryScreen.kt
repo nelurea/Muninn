@@ -13,14 +13,18 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,13 +37,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,24 +53,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.text.HtmlCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.nelurea.muninn.discovery.ArtworkPreviewUiState
 import io.github.nelurea.muninn.discovery.DiscoveryViewModel
+import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.ArtworkPreviewMedia
 import io.github.nelurea.muninn.discovery.model.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlin.math.abs
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.heightIn
-import androidx.core.text.HtmlCompat
-import androidx.compose.ui.text.style.TextOverflow
 
 @Composable
 fun DiscoveryScreen(
@@ -161,11 +160,14 @@ fun DiscoveryScreen(
                 onOpenOriginal = {
                     val item =
                         previewState.item
-                            ?: return@ArtworkPreviewOverlay
 
-                    onItemClick(
-                        item
-                    )
+                    if (
+                        item != null
+                    ) {
+                        onItemClick(
+                            item
+                        )
+                    }
                 },
                 onTagClick = {
                         tag ->
@@ -174,6 +176,14 @@ fun DiscoveryScreen(
                         .searchByTag(
                             tag
                         )
+                },
+                onSaveAll = {
+                    viewModel
+                        .saveAll()
+                },
+                onSaveSelected = {
+                    viewModel
+                        .saveSelected()
                 }
             )
         }
@@ -527,7 +537,9 @@ private fun ArtworkPreviewOverlay(
     onSelect: (Int) -> Unit,
     onDeselect: (Int) -> Unit,
     onOpenOriginal: () -> Unit,
-    onTagClick: (String) -> Unit
+    onTagClick: (String) -> Unit,
+    onSaveAll: () -> Unit,
+    onSaveSelected: () -> Unit
 ) {
     var controlsVisible by rememberSaveable {
         mutableStateOf(
@@ -624,7 +636,9 @@ private fun ArtworkPreviewOverlay(
                         modifier =
                             Modifier.fillMaxSize(),
                         beyondViewportPageCount =
-                            1
+                            1,
+                        userScrollEnabled =
+                            !state.isSaving
                     ) {
                             page ->
 
@@ -641,6 +655,8 @@ private fun ArtworkPreviewOverlay(
                                         state.selectedMediaIndices,
                             controlsVisible =
                                 controlsVisible,
+                            gesturesEnabled =
+                                !state.isSaving,
                             onSelect =
                                 onSelect,
                             onDeselect =
@@ -674,7 +690,9 @@ private fun ArtworkPreviewOverlay(
                         ) {
                             Button(
                                 onClick =
-                                    onClose
+                                    onClose,
+                                enabled =
+                                    !state.isSaving
                             ) {
                                 Text(
                                     "Close"
@@ -683,7 +701,9 @@ private fun ArtworkPreviewOverlay(
 
                             OutlinedButton(
                                 onClick =
-                                    onOpenOriginal
+                                    onOpenOriginal,
+                                enabled =
+                                    !state.isSaving
                             ) {
                                 Text(
                                     "Pixiv"
@@ -720,8 +740,18 @@ private fun ArtworkPreviewOverlay(
                                 state
                                     .selectedMediaIndices
                                     .size,
+                            isSaving =
+                                state.isSaving,
+                            saveMessage =
+                                state.saveMessage,
+                            saveError =
+                                state.saveError,
                             onTagClick =
                                 onTagClick,
+                            onSaveAll =
+                                onSaveAll,
+                            onSaveSelected =
+                                onSaveSelected,
                             modifier =
                                 Modifier
                                     .align(
@@ -737,19 +767,17 @@ private fun ArtworkPreviewOverlay(
 
 @Composable
 private fun ArtworkPreviewInfoPanel(
-    preview: io.github.nelurea.muninn.discovery.model.ArtworkPreview,
+    preview: ArtworkPreview,
     selected: Boolean,
     selectedCount: Int,
+    isSaving: Boolean,
+    saveMessage: String?,
+    saveError: String?,
     onTagClick: (String) -> Unit,
+    onSaveAll: () -> Unit,
+    onSaveSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var captionExpanded by remember(
-        preview.sourceItemId
-    ) {
-        mutableStateOf(
-            false
-        )
-    }
     val context =
         LocalContext.current
 
@@ -868,120 +896,12 @@ private fun ArtworkPreviewInfoPanel(
                 ?.let {
                         caption ->
 
-                    val plainCaption =
-                        HtmlCompat
-                            .fromHtml(
-                                caption,
-                                HtmlCompat
-                                    .FROM_HTML_MODE_LEGACY
-                            )
-                            .toString()
-                            .trim()
-
-                    if (
-                        plainCaption.isNotBlank()
-                    ) {
-                        var captionExpanded by remember(
+                    ArtworkCaption(
+                        caption =
+                            caption,
+                        sourceItemId =
                             preview.sourceItemId
-                        ) {
-                            mutableStateOf(
-                                false
-                            )
-                        }
-
-                        var captionOverflowed by remember(
-                            preview.sourceItemId
-                        ) {
-                            mutableStateOf(
-                                false
-                            )
-                        }
-
-                        Column(
-                            modifier =
-                                Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text =
-                                    plainCaption,
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clickable(
-                                            enabled =
-                                                captionExpanded ||
-                                                        captionOverflowed
-                                        ) {
-                                            captionExpanded =
-                                                !captionExpanded
-                                        },
-                                color =
-                                    Color.White.copy(
-                                        alpha = 0.82f
-                                    ),
-                                style =
-                                    MaterialTheme
-                                        .typography
-                                        .bodySmall,
-                                maxLines =
-                                    if (
-                                        captionExpanded
-                                    ) {
-                                        Int.MAX_VALUE
-                                    } else {
-                                        3
-                                    },
-                                overflow =
-                                    TextOverflow.Ellipsis,
-                                onTextLayout = {
-                                        result ->
-
-                                    if (
-                                        !captionExpanded
-                                    ) {
-                                        captionOverflowed =
-                                            result.hasVisualOverflow
-                                    }
-                                }
-                            )
-
-                            if (
-                                captionExpanded ||
-                                captionOverflowed
-                            ) {
-                                Text(
-                                    text =
-                                        if (
-                                            captionExpanded
-                                        ) {
-                                            "折りたたむ"
-                                        } else {
-                                            "続きを読む"
-                                        },
-                                    modifier =
-                                        Modifier
-                                            .align(
-                                                Alignment.End
-                                            )
-                                            .padding(
-                                                top = 3.dp
-                                            )
-                                            .clickable {
-                                                captionExpanded =
-                                                    !captionExpanded
-                                            },
-                                    color =
-                                        Color.White.copy(
-                                            alpha = 0.55f
-                                        ),
-                                    style =
-                                        MaterialTheme
-                                            .typography
-                                            .labelMedium
-                                )
-                            }
-                        }
-                    }
+                    )
                 }
 
             if (
@@ -1004,7 +924,10 @@ private fun ArtworkPreviewInfoPanel(
 
                         Surface(
                             modifier =
-                                Modifier.clickable {
+                                Modifier.clickable(
+                                    enabled =
+                                        !isSaving
+                                ) {
                                     onTagClick(
                                         tag
                                     )
@@ -1053,9 +976,9 @@ private fun ArtworkPreviewInfoPanel(
                         if (
                             selected
                         ) {
-                            "Selected · ↑ remove"
+                            "Selected \u00b7 \u2191 remove"
                         } else {
-                            "↓ select"
+                            "\u2193 select"
                         },
                     color =
                         if (
@@ -1090,6 +1013,234 @@ private fun ArtworkPreviewInfoPanel(
                             .labelMedium
                 )
             }
+
+            saveMessage
+                ?.let {
+                        message ->
+
+                    Text(
+                        text =
+                            message,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .primary,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelMedium
+                    )
+                }
+
+            saveError
+                ?.let {
+                        error ->
+
+                    Text(
+                        text =
+                            error,
+                        color =
+                            MaterialTheme
+                                .colorScheme
+                                .error,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelMedium
+                    )
+                }
+
+            if (
+                preview.media.size == 1
+            ) {
+                Button(
+                    onClick =
+                        onSaveAll,
+                    enabled =
+                        !isSaving,
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (
+                            isSaving
+                        ) {
+                            "Saving..."
+                        } else {
+                            "Save"
+                        }
+                    )
+                }
+            } else {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
+                ) {
+                    Button(
+                        onClick =
+                            onSaveAll,
+                        enabled =
+                            !isSaving,
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            )
+                    ) {
+                        Text(
+                            if (
+                                isSaving
+                            ) {
+                                "Saving..."
+                            } else {
+                                "Save all"
+                            }
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick =
+                            onSaveSelected,
+                        enabled =
+                            !isSaving &&
+                                    selectedCount > 0,
+                        modifier =
+                            Modifier.weight(
+                                1f
+                            )
+                    ) {
+                        Text(
+                            "Save selected"
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtworkCaption(
+    caption: String,
+    sourceItemId: String
+) {
+    val plainCaption =
+        HtmlCompat
+            .fromHtml(
+                caption,
+                HtmlCompat
+                    .FROM_HTML_MODE_LEGACY
+            )
+            .toString()
+            .trim()
+
+    if (
+        plainCaption.isBlank()
+    ) {
+        return
+    }
+
+    var expanded by remember(
+        sourceItemId
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var overflowed by remember(
+        sourceItemId
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text =
+                plainCaption,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        enabled =
+                            expanded ||
+                                    overflowed
+                    ) {
+                        expanded =
+                            !expanded
+                    },
+            color =
+                Color.White.copy(
+                    alpha = 0.82f
+                ),
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall,
+            maxLines =
+                if (
+                    expanded
+                ) {
+                    Int.MAX_VALUE
+                } else {
+                    3
+                },
+            overflow =
+                TextOverflow.Ellipsis,
+            onTextLayout = {
+                    result ->
+
+                if (
+                    !expanded
+                ) {
+                    overflowed =
+                        result.hasVisualOverflow
+                }
+            }
+        )
+
+        if (
+            expanded ||
+            overflowed
+        ) {
+            Text(
+                text =
+                    if (
+                        expanded
+                    ) {
+                        "\u6298\u308a\u305f\u305f\u3080"
+                    } else {
+                        "\u7d9a\u304d\u3092\u8aad\u3080"
+                    },
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.End
+                        )
+                        .padding(
+                            top = 3.dp
+                        )
+                        .clickable {
+                            expanded =
+                                !expanded
+                        },
+                color =
+                    Color.White.copy(
+                        alpha = 0.55f
+                    ),
+                style =
+                    MaterialTheme
+                        .typography
+                        .labelMedium
+            )
         }
     }
 }
@@ -1099,6 +1250,7 @@ private fun ArtworkPagerPage(
     media: ArtworkPreviewMedia,
     selected: Boolean,
     controlsVisible: Boolean,
+    gesturesEnabled: Boolean,
     onSelect: (Int) -> Unit,
     onDeselect: (Int) -> Unit,
     onToggleControls: () -> Unit
@@ -1140,8 +1292,15 @@ private fun ArtworkPagerPage(
             Modifier
                 .fillMaxSize()
                 .pointerInput(
-                    media.mediaIndex
+                    media.mediaIndex,
+                    gesturesEnabled
                 ) {
+                    if (
+                        !gesturesEnabled
+                    ) {
+                        return@pointerInput
+                    }
+
                     detectVerticalDragGestures(
                         onDragStart = {
                             verticalDragTotal =
@@ -1185,8 +1344,15 @@ private fun ArtworkPagerPage(
                     )
                 }
                 .pointerInput(
-                    media.mediaIndex
+                    media.mediaIndex,
+                    gesturesEnabled
                 ) {
+                    if (
+                        !gesturesEnabled
+                    ) {
+                        return@pointerInput
+                    }
+
                     detectTapGestures(
                         onTap = {
                             onToggleControls()
@@ -1217,6 +1383,7 @@ private fun ArtworkPagerPage(
                 )
             }
         )
+
         if (
             selected &&
             !controlsVisible
@@ -1244,7 +1411,7 @@ private fun ArtworkPagerPage(
             ) {
                 Text(
                     text =
-                        "✓",
+                        "\u2713",
                     modifier =
                         Modifier.padding(
                             horizontal = 10.dp,
@@ -1432,7 +1599,7 @@ private fun DiscoveryGridItem(
             ) {
                 DiscoveryBadge(
                     text =
-                        "▣ ${item.mediaCount}",
+                        "\u25a3 ${item.mediaCount}",
                     backgroundColor =
                         Color.Black.copy(
                             alpha = 0.72f

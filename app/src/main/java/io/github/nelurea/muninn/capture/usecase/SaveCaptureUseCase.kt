@@ -107,7 +107,8 @@ class SaveCaptureUseCase(
                 localUri = localUris[index],
                 sourceUrl = item.sourceUrl,
                 mimeType = item.mimeType,
-                fileName = item.fileName
+                fileName = item.fileName,
+                isHighlighted = item.isHighlighted
             )
         }
 
