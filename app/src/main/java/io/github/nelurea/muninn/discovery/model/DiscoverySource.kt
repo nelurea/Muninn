@@ -10,7 +10,8 @@ interface DiscoverySource {
 
     suspend fun load(
         mode: DiscoveryMode,
-        page: Int
+        page: Int,
+        query: String? = null
     ): DiscoveryPage
 }
 

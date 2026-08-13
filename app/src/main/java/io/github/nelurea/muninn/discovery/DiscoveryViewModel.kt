@@ -26,6 +26,11 @@ class DiscoveryViewModel(
     )
         private set
 
+    var searchQuery by mutableStateOf(
+        ""
+    )
+        private set
+
     private var currentPage =
         0
 
@@ -34,6 +39,9 @@ class DiscoveryViewModel(
 
     private var isLoading =
         false
+
+    private var generation =
+        0
 
     init {
         loadInitial()
@@ -51,21 +59,69 @@ class DiscoveryViewModel(
         mode =
             newMode
 
+        if (
+            newMode ==
+            DiscoveryMode.SEARCH &&
+            searchQuery.isBlank()
+        ) {
+            clearResults()
+            return
+        }
+
+        loadInitial()
+    }
+
+    fun updateSearchQuery(
+        newQuery: String
+    ) {
+        searchQuery =
+            newQuery
+    }
+
+    fun submitSearch() {
+        if (
+            mode !=
+            DiscoveryMode.SEARCH
+        ) {
+            return
+        }
+
+        val normalizedQuery =
+            searchQuery.trim()
+
+        searchQuery =
+            normalizedQuery
+
+        if (
+            normalizedQuery.isBlank()
+        ) {
+            clearResults()
+            return
+        }
+
         loadInitial()
     }
 
     fun loadInitial() {
         if (
-            isLoading
+            mode ==
+            DiscoveryMode.SEARCH &&
+            searchQuery.isBlank()
         ) {
+            clearResults()
             return
         }
+
+        generation += 1
 
         currentPage =
             0
 
         hasNextPage =
             true
+
+        isLoading =
+            false
 
         uiState =
             DiscoveryUiState(
@@ -77,7 +133,9 @@ class DiscoveryViewModel(
             page =
                 1,
             replace =
-                true
+                true,
+            requestGeneration =
+                generation
         )
     }
 
@@ -93,7 +151,9 @@ class DiscoveryViewModel(
             page =
                 currentPage + 1,
             replace =
-                false
+                false,
+            requestGeneration =
+                generation
         )
     }
 
@@ -107,9 +167,26 @@ class DiscoveryViewModel(
         }
     }
 
+    private fun clearResults() {
+        generation += 1
+
+        currentPage =
+            0
+
+        hasNextPage =
+            true
+
+        isLoading =
+            false
+
+        uiState =
+            DiscoveryUiState()
+    }
+
     private fun loadPage(
         page: Int,
-        replace: Boolean
+        replace: Boolean,
+        requestGeneration: Int
     ) {
         if (
             isLoading
@@ -130,17 +207,39 @@ class DiscoveryViewModel(
                     null
             )
 
+        val requestedMode =
+            mode
+
+        val requestedQuery =
+            if (
+                requestedMode ==
+                DiscoveryMode.SEARCH
+            ) {
+                searchQuery
+            } else {
+                null
+            }
+
         viewModelScope.launch {
             runCatching {
                 source.load(
                     mode =
-                        mode,
+                        requestedMode,
                     page =
-                        page
+                        page,
+                    query =
+                        requestedQuery
                 )
             }
                 .onSuccess {
                         result ->
+
+                    if (
+                        requestGeneration !=
+                        generation
+                    ) {
+                        return@onSuccess
+                    }
 
                     currentPage =
                         result.page
@@ -181,6 +280,13 @@ class DiscoveryViewModel(
                 }
                 .onFailure {
                         error ->
+
+                    if (
+                        requestGeneration !=
+                        generation
+                    ) {
+                        return@onFailure
+                    }
 
                     uiState =
                         uiState.copy(
