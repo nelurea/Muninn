@@ -13,9 +13,13 @@ import androidx.room.RoomDatabase
         CaptureEventEntity::class,
         CapturedWorkEntity::class,
         CapturedMediaEntity::class,
-        CapturedTagEntity::class
+        CapturedTagEntity::class,
+        StateVocabularyEntity::class,
+        SessionStateEntity::class,
+        PurposeVocabularyEntity::class,
+        CapturedWorkPurposeEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

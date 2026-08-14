@@ -107,6 +107,29 @@ fun SessionDetailScreen(
             )
         }
 
+        if (data.states.isNotEmpty()) {
+
+            item(
+                span = {
+                    GridItemSpan(maxLineSpan)
+                }
+            ) {
+                Text(
+                    text =
+                        "State: " +
+                                data.states
+                                    .sortedBy {
+                                        it.label
+                                    }
+                                    .joinToString(
+                                        separator = " · "
+                                    ) {
+                                        it.label
+                                    }
+                )
+            }
+        }
+
         if (data.images.isNotEmpty()) {
 
             item(
