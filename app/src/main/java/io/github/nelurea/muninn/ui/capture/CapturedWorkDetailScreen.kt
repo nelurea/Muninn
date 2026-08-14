@@ -2,11 +2,8 @@ package io.github.nelurea.muninn.ui.capture
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,9 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,7 +47,9 @@ fun CapturedWorkDetailScreen(
     repository: CapturedWorkRepository
 ) {
     var capturedWork by remember {
-        mutableStateOf<CapturedWorkWithMedia?>(null)
+        mutableStateOf<CapturedWorkWithMedia?>(
+            null
+        )
     }
 
     var loading by remember {
@@ -63,13 +60,16 @@ fun CapturedWorkDetailScreen(
         mutableStateOf(false)
     }
 
-    LaunchedEffect(workId) {
+    LaunchedEffect(
+        workId
+    ) {
         capturedWork =
             repository.getWithMediaById(
                 workId
             )
 
-        loading = false
+        loading =
+            false
     }
 
     Scaffold(
@@ -176,11 +176,7 @@ fun CapturedWorkDetailScreen(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .verticalScroll(
-                                    rememberScrollState()
-                                )
                     ) {
-
                         if (
                             media.isNotEmpty()
                         ) {
@@ -190,8 +186,8 @@ fun CapturedWorkDetailScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .height(
-                                            520.dp
+                                        .weight(
+                                            1f
                                         )
                             ) { page ->
 
@@ -271,153 +267,27 @@ fun CapturedWorkDetailScreen(
                                                     .CenterHorizontally
                                             )
                                             .padding(
-                                                top =
-                                                    8.dp
-                                            )
-                                )
-                            }
-                        }
-
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        16.dp
-                                    )
-                        ) {
-                            item.work.title
-                                ?.takeIf {
-                                    it.isNotBlank()
-                                }
-                                ?.let { title ->
-
-                                    Text(
-                                        text =
-                                            title,
-                                        style =
-                                            MaterialTheme
-                                                .typography
-                                                .titleLarge,
-                                        fontWeight =
-                                            FontWeight.Bold
-                                    )
-
-                                    Spacer(
-                                        Modifier.height(
-                                            8.dp
-                                        )
-                                    )
-                                }
-
-                            Text(
-                                text =
-                                    item.work
-                                        .authorName,
-                                style =
-                                    MaterialTheme
-                                        .typography
-                                        .titleMedium
-                            )
-
-                            item.work.caption
-                                .takeIf {
-                                    it.isNotBlank()
-                                }
-                                ?.let { caption ->
-
-                                    Spacer(
-                                        Modifier.height(
-                                            16.dp
-                                        )
-                                    )
-
-                                    Text(
-                                        text =
-                                            caption
-                                    )
-                                }
-
-                            val tags =
-                                remember(
-                                    item.tags
-                                ) {
-                                    item.tags
-                                        .sortedBy {
-                                            it.position
-                                        }
-                                        .map {
-                                            it.tag
-                                        }
-                                }
-
-                            if (
-                                tags.isNotEmpty()
-                            ) {
-                                Spacer(
-                                    Modifier.height(
-                                        16.dp
-                                    )
-                                )
-
-                                Text(
-                                    text =
-                                        tags.joinToString(
-                                            separator =
-                                                "  "
-                                        ) {
-                                            "#$it"
-                                        },
+                                                vertical =
+                                                    12.dp
+                                            ),
                                     style =
                                         MaterialTheme
                                             .typography
                                             .bodyMedium
                                 )
                             }
-
-                            Spacer(
-                                Modifier.height(
-                                    24.dp
+                        } else {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize(),
+                                contentAlignment =
+                                    Alignment.Center
+                            ) {
+                                Text(
+                                    "No saved media"
                                 )
-                            )
-
-                            DetailRow(
-                                label =
-                                    "Published",
-                                value =
-                                    item.work
-                                        .publishedAt
-                            )
-
-                            DetailRow(
-                                label =
-                                    "Captured",
-                                value =
-                                    item.work
-                                        .capturedAt
-                            )
-
-                            DetailRow(
-                                label =
-                                    "Discovery",
-                                value =
-                                    item.work
-                                        .discoveryMode
-                            )
-
-                            DetailRow(
-                                label =
-                                    "Query",
-                                value =
-                                    item.work
-                                        .discoveryQuery
-                            )
-
-                            Spacer(
-                                Modifier.height(
-                                    96.dp
-                                )
-                            )
+                            }
                         }
                     }
 
@@ -429,6 +299,8 @@ fun CapturedWorkDetailScreen(
                                 workId,
                             currentMediaId =
                                 currentMedia?.id,
+                            capturedWork =
+                                item,
                             repository =
                                 repository,
                             onDismiss = {
@@ -440,43 +312,5 @@ fun CapturedWorkDetailScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun DetailRow(
-    label: String,
-    value: String?
-) {
-    if (
-        value.isNullOrBlank()
-    ) {
-        return
-    }
-
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    vertical =
-                        3.dp
-                ),
-        horizontalArrangement =
-            Arrangement.spacedBy(
-                12.dp
-            )
-    ) {
-        Text(
-            text =
-                "$label:",
-            fontWeight =
-                FontWeight.SemiBold
-        )
-
-        Text(
-            text =
-                value
-        )
     }
 }

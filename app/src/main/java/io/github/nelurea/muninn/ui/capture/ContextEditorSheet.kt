@@ -50,6 +50,12 @@ import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.CenterFocusStrong
 import io.github.nelurea.muninn.data.db.MediaFocusEntity
+import androidx.compose.material.icons.filled.Info
+import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private data class AttractionDimensionUi(
     val key: String,
@@ -149,6 +155,7 @@ private val attractionDimensions =
 fun ContextEditorSheet(
     workId: Long,
     currentMediaId: Long?,
+    capturedWork: CapturedWorkWithMedia,
     repository: CapturedWorkRepository,
     onDismiss: () -> Unit
 ) {
@@ -271,6 +278,27 @@ fun ContextEditorSheet(
                         )
                     }
                 )
+
+                Tab(
+                    selected =
+                        selectedTab == 4,
+                    onClick = {
+                        selectedTab = 4
+                    },
+                    text = {
+                        Text(
+                            "Info"
+                        )
+                    },
+                    icon = {
+                        Icon(
+                            imageVector =
+                                Icons.Default.Info,
+                            contentDescription =
+                                null
+                        )
+                    }
+                )
             }
 
             Spacer(
@@ -317,6 +345,13 @@ fun ContextEditorSheet(
                             currentMediaId,
                         repository =
                             repository
+                    )
+                }
+
+                4 -> {
+                    InfoSection(
+                        capturedWork =
+                            capturedWork
                     )
                 }
             }
@@ -1473,5 +1508,244 @@ private fun AddTermField(
         Text(
             "Add"
         )
+    }
+}
+@Composable
+private fun InfoSection(
+    capturedWork: CapturedWorkWithMedia
+) {
+    val work =
+        capturedWork.work
+
+    val tags =
+        remember(
+            capturedWork.tags
+        ) {
+            capturedWork.tags
+                .sortedBy {
+                    it.position
+                }
+                .map {
+                    it.tag
+                }
+        }
+
+    EditorSection(
+        title =
+            "Artwork information"
+    ) {
+        InfoRow(
+            label =
+                "Title",
+            value =
+                work.title
+        )
+
+        InfoRow(
+            label =
+                "Author",
+            value =
+                work.authorName
+        )
+
+        if (
+            tags.isNotEmpty()
+        ) {
+            InfoRow(
+                label =
+                    "Tags",
+                value =
+                    tags.joinToString(
+                        separator =
+                            "  "
+                    ) {
+                        "#$it"
+                    }
+            )
+        }
+
+        InfoRow(
+            label =
+                "Published",
+            value =
+                formatJstDateTime(
+                    work.publishedAt
+                )
+        )
+
+        InfoRow(
+            label =
+                "Captured",
+            value =
+                formatJstDateTime(
+                    work.capturedAt
+                )
+        )
+
+        InfoRow(
+            label =
+                "Discovery",
+            value =
+                work.discoveryMode
+        )
+
+        InfoRow(
+            label =
+                "Query",
+            value =
+                work.discoveryQuery
+        )
+
+        InfoRow(
+            label =
+                "Source",
+            value =
+                work.sourceType
+        )
+
+        InfoRow(
+            label =
+                "URL",
+            value =
+                work.canonicalUrl
+        )
+
+        work.caption
+            .takeIf {
+                it.isNotBlank()
+            }
+            ?.let {
+                Spacer(
+                    Modifier.height(
+                        16.dp
+                    )
+                )
+
+                Text(
+                    text =
+                        "Caption",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelLarge,
+                    fontWeight =
+                        FontWeight.SemiBold
+                )
+
+                Spacer(
+                    Modifier.height(
+                        6.dp
+                    )
+                )
+
+                Text(
+                    text =
+                        it,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium
+                )
+            }
+    }
+}
+
+@Composable
+private fun InfoRow(
+    label: String,
+    value: String?
+) {
+    if (
+        value.isNullOrBlank()
+    ) {
+        return
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    vertical =
+                        6.dp
+                )
+    ) {
+        Text(
+            text =
+                label,
+            style =
+                MaterialTheme
+                    .typography
+                    .labelMedium,
+            fontWeight =
+                FontWeight.SemiBold
+        )
+
+        Spacer(
+            Modifier.height(
+                2.dp
+            )
+        )
+
+        Text(
+            text =
+                value,
+            style =
+                MaterialTheme
+                    .typography
+                    .bodyMedium
+        )
+    }
+}
+
+private fun formatJstDateTime(
+    value: String?
+): String? {
+    if (
+        value.isNullOrBlank()
+    ) {
+        return null
+    }
+
+    val zone =
+        ZoneId.of(
+            "Asia/Tokyo"
+        )
+
+    val formatter =
+        DateTimeFormatter.ofPattern(
+            "yyyy-MM-dd HH:mm:ss 'JST'"
+        )
+
+    return try {
+        Instant
+            .parse(
+                value
+            )
+            .atZone(
+                zone
+            )
+            .format(
+                formatter
+            )
+    } catch (
+        _: Exception
+    ) {
+        try {
+            OffsetDateTime
+                .parse(
+                    value
+                )
+                .atZoneSameInstant(
+                    zone
+                )
+                .format(
+                    formatter
+                )
+        } catch (
+            _: Exception
+        ) {
+            value
+        }
     }
 }
