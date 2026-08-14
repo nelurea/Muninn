@@ -6,6 +6,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.OnConflictStrategy
 
+
 @Dao
 abstract class CapturedWorkDao {
 
@@ -138,4 +139,200 @@ abstract class CapturedWorkDao {
     abstract suspend fun getPurposesForWork(
         workId: Long
     ): List<PurposeVocabularyEntity>
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertAttractionVocabulary(
+        attraction: AttractionVocabularyEntity
+    ): Long
+
+    @Query(
+        """
+    SELECT *
+    FROM attraction_vocabulary
+    ORDER BY dimension ASC, label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getAttractionVocabulary():
+            List<AttractionVocabularyEntity>
+
+    @Query(
+        """
+    SELECT id
+    FROM attraction_vocabulary
+    WHERE dimension = :dimension
+      AND label = :label
+    LIMIT 1
+    """
+    )
+    abstract suspend fun getAttractionVocabularyId(
+        dimension: String,
+        label: String
+    ): Long?
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertWorkAttraction(
+        attraction: CapturedWorkAttractionEntity
+    )
+
+    @Query(
+        """
+    DELETE FROM captured_work_attractions
+    WHERE workId = :workId
+      AND attractionVocabularyId = :attractionVocabularyId
+    """
+    )
+    abstract suspend fun deleteWorkAttraction(
+        workId: Long,
+        attractionVocabularyId: Long
+    )
+
+    @Query(
+        """
+    SELECT attraction_vocabulary.*
+    FROM attraction_vocabulary
+    INNER JOIN captured_work_attractions
+        ON attraction_vocabulary.id =
+           captured_work_attractions.attractionVocabularyId
+    WHERE captured_work_attractions.workId = :workId
+    ORDER BY attraction_vocabulary.dimension ASC,
+             attraction_vocabulary.label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getAttractionsForWork(
+        workId: Long
+    ): List<AttractionVocabularyEntity>
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertResponseVocabulary(
+        response: AestheticResponseVocabularyEntity
+    ): Long
+
+    @Query(
+        """
+    SELECT *
+    FROM aesthetic_response_vocabulary
+    ORDER BY label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getResponseVocabulary():
+            List<AestheticResponseVocabularyEntity>
+
+    @Query(
+        """
+    SELECT id
+    FROM aesthetic_response_vocabulary
+    WHERE label = :label
+    LIMIT 1
+    """
+    )
+    abstract suspend fun getResponseVocabularyId(
+        label: String
+    ): Long?
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertWorkResponse(
+        response: CapturedWorkResponseEntity
+    )
+
+    @Query(
+        """
+    DELETE FROM captured_work_responses
+    WHERE workId = :workId
+      AND responseVocabularyId = :responseVocabularyId
+    """
+    )
+    abstract suspend fun deleteWorkResponse(
+        workId: Long,
+        responseVocabularyId: Long
+    )
+
+    @Query(
+        """
+    SELECT aesthetic_response_vocabulary.*
+    FROM aesthetic_response_vocabulary
+    INNER JOIN captured_work_responses
+        ON aesthetic_response_vocabulary.id =
+           captured_work_responses.responseVocabularyId
+    WHERE captured_work_responses.workId = :workId
+    ORDER BY aesthetic_response_vocabulary.label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getResponsesForWork(
+        workId: Long
+    ): List<AestheticResponseVocabularyEntity>
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertMediaAttraction(
+        attraction: CapturedMediaAttractionEntity
+    )
+
+    @Query(
+        """
+    DELETE FROM captured_media_attractions
+    WHERE mediaId = :mediaId
+      AND attractionVocabularyId = :attractionVocabularyId
+    """
+    )
+    abstract suspend fun deleteMediaAttraction(
+        mediaId: Long,
+        attractionVocabularyId: Long
+    )
+
+    @Query(
+        """
+    SELECT attraction_vocabulary.*
+    FROM attraction_vocabulary
+    INNER JOIN captured_media_attractions
+        ON attraction_vocabulary.id =
+           captured_media_attractions.attractionVocabularyId
+    WHERE captured_media_attractions.mediaId = :mediaId
+    ORDER BY attraction_vocabulary.dimension ASC,
+             attraction_vocabulary.label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getAttractionsForMedia(
+        mediaId: Long
+    ): List<AttractionVocabularyEntity>
+
+    @Insert
+    abstract suspend fun insertMediaFocus(
+        focus: MediaFocusEntity
+    ): Long
+
+    @Query(
+        """
+    DELETE FROM media_focus
+    WHERE id = :focusId
+    """
+    )
+    abstract suspend fun deleteMediaFocus(
+        focusId: Long
+    )
+
+    @Query(
+        """
+    SELECT *
+    FROM media_focus
+    WHERE mediaId = :mediaId
+    ORDER BY id ASC
+    """
+    )
+    abstract suspend fun getFocusForMedia(
+        mediaId: Long
+    ): List<MediaFocusEntity>
 }

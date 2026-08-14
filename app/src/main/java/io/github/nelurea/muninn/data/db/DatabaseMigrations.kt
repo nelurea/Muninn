@@ -497,3 +497,199 @@ val MIGRATION_13_14 =
             )
         }
     }
+
+val MIGRATION_14_15 =
+    object : Migration(14, 15) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                CREATE TABLE `attraction_vocabulary` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `dimension` TEXT NOT NULL,
+                    `label` TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX
+                `index_attraction_vocabulary_dimension_label`
+                ON `attraction_vocabulary` (
+                    `dimension`,
+                    `label`
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `captured_work_attractions` (
+                    `workId` INTEGER NOT NULL,
+                    `attractionVocabularyId` INTEGER NOT NULL,
+                    PRIMARY KEY(
+                        `workId`,
+                        `attractionVocabularyId`
+                    ),
+                    FOREIGN KEY(`workId`)
+                        REFERENCES `captured_works`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(`attractionVocabularyId`)
+                        REFERENCES `attraction_vocabulary`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_work_attractions_workId`
+                ON `captured_work_attractions` (`workId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_work_attractions_attractionVocabularyId`
+                ON `captured_work_attractions` (`attractionVocabularyId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `captured_media_attractions` (
+                    `mediaId` INTEGER NOT NULL,
+                    `attractionVocabularyId` INTEGER NOT NULL,
+                    PRIMARY KEY(
+                        `mediaId`,
+                        `attractionVocabularyId`
+                    ),
+                    FOREIGN KEY(`mediaId`)
+                        REFERENCES `captured_media`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(`attractionVocabularyId`)
+                        REFERENCES `attraction_vocabulary`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_media_attractions_mediaId`
+                ON `captured_media_attractions` (`mediaId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_media_attractions_attractionVocabularyId`
+                ON `captured_media_attractions` (`attractionVocabularyId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `aesthetic_response_vocabulary` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `label` TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX
+                `index_aesthetic_response_vocabulary_label`
+                ON `aesthetic_response_vocabulary` (`label`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `captured_work_responses` (
+                    `workId` INTEGER NOT NULL,
+                    `responseVocabularyId` INTEGER NOT NULL,
+                    PRIMARY KEY(
+                        `workId`,
+                        `responseVocabularyId`
+                    ),
+                    FOREIGN KEY(`workId`)
+                        REFERENCES `captured_works`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(`responseVocabularyId`)
+                        REFERENCES `aesthetic_response_vocabulary`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_work_responses_workId`
+                ON `captured_work_responses` (`workId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_work_responses_responseVocabularyId`
+                ON `captured_work_responses` (`responseVocabularyId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `media_focus` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `mediaId` INTEGER NOT NULL,
+                    `attractionVocabularyId` INTEGER,
+                    `note` TEXT,
+                    `regionLeft` REAL,
+                    `regionTop` REAL,
+                    `regionRight` REAL,
+                    `regionBottom` REAL,
+                    FOREIGN KEY(`mediaId`)
+                        REFERENCES `captured_media`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(`attractionVocabularyId`)
+                        REFERENCES `attraction_vocabulary`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE SET NULL
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_media_focus_mediaId`
+                ON `media_focus` (`mediaId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_media_focus_attractionVocabularyId`
+                ON `media_focus` (`attractionVocabularyId`)
+                """.trimIndent()
+            )
+        }
+    }
