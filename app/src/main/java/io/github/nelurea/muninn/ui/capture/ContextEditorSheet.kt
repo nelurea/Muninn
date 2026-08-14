@@ -48,6 +48,8 @@ import io.github.nelurea.muninn.data.db.AttractionVocabularyEntity
 import io.github.nelurea.muninn.data.db.PurposeVocabularyEntity
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import io.github.nelurea.muninn.data.db.MediaFocusEntity
 
 private data class AttractionDimensionUi(
     val key: String,
@@ -248,6 +250,27 @@ fun ContextEditorSheet(
                         )
                     }
                 )
+
+                Tab(
+                    selected =
+                        selectedTab == 3,
+                    onClick = {
+                        selectedTab = 3
+                    },
+                    text = {
+                        Text(
+                            "Focus"
+                        )
+                    },
+                    icon = {
+                        Icon(
+                            imageVector =
+                                Icons.Default.CenterFocusStrong,
+                            contentDescription =
+                                null
+                        )
+                    }
+                )
             }
 
             Spacer(
@@ -283,6 +306,15 @@ fun ContextEditorSheet(
                     ResponseEditor(
                         workId =
                             workId,
+                        repository =
+                            repository
+                    )
+                }
+
+                3 -> {
+                    FocusEditor(
+                        currentMediaId =
+                            currentMediaId,
                         repository =
                             repository
                     )
@@ -998,6 +1030,376 @@ private fun ResponseEditor(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun FocusEditor(
+    currentMediaId: Long?,
+    repository: CapturedWorkRepository
+) {
+    var attractionVocabulary by remember {
+        mutableStateOf<
+                List<AttractionVocabularyEntity>
+                >(
+            emptyList()
+        )
+    }
+
+    var pageAttractions by remember {
+        mutableStateOf<
+                List<AttractionVocabularyEntity>
+                >(
+            emptyList()
+        )
+    }
+
+    var focuses by remember {
+        mutableStateOf<
+                List<MediaFocusEntity>
+                >(
+            emptyList()
+        )
+    }
+
+    var selectedAttractionId by remember {
+        mutableStateOf<Long?>(
+            null
+        )
+    }
+
+    var note by remember {
+        mutableStateOf("")
+    }
+
+    val scope =
+        rememberCoroutineScope()
+
+    suspend fun reload() {
+        val mediaId =
+            currentMediaId
+
+        if (
+            mediaId == null
+        ) {
+            attractionVocabulary =
+                emptyList()
+
+            pageAttractions =
+                emptyList()
+
+            focuses =
+                emptyList()
+
+            return
+        }
+
+        attractionVocabulary =
+            repository
+                .getAttractionVocabulary()
+
+        pageAttractions =
+            repository
+                .getAttractionsForMedia(
+                    mediaId
+                )
+
+        focuses =
+            repository
+                .getFocusForMedia(
+                    mediaId
+                )
+    }
+
+    LaunchedEffect(
+        currentMediaId
+    ) {
+        selectedAttractionId =
+            null
+
+        note =
+            ""
+
+        reload()
+    }
+
+    EditorSection(
+        title =
+            "What matters on this page?"
+    ) {
+        if (
+            currentMediaId == null
+        ) {
+            Text(
+                text =
+                    "No page is available."
+            )
+
+            return@EditorSection
+        }
+
+        Text(
+            text =
+                "Focus always belongs to the current page.",
+            style =
+                MaterialTheme
+                    .typography
+                    .bodyMedium
+        )
+
+        Spacer(
+            Modifier.height(
+                16.dp
+            )
+        )
+
+        Text(
+            text =
+                "Related attraction",
+            style =
+                MaterialTheme
+                    .typography
+                    .labelLarge
+        )
+
+        Spacer(
+            Modifier.height(
+                8.dp
+            )
+        )
+
+        if (
+            pageAttractions.isEmpty()
+        ) {
+            Text(
+                text =
+                    "No attraction is attached to this page yet.",
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyMedium
+            )
+        } else {
+            FlowRow(
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                pageAttractions
+                    .forEach {
+                            attraction ->
+
+                        FilterChip(
+                            selected =
+                                selectedAttractionId ==
+                                        attraction.id,
+                            onClick = {
+                                selectedAttractionId =
+                                    if (
+                                        selectedAttractionId ==
+                                        attraction.id
+                                    ) {
+                                        null
+                                    } else {
+                                        attraction.id
+                                    }
+                            },
+                            label = {
+                                Text(
+                                    attraction.label
+                                )
+                            }
+                        )
+                    }
+            }
+        }
+
+        Spacer(
+            Modifier.height(
+                16.dp
+            )
+        )
+
+        OutlinedTextField(
+            value =
+                note,
+            onValueChange = {
+                note =
+                    it
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth(),
+            label = {
+                Text(
+                    "Focus note"
+                )
+            },
+            placeholder = {
+                Text(
+                    "What about this page matters?"
+                )
+            }
+        )
+
+        TextButton(
+            enabled =
+                selectedAttractionId != null ||
+                        note.isNotBlank(),
+            onClick = {
+                val mediaId =
+                    currentMediaId
+
+                if (
+                    mediaId != null
+                ) {
+                    scope.launch {
+                        repository
+                            .addFocusToMedia(
+                                mediaId =
+                                    mediaId,
+                                attractionVocabularyId =
+                                    selectedAttractionId,
+                                note =
+                                    note
+                            )
+
+                        selectedAttractionId =
+                            null
+
+                        note =
+                            ""
+
+                        reload()
+                    }
+                }
+            }
+        ) {
+            Text(
+                "Add focus"
+            )
+        }
+
+        if (
+            focuses.isNotEmpty()
+        ) {
+            Spacer(
+                Modifier.height(
+                    20.dp
+                )
+            )
+
+            Text(
+                text =
+                    "Saved focus",
+                style =
+                    MaterialTheme
+                        .typography
+                        .labelLarge
+            )
+
+            Spacer(
+                Modifier.height(
+                    8.dp
+                )
+            )
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
+            ) {
+                focuses.forEach {
+                        focus ->
+
+                    val attraction =
+                        attractionVocabulary
+                            .firstOrNull {
+                                it.id ==
+                                        focus
+                                            .attractionVocabularyId
+                            }
+
+                    FocusItem(
+                        attractionLabel =
+                            attraction?.label,
+                        note =
+                            focus.note,
+                        onDelete = {
+                            scope.launch {
+                                repository
+                                    .removeFocus(
+                                        focus.id
+                                    )
+
+                                reload()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FocusItem(
+    attractionLabel: String?,
+    note: String?,
+    onDelete: () -> Unit
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    vertical =
+                        4.dp
+                )
+    ) {
+        attractionLabel
+            ?.let {
+                Text(
+                    text =
+                        it,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleSmall,
+                    fontWeight =
+                        FontWeight.SemiBold
+                )
+            }
+
+        note
+            ?.takeIf {
+                it.isNotBlank()
+            }
+            ?.let {
+                Text(
+                    text =
+                        it,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium
+                )
+            }
+
+        TextButton(
+            onClick =
+                onDelete
+        ) {
+            Text(
+                "Remove"
+            )
+        }
     }
 }
 
