@@ -17,9 +17,15 @@ import androidx.room.RoomDatabase
         StateVocabularyEntity::class,
         SessionStateEntity::class,
         PurposeVocabularyEntity::class,
-        CapturedWorkPurposeEntity::class
+        CapturedWorkPurposeEntity::class,
+        AttractionVocabularyEntity::class,
+        CapturedWorkAttractionEntity::class,
+        CapturedMediaAttractionEntity::class,
+        AestheticResponseVocabularyEntity::class,
+        CapturedWorkResponseEntity::class,
+        MediaFocusEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
