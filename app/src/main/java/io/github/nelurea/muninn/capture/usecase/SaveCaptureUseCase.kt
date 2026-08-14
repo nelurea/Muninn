@@ -95,6 +95,7 @@ class SaveCaptureUseCase(
 
             authorId = draft.authorId,
             authorName = draft.authorName,
+            authorHandle = draft.authorHandle,
             title = draft.title,
             caption = draft.caption,
             sessionId = sessionId

@@ -1,13 +1,13 @@
-package io.github.nelurea.muninn.capture.web.pixiv
+package io.github.nelurea.muninn.capture.web.x
 
 import io.github.nelurea.muninn.capture.model.CaptureDraft
 import io.github.nelurea.muninn.capture.model.CaptureMediaDraft
 import java.io.File
 
-object PixivCaptureMapper {
+object XCaptureMapper {
 
     fun toCaptureDraft(
-        payload: PixivCapturePayload,
+        payload: XCapturePayload,
         downloadedFiles: List<File>,
         discoveryMode: String? = null,
         discoveryQuery: String? = null
@@ -21,28 +21,31 @@ object PixivCaptureMapper {
         }
 
         val media =
-            payload.media.mapIndexed {
-                    index,
-                    item ->
+            payload.media
+                .mapIndexed {
+                        index,
+                        item ->
 
-                CaptureMediaDraft(
-                    mediaIndex =
-                        item.mediaIndex,
+                    CaptureMediaDraft(
+                        mediaIndex =
+                            item.mediaIndex,
 
-                    sourceUrl =
-                        item.sourceUrl,
+                        sourceUrl =
+                            item.sourceUrl,
 
-                    mimeType =
-                        item.mimeType
-                            ?: "application/octet-stream",
+                        mimeType =
+                            item.mimeType
+                                ?: "application/octet-stream",
 
-                    fileName =
-                        item.fileName,
+                        fileName =
+                            item.fileName,
 
-                    sourceFile =
-                        downloadedFiles[index]
-                )
-            }
+                        sourceFile =
+                            downloadedFiles[
+                                index
+                            ]
+                    )
+                }
 
         return CaptureDraft(
             sourceType =
@@ -57,6 +60,15 @@ object PixivCaptureMapper {
             capturedAt =
                 payload.capturedAt,
 
+            publishedAt =
+                payload.publishedAt,
+
+            discoveryMode =
+                discoveryMode,
+
+            discoveryQuery =
+                discoveryQuery,
+
             authorId =
                 payload.authorId
                     ?: "",
@@ -66,7 +78,7 @@ object PixivCaptureMapper {
                     ?: "",
 
             authorHandle =
-                null,
+                payload.authorHandle,
 
             title =
                 payload.title,
@@ -79,16 +91,7 @@ object PixivCaptureMapper {
                 payload.tags,
 
             media =
-                media,
-
-            publishedAt =
-                payload.publishedAt,
-
-            discoveryMode =
-                discoveryMode,
-
-            discoveryQuery =
-                discoveryQuery,
+                media
         )
     }
 }

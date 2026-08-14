@@ -25,7 +25,7 @@ import androidx.room.RoomDatabase
         CapturedWorkResponseEntity::class,
         MediaFocusEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

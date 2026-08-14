@@ -38,6 +38,11 @@ import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureParseResult
 import io.github.nelurea.muninn.capture.web.pixiv.PixivCaptureParser
 import io.github.nelurea.muninn.capture.web.pixiv.PixivMediaDownloadResult
 import io.github.nelurea.muninn.capture.web.pixiv.PixivMediaDownloader
+import io.github.nelurea.muninn.capture.web.x.XCaptureMapper
+import io.github.nelurea.muninn.capture.web.x.XCaptureParseResult
+import io.github.nelurea.muninn.capture.web.x.XCaptureParser
+import io.github.nelurea.muninn.capture.web.x.XMediaDownloadResult
+import io.github.nelurea.muninn.capture.web.x.XMediaDownloader
 import io.github.nelurea.muninn.ui.browser.cosmetic.BuiltInCosmeticRules
 import io.github.nelurea.muninn.ui.browser.cosmetic.CosmeticRuleInjector
 import kotlinx.coroutines.launch
@@ -516,6 +521,15 @@ fun WebCaptureScreen(
                             "https://www.pixiv.net"
                         )
 
+                    val xOrigins =
+                        setOf(
+                            "https://x.com"
+                        )
+
+                    val captureOrigins =
+                        pixivOrigins +
+                                xOrigins
+
                     if (
                         WebViewFeature
                             .isFeatureSupported(
@@ -531,11 +545,18 @@ fun WebCaptureScreen(
                                         .PAGE_WORLD_NAME
                                 )
 
+                        /*
+                         * One native bridge is exposed to both
+                         * supported origins.
+                         *
+                         * The message is routed according to
+                         * the verified source origin.
+                         */
                         WebViewCompat
                             .addWebMessageListener(
                                 this,
                                 "MuninnBridge",
-                                pixivOrigins,
+                                captureOrigins,
                                 pageWorld
                             ) {
                                     _,
@@ -545,10 +566,18 @@ fun WebCaptureScreen(
                                     _ ->
 
                                 if (
-                                    !isMainFrame ||
+                                    !isMainFrame
+                                ) {
+                                    return@addWebMessageListener
+                                }
+
+                                val origin =
                                     sourceOrigin
-                                        .toString() !=
-                                    "https://www.pixiv.net"
+                                        .toString()
+
+                                if (
+                                    origin !in
+                                    captureOrigins
                                 ) {
                                     return@addWebMessageListener
                                 }
@@ -558,159 +587,327 @@ fun WebCaptureScreen(
                                         ?: return@addWebMessageListener
 
                                 when (
-                                    val parseResult =
-                                        PixivCaptureParser
-                                            .parse(
-                                                rawMessage
-                                            )
+                                    origin
                                 ) {
-                                    is PixivCaptureParseResult.Success -> {
-                                        val payload =
-                                            parseResult.payload
-
-                                        val currentWebView =
-                                            webView
-                                                ?: return@addWebMessageListener
-
-                                        val userAgent =
-                                            currentWebView
-                                                .settings
-                                                .userAgentString
-
-                                        coroutineScope
-                                            .launch {
-                                                val downloader =
-                                                    PixivMediaDownloader(
-                                                        context
+                                    "https://www.pixiv.net" -> {
+                                        when (
+                                            val parseResult =
+                                                PixivCaptureParser
+                                                    .parse(
+                                                        rawMessage
                                                     )
+                                        ) {
+                                            is PixivCaptureParseResult.Success -> {
+                                                val payload =
+                                                    parseResult.payload
 
-                                                when (
-                                                    val downloadResult =
-                                                        downloader
-                                                            .download(
-                                                                payload =
-                                                                    payload,
-                                                                userAgent =
-                                                                    userAgent
+                                                val currentWebView =
+                                                    webView
+                                                        ?: return@addWebMessageListener
+
+                                                val userAgent =
+                                                    currentWebView
+                                                        .settings
+                                                        .userAgentString
+
+                                                coroutineScope
+                                                    .launch {
+                                                        val downloader =
+                                                            PixivMediaDownloader(
+                                                                context
                                                             )
-                                                ) {
-                                                    is PixivMediaDownloadResult.Success -> {
-                                                        val temporaryDirectory =
-                                                            downloadResult
-                                                                .files
-                                                                .firstOrNull()
-                                                                ?.parentFile
 
-                                                        try {
-                                                            val draft =
-                                                                PixivCaptureMapper
-                                                                    .toCaptureDraft(
+                                                        when (
+                                                            val downloadResult =
+                                                                downloader
+                                                                    .download(
                                                                         payload =
                                                                             payload,
-                                                                        downloadedFiles =
-                                                                            downloadResult.files,
-                                                                        discoveryMode =
-                                                                            discoveryMode,
-                                                                        discoveryQuery =
-                                                                            discoveryQuery
+                                                                        userAgent =
+                                                                            userAgent
                                                                     )
+                                                        ) {
+                                                            is PixivMediaDownloadResult.Success -> {
+                                                                val temporaryDirectory =
+                                                                    downloadResult
+                                                                        .files
+                                                                        .firstOrNull()
+                                                                        ?.parentFile
 
-                                                            when (
-                                                                val saveResult =
-                                                                    saveCaptureUseCase
-                                                                        .save(
-                                                                            draft
-                                                                        )
-                                                            ) {
-                                                                is SaveCaptureResult.Success -> {
-                                                                    isCapturing =
-                                                                        false
+                                                                try {
+                                                                    val draft =
+                                                                        PixivCaptureMapper
+                                                                            .toCaptureDraft(
+                                                                                payload =
+                                                                                    payload,
+                                                                                downloadedFiles =
+                                                                                    downloadResult.files,
+                                                                                discoveryMode =
+                                                                                    discoveryMode,
+                                                                                discoveryQuery =
+                                                                                    discoveryQuery
+                                                                            )
 
-                                                                    captureStatus =
-                                                                        "Saved ${saveResult.mediaCount} image(s)"
+                                                                    when (
+                                                                        val saveResult =
+                                                                            saveCaptureUseCase
+                                                                                .save(
+                                                                                    draft
+                                                                                )
+                                                                    ) {
+                                                                        is SaveCaptureResult.Success -> {
+                                                                            isCapturing =
+                                                                                false
 
-                                                                    Log.d(
-                                                                        "MuninnPixivCapture",
-                                                                        "Saved capture: " +
-                                                                                "workId=${saveResult.workId}, " +
-                                                                                "mediaCount=${saveResult.mediaCount}"
-                                                                    )
-                                                                }
+                                                                            captureStatus =
+                                                                                "Saved ${saveResult.mediaCount} image(s)"
 
-                                                                is SaveCaptureResult.Failure -> {
+                                                                            Log.d(
+                                                                                "MuninnPixivCapture",
+                                                                                "Saved capture: " +
+                                                                                        "workId=${saveResult.workId}, " +
+                                                                                        "mediaCount=${saveResult.mediaCount}"
+                                                                            )
+                                                                        }
+
+                                                                        is SaveCaptureResult.Failure -> {
+                                                                            isCapturing =
+                                                                                false
+
+                                                                            captureStatus =
+                                                                                "Capture failed: " +
+                                                                                        saveResult
+                                                                                            .errors
+                                                                                            .joinToString()
+
+                                                                            Log.e(
+                                                                                "MuninnPixivCapture",
+                                                                                "Save failed: " +
+                                                                                        saveResult
+                                                                                            .errors
+                                                                                            .joinToString()
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                } catch (
+                                                                    exception: Exception
+                                                                ) {
                                                                     isCapturing =
                                                                         false
 
                                                                     captureStatus =
                                                                         "Capture failed: " +
-                                                                                saveResult.errors
-                                                                                    .joinToString()
+                                                                                (
+                                                                                        exception.message
+                                                                                            ?: "unknown error"
+                                                                                        )
 
                                                                     Log.e(
                                                                         "MuninnPixivCapture",
-                                                                        "Save failed: " +
-                                                                                saveResult.errors
-                                                                                    .joinToString()
+                                                                        "Capture persistence failed",
+                                                                        exception
                                                                     )
+                                                                } finally {
+                                                                    temporaryDirectory
+                                                                        ?.deleteRecursively()
                                                                 }
                                                             }
-                                                        } catch (
-                                                            exception: Exception
-                                                        ) {
-                                                            isCapturing =
-                                                                false
 
-                                                            captureStatus =
-                                                                "Capture failed: " +
-                                                                        (
-                                                                                exception.message
-                                                                                    ?: "unknown error"
-                                                                                )
+                                                            is PixivMediaDownloadResult.Failure -> {
+                                                                isCapturing =
+                                                                    false
 
-                                                            Log.e(
-                                                                "MuninnPixivCapture",
-                                                                "Capture persistence failed",
-                                                                exception
-                                                            )
-                                                        } finally {
-                                                            temporaryDirectory
-                                                                ?.deleteRecursively()
+                                                                captureStatus =
+                                                                    "Capture failed: ${downloadResult.error}"
+
+                                                                Log.e(
+                                                                    "MuninnPixivCapture",
+                                                                    "Media download failed: " +
+                                                                            downloadResult.error
+                                                                )
+                                                            }
                                                         }
                                                     }
-
-                                                    is PixivMediaDownloadResult.Failure -> {
-                                                        isCapturing =
-                                                            false
-
-                                                        captureStatus =
-                                                            "Capture failed: ${downloadResult.error}"
-
-                                                        Log.e(
-                                                            "MuninnPixivCapture",
-                                                            "Media download failed: " +
-                                                                    downloadResult.error
-                                                        )
-                                                    }
-                                                }
                                             }
+
+                                            is PixivCaptureParseResult.Failure -> {
+                                                isCapturing =
+                                                    false
+
+                                                captureStatus =
+                                                    "Capture failed: ${parseResult.error}"
+
+                                                Log.e(
+                                                    "MuninnPixivCapture",
+                                                    "Parse failed: ${parseResult.error}"
+                                                )
+                                            }
+                                        }
                                     }
 
-                                    is PixivCaptureParseResult.Failure -> {
-                                        isCapturing =
-                                            false
+                                    "https://x.com" -> {
+                                        when (
+                                            val parseResult =
+                                                XCaptureParser
+                                                    .parse(
+                                                        rawMessage
+                                                    )
+                                        ) {
+                                            is XCaptureParseResult.Success -> {
+                                                val payload =
+                                                    parseResult.payload
 
-                                        captureStatus =
-                                            "Capture failed: ${parseResult.error}"
+                                                val currentWebView =
+                                                    webView
+                                                        ?: return@addWebMessageListener
 
-                                        Log.e(
-                                            "MuninnPixivCapture",
-                                            "Parse failed: ${parseResult.error}"
-                                        )
+                                                val userAgent =
+                                                    currentWebView
+                                                        .settings
+                                                        .userAgentString
+
+                                                coroutineScope
+                                                    .launch {
+                                                        val downloader =
+                                                            XMediaDownloader(
+                                                                context
+                                                            )
+
+                                                        when (
+                                                            val downloadResult =
+                                                                downloader
+                                                                    .download(
+                                                                        payload =
+                                                                            payload,
+                                                                        userAgent =
+                                                                            userAgent
+                                                                    )
+                                                        ) {
+                                                            is XMediaDownloadResult.Success -> {
+                                                                val temporaryDirectory =
+                                                                    downloadResult
+                                                                        .files
+                                                                        .firstOrNull()
+                                                                        ?.parentFile
+
+                                                                try {
+                                                                    val draft =
+                                                                        XCaptureMapper
+                                                                            .toCaptureDraft(
+                                                                                payload =
+                                                                                    payload,
+                                                                                downloadedFiles =
+                                                                                    downloadResult.files,
+                                                                                discoveryMode =
+                                                                                    discoveryMode,
+                                                                                discoveryQuery =
+                                                                                    discoveryQuery
+                                                                            )
+
+                                                                    when (
+                                                                        val saveResult =
+                                                                            saveCaptureUseCase
+                                                                                .save(
+                                                                                    draft
+                                                                                )
+                                                                    ) {
+                                                                        is SaveCaptureResult.Success -> {
+                                                                            isCapturing =
+                                                                                false
+
+                                                                            captureStatus =
+                                                                                "Saved ${saveResult.mediaCount} X image(s)"
+
+                                                                            Log.d(
+                                                                                "MuninnXCapture",
+                                                                                "Saved X capture: " +
+                                                                                        "workId=${saveResult.workId}, " +
+                                                                                        "sourceId=${payload.sourceId}, " +
+                                                                                        "mediaCount=${saveResult.mediaCount}"
+                                                                            )
+                                                                        }
+
+                                                                        is SaveCaptureResult.Failure -> {
+                                                                            isCapturing =
+                                                                                false
+
+                                                                            captureStatus =
+                                                                                "X capture failed: " +
+                                                                                        saveResult
+                                                                                            .errors
+                                                                                            .joinToString()
+
+                                                                            Log.e(
+                                                                                "MuninnXCapture",
+                                                                                "Save failed: " +
+                                                                                        saveResult
+                                                                                            .errors
+                                                                                            .joinToString()
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                } catch (
+                                                                    exception: Exception
+                                                                ) {
+                                                                    isCapturing =
+                                                                        false
+
+                                                                    captureStatus =
+                                                                        "X capture failed: " +
+                                                                                (
+                                                                                        exception.message
+                                                                                            ?: "unknown error"
+                                                                                        )
+
+                                                                    Log.e(
+                                                                        "MuninnXCapture",
+                                                                        "Capture persistence failed",
+                                                                        exception
+                                                                    )
+                                                                } finally {
+                                                                    temporaryDirectory
+                                                                        ?.deleteRecursively()
+                                                                }
+                                                            }
+
+                                                            is XMediaDownloadResult.Failure -> {
+                                                                isCapturing =
+                                                                    false
+
+                                                                captureStatus =
+                                                                    "X capture failed: ${downloadResult.error}"
+
+                                                                Log.e(
+                                                                    "MuninnXCapture",
+                                                                    "Media download failed: " +
+                                                                            downloadResult.error
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                            }
+
+                                            is XCaptureParseResult.Failure -> {
+                                                isCapturing =
+                                                    false
+
+                                                captureStatus =
+                                                    "X capture failed: ${parseResult.error}"
+
+                                                Log.e(
+                                                    "MuninnXCapture",
+                                                    "Parse failed: ${parseResult.error}"
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
 
-                        val captureHook =
+                        /*
+                         * Pixiv page-world capture hook.
+                         */
+                        val pixivCaptureHook =
                             context.assets
                                 .open(
                                     "webcapture/pixiv/capture-hook.js"
@@ -723,15 +920,38 @@ fun WebCaptureScreen(
                         WebViewCompat
                             .addJavaScriptOnEvent(
                                 this,
-                                captureHook,
+                                pixivCaptureHook,
                                 WebViewCompat
                                     .INJECTION_EVENT_DOCUMENT_START,
                                 pixivOrigins,
                                 pageWorld
                             )
+
+                        /*
+                         * X page-world capture hook.
+                         */
+                        val xCaptureHook =
+                            context.assets
+                                .open(
+                                    "webcapture/x/capture-hook.js"
+                                )
+                                .bufferedReader()
+                                .use {
+                                    it.readText()
+                                }
+
+                        WebViewCompat
+                            .addJavaScriptOnEvent(
+                                this,
+                                xCaptureHook,
+                                WebViewCompat
+                                    .INJECTION_EVENT_DOCUMENT_START,
+                                xOrigins,
+                                pageWorld
+                            )
                     } else {
                         Log.e(
-                            "MuninnPixivCapture",
+                            "MuninnWebCapture",
                             "JS_INJECTION_IN_FRAME_AND_WORLD is unsupported"
                         )
                     }
@@ -743,12 +963,26 @@ fun WebCaptureScreen(
             }
         )
 
+        val isPixivArtwork =
+            currentUrl.contains(
+                "pixiv.net/artworks/"
+            )
+
+        val isXPost =
+            Regex(
+                """https://x\.com/[^/]+/status/\d+"""
+            ).containsMatchIn(
+                currentUrl
+            )
+
+        val canCaptureCurrentPage =
+            isPixivArtwork ||
+                    isXPost
+
         Button(
             enabled =
                 !isCapturing &&
-                        currentUrl.contains(
-                            "pixiv.net/artworks/"
-                        ),
+                        canCaptureCurrentPage,
             modifier =
                 Modifier.fillMaxWidth(),
             onClick = {
@@ -758,33 +992,74 @@ fun WebCaptureScreen(
                 captureStatus =
                     "Capturing..."
 
-                webView
-                    ?.evaluateJavascript(
-                        """
-                        if (
-                            typeof window.__muninnCapturePixiv === "function"
-                        ) {
-                            window.__muninnCapturePixiv();
-                            "started";
-                        } else {
-                            "unavailable";
-                        }
-                        """.trimIndent()
-                    ) {
-                            result ->
+                when {
+                    isPixivArtwork -> {
+                        webView
+                            ?.evaluateJavascript(
+                                """
+                                if (
+                                    typeof window.__muninnCapturePixiv === "function"
+                                ) {
+                                    window.__muninnCapturePixiv();
+                                    "started";
+                                } else {
+                                    "unavailable";
+                                }
+                                """.trimIndent()
+                            ) {
+                                    result ->
 
-                        if (
-                            result.contains(
-                                "unavailable"
-                            )
-                        ) {
-                            isCapturing =
-                                false
+                                if (
+                                    result.contains(
+                                        "unavailable"
+                                    )
+                                ) {
+                                    isCapturing =
+                                        false
 
-                            captureStatus =
-                                "Capture is unavailable on this page"
-                        }
+                                    captureStatus =
+                                        "Pixiv capture is unavailable on this page"
+                                }
+                            }
                     }
+
+                    isXPost -> {
+                        webView
+                            ?.evaluateJavascript(
+                                """
+                                if (
+                                    typeof window.__muninnCaptureX === "function"
+                                ) {
+                                    window.__muninnCaptureX();
+                                } else {
+                                    "unavailable";
+                                }
+                                """.trimIndent()
+                            ) {
+                                    result ->
+
+                                if (
+                                    result.contains(
+                                        "unavailable"
+                                    )
+                                ) {
+                                    isCapturing =
+                                        false
+
+                                    captureStatus =
+                                        "X capture is unavailable on this page"
+                                }
+                            }
+                    }
+
+                    else -> {
+                        isCapturing =
+                            false
+
+                        captureStatus =
+                            "Capture is unavailable on this page"
+                    }
+                }
             }
         ) {
             Text(
