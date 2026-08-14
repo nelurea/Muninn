@@ -37,6 +37,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Modifier
 import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
 import io.github.nelurea.muninn.ui.capture.CapturedWorkDetailScreen
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import io.github.nelurea.muninn.data.db.StateVocabularyEntity
+import io.github.nelurea.muninn.ui.session.SessionStatePicker
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavigation(
@@ -118,7 +126,12 @@ fun AppNavigation(
                     navController.navigate(
                         "settings"
                     )
-                }
+                },
+                onSessionsClick = {
+                    navController.navigate(
+                        "sessions"
+                    )
+                },
             )
         }
 
@@ -335,6 +348,50 @@ fun AppNavigation(
             route =
                 "discovery"
         ) {
+            val scope =
+                rememberCoroutineScope()
+
+            var showStatePicker by remember {
+                mutableStateOf(false)
+            }
+
+            var activeSessionId by remember {
+                mutableStateOf<Long?>(null)
+            }
+
+            var stateVocabulary by remember {
+                mutableStateOf<List<StateVocabularyEntity>>(
+                    emptyList()
+                )
+            }
+
+            var selectedStateIds by remember {
+                mutableStateOf<Set<Long>>(
+                    emptySet()
+                )
+            }
+
+            var newStateLabel by remember {
+                mutableStateOf("")
+            }
+
+            LaunchedEffect(Unit) {
+                val resolution =
+                    sessionRepository.resolveSession()
+
+                activeSessionId =
+                    resolution.sessionId
+
+                stateVocabulary =
+                    sessionRepository
+                        .getStateVocabulary()
+
+                if (resolution.isNew) {
+                    showStatePicker =
+                        true
+                }
+            }
+
             DiscoveryScreen(
                 viewModel =
                     discoveryViewModel,
@@ -401,6 +458,112 @@ fun AppNavigation(
                         .popBackStack()
                 }
             )
+
+            if (
+                showStatePicker &&
+                activeSessionId != null
+            ) {
+                SessionStatePicker(
+                    vocabulary =
+                        stateVocabulary,
+                    selectedStateIds =
+                        selectedStateIds,
+                    newStateLabel =
+                        newStateLabel,
+                    onNewStateLabelChange = {
+                        newStateLabel =
+                            it
+                    },
+                    onToggleState = {
+                            state ->
+
+                        val sessionId =
+                            activeSessionId
+                                ?: return@SessionStatePicker
+
+                        if (
+                            state.id in
+                            selectedStateIds
+                        ) {
+                            selectedStateIds =
+                                selectedStateIds -
+                                        state.id
+
+                            scope.launch {
+                                    sessionRepository
+                                        .removeStateFromSession(
+                                            sessionId =
+                                                sessionId,
+                                            stateVocabularyId =
+                                                state.id
+                                        )
+                                }
+                        } else {
+                            selectedStateIds =
+                                selectedStateIds +
+                                        state.id
+
+                            scope.launch {
+                                    sessionRepository
+                                        .addStateToSession(
+                                            sessionId =
+                                                sessionId,
+                                            label =
+                                                state.label
+                                        )
+                                }
+                        }
+                    },
+                    onAddState = {
+                        val sessionId =
+                            activeSessionId
+                                ?: return@SessionStatePicker
+
+                        val label =
+                            newStateLabel
+                                .trim()
+
+                        if (
+                            label.isNotBlank()
+                        ) {
+                            scope.launch {
+                                    sessionRepository
+                                        .addStateToSession(
+                                            sessionId =
+                                                sessionId,
+                                            label =
+                                                label
+                                        )
+
+                                    stateVocabulary =
+                                        sessionRepository
+                                            .getStateVocabulary()
+
+                                    selectedStateIds =
+                                        sessionRepository
+                                            .getStatesForSession(
+                                                sessionId
+                                            )
+                                            .map {
+                                                it.id
+                                            }
+                                            .toSet()
+
+                                    newStateLabel =
+                                        ""
+                                }
+                        }
+                    },
+                    onDone = {
+                        showStatePicker =
+                            false
+                    },
+                    onSkip = {
+                        showStatePicker =
+                            false
+                    }
+                )
+            }
         }
 
         composable(

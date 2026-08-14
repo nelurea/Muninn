@@ -381,3 +381,119 @@ val MIGRATION_12_13 =
             )
         }
     }
+
+val MIGRATION_13_14 =
+    object : Migration(13, 14) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                CREATE TABLE `state_vocabulary` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `label` TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX
+                `index_state_vocabulary_label`
+                ON `state_vocabulary` (`label`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `session_states` (
+                    `sessionId` INTEGER NOT NULL,
+                    `stateVocabularyId` INTEGER NOT NULL,
+                    PRIMARY KEY(
+                        `sessionId`,
+                        `stateVocabularyId`
+                    ),
+                    FOREIGN KEY(`sessionId`)
+                        REFERENCES `sessions`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(`stateVocabularyId`)
+                        REFERENCES `state_vocabulary`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_session_states_sessionId`
+                ON `session_states` (`sessionId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_session_states_stateVocabularyId`
+                ON `session_states` (`stateVocabularyId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `purpose_vocabulary` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `label` TEXT NOT NULL
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX
+                `index_purpose_vocabulary_label`
+                ON `purpose_vocabulary` (`label`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE `captured_work_purposes` (
+                    `workId` INTEGER NOT NULL,
+                    `purposeVocabularyId` INTEGER NOT NULL,
+                    PRIMARY KEY(
+                        `workId`,
+                        `purposeVocabularyId`
+                    ),
+                    FOREIGN KEY(`workId`)
+                        REFERENCES `captured_works`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE,
+                    FOREIGN KEY(`purposeVocabularyId`)
+                        REFERENCES `purpose_vocabulary`(`id`)
+                        ON UPDATE NO ACTION
+                        ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_work_purposes_workId`
+                ON `captured_work_purposes` (`workId`)
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX
+                `index_captured_work_purposes_purposeVocabularyId`
+                ON `captured_work_purposes` (`purposeVocabularyId`)
+                """.trimIndent()
+            )
+        }
+    }

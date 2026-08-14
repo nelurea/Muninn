@@ -2,9 +2,11 @@ package io.github.nelurea.muninn.ui.capture
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,15 +21,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +42,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
+import io.github.nelurea.muninn.data.db.PurposeVocabularyEntity
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import kotlinx.coroutines.launch
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -55,11 +63,42 @@ fun CapturedWorkDetailScreen(
         mutableStateOf(true)
     }
 
+    var purposeVocabulary by remember {
+        mutableStateOf<List<PurposeVocabularyEntity>>(
+            emptyList()
+        )
+    }
+
+    var selectedPurposes by remember {
+        mutableStateOf<List<PurposeVocabularyEntity>>(
+            emptyList()
+        )
+    }
+
+    var newPurposeLabel by remember {
+        mutableStateOf("")
+    }
+
+    val scope =
+        rememberCoroutineScope()
+
+    suspend fun reloadPurposeState() {
+        purposeVocabulary =
+            repository.getPurposeVocabulary()
+
+        selectedPurposes =
+            repository.getPurposesForWork(
+                workId
+            )
+    }
+
     LaunchedEffect(workId) {
         capturedWork =
             repository.getWithMediaById(
                 workId
             )
+
+        reloadPurposeState()
 
         loading = false
     }
@@ -288,11 +327,12 @@ fun CapturedWorkDetailScreen(
                             )
 
                             Text(
-                                text = tags.joinToString(
-                                    separator = "  "
-                                ) {
-                                    "#$it"
-                                },
+                                text =
+                                    tags.joinToString(
+                                        separator = "  "
+                                    ) {
+                                        "#$it"
+                                    },
                                 style =
                                     MaterialTheme
                                         .typography
@@ -302,7 +342,149 @@ fun CapturedWorkDetailScreen(
 
                         Spacer(
                             Modifier.height(
-                                20.dp
+                                24.dp
+                            )
+                        )
+
+                        Text(
+                            text = "Purpose",
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .titleMedium,
+                            fontWeight =
+                                FontWeight.SemiBold
+                        )
+
+                        Spacer(
+                            Modifier.height(
+                                8.dp
+                            )
+                        )
+
+                        if (
+                            purposeVocabulary
+                                .isNotEmpty()
+                        ) {
+                            FlowRow(
+                                horizontalArrangement =
+                                    Arrangement.spacedBy(
+                                        8.dp
+                                    ),
+                                verticalArrangement =
+                                    Arrangement.spacedBy(
+                                        8.dp
+                                    )
+                            ) {
+                                purposeVocabulary
+                                    .forEach {
+                                            purpose ->
+
+                                        val selected =
+                                            selectedPurposes
+                                                .any {
+                                                    it.id ==
+                                                            purpose.id
+                                                }
+
+                                        FilterChip(
+                                            selected =
+                                                selected,
+                                            onClick = {
+                                                scope.launch {
+                                                    if (selected) {
+                                                        repository
+                                                            .removePurposeFromWork(
+                                                                workId =
+                                                                    workId,
+                                                                purposeVocabularyId =
+                                                                    purpose.id
+                                                            )
+                                                    } else {
+                                                        repository
+                                                            .addPurposeToWork(
+                                                                workId =
+                                                                    workId,
+                                                                label =
+                                                                    purpose.label
+                                                            )
+                                                    }
+
+                                                    reloadPurposeState()
+                                                }
+                                            },
+                                            label = {
+                                                Text(
+                                                    purpose.label
+                                                )
+                                            }
+                                        )
+                                    }
+                            }
+
+                            Spacer(
+                                Modifier.height(
+                                    12.dp
+                                )
+                            )
+                        }
+
+                        OutlinedTextField(
+                            value =
+                                newPurposeLabel,
+                            onValueChange = {
+                                newPurposeLabel =
+                                    it
+                            },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth(),
+                            label = {
+                                Text(
+                                    "Add purpose"
+                                )
+                            },
+                            singleLine =
+                                true
+                        )
+
+                        TextButton(
+                            enabled =
+                                newPurposeLabel
+                                    .isNotBlank(),
+                            onClick = {
+                                val label =
+                                    newPurposeLabel
+                                        .trim()
+
+                                if (
+                                    label.isNotBlank()
+                                ) {
+                                    scope.launch {
+                                        repository
+                                            .addPurposeToWork(
+                                                workId =
+                                                    workId,
+                                                label =
+                                                    label
+                                            )
+
+                                        newPurposeLabel =
+                                            ""
+
+                                        reloadPurposeState()
+                                    }
+                                }
+                            }
+                        ) {
+                            Text(
+                                "Add"
+                            )
+                        }
+
+                        Spacer(
+                            Modifier.height(
+                                24.dp
                             )
                         )
 

@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.OnConflictStrategy
 
 @Dao
 abstract class CapturedWorkDao {
@@ -72,4 +73,69 @@ abstract class CapturedWorkDao {
     abstract suspend fun getWithMediaById(
         workId: Long
     ): CapturedWorkWithMedia?
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertPurposeVocabulary(
+        purpose: PurposeVocabularyEntity
+    ): Long
+
+    @Query(
+        """
+    SELECT *
+    FROM purpose_vocabulary
+    ORDER BY label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getPurposeVocabulary():
+            List<PurposeVocabularyEntity>
+
+    @Query(
+        """
+    SELECT id
+    FROM purpose_vocabulary
+    WHERE label = :label
+    LIMIT 1
+    """
+    )
+    abstract suspend fun getPurposeVocabularyId(
+        label: String
+    ): Long?
+
+    @Insert(
+        onConflict =
+            OnConflictStrategy.IGNORE
+    )
+    abstract suspend fun insertCapturedWorkPurpose(
+        purpose: CapturedWorkPurposeEntity
+    )
+
+    @Query(
+        """
+    DELETE FROM captured_work_purposes
+    WHERE workId = :workId
+      AND purposeVocabularyId = :purposeVocabularyId
+    """
+    )
+    abstract suspend fun deleteCapturedWorkPurpose(
+        workId: Long,
+        purposeVocabularyId: Long
+    )
+
+    @Query(
+        """
+    SELECT purpose_vocabulary.*
+    FROM purpose_vocabulary
+    INNER JOIN captured_work_purposes
+        ON purpose_vocabulary.id =
+           captured_work_purposes.purposeVocabularyId
+    WHERE captured_work_purposes.workId = :workId
+    ORDER BY purpose_vocabulary.label COLLATE NOCASE ASC
+    """
+    )
+    abstract suspend fun getPurposesForWork(
+        workId: Long
+    ): List<PurposeVocabularyEntity>
 }

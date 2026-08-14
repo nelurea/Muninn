@@ -18,5 +18,17 @@ data class SessionWithImages(
         parentColumn = "id",
         entityColumn = "sessionId"
     )
-    val capturedWorks: List<CapturedWorkWithMedia>
+    val capturedWorks: List<CapturedWorkWithMedia>,
+
+    @Relation(
+        entity = StateVocabularyEntity::class,
+        parentColumn = "id",
+        entityColumn = "id",
+        associateBy = androidx.room.Junction(
+            value = SessionStateEntity::class,
+            parentColumn = "sessionId",
+            entityColumn = "stateVocabularyId"
+        )
+    )
+    val states: List<StateVocabularyEntity>
 )
