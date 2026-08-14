@@ -2,6 +2,7 @@ package io.github.nelurea.muninn.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.Query
 import androidx.room.Transaction
 
 @Dao
@@ -48,4 +49,27 @@ abstract class CapturedWorkDao {
 
         return workId
     }
+
+    @Transaction
+    @Query(
+        """
+    SELECT *
+    FROM captured_works
+    ORDER BY capturedAt DESC
+    """
+    )
+    abstract suspend fun getAllWithMedia():
+            List<CapturedWorkWithMedia>
+
+    @Transaction
+    @Query(
+        """
+    SELECT *
+    FROM captured_works
+    WHERE id = :workId
+    """
+    )
+    abstract suspend fun getWithMediaById(
+        workId: Long
+    ): CapturedWorkWithMedia?
 }
