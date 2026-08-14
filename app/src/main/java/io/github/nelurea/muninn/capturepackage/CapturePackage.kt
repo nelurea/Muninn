@@ -4,6 +4,7 @@ data class CapturePackage(
     val schemaVersion: Int,
     val source: CapturePackageSource,
     val capturedAt: String,
+    val publishedAt: String? = null,
     val content: CapturePackageContent,
     val media: List<CapturePackageMedia>
 )
@@ -23,7 +24,8 @@ data class CapturePackageContent(
 
 data class CapturePackageAuthor(
     val id: String,
-    val name: String
+    val name: String,
+    val handle: String? = null
 )
 
 data class CapturePackageMedia(

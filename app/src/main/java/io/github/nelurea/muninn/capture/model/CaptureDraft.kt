@@ -12,6 +12,7 @@ data class CaptureDraft(
 
     val authorId: String,
     val authorName: String,
+    val authorHandle: String? = null,
     val title: String?,
     val caption: String,
 

@@ -28,6 +28,7 @@ data class CapturedWorkEntity(
 
     val authorId: String,
     val authorName: String,
+    val authorHandle: String? = null,
     val title: String?,
     val caption: String,
 
