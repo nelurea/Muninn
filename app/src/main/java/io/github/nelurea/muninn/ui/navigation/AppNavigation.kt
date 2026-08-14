@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.Modifier
 import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
+import io.github.nelurea.muninn.ui.capture.CapturedWorkDetailScreen
 
 @Composable
 fun AppNavigation(
@@ -100,7 +101,7 @@ fun AppNavigation(
             HomeScreen(
                 onGalleryClick = {
                     navController.navigate(
-                        "sessions"
+                        "gallery"
                     )
                 },
                 onDiscoveryClick = {
@@ -126,18 +127,45 @@ fun AppNavigation(
         ) {
             GalleryScreen(
                 repository =
-                    repository,
-                onBack = {
-                    navController
-                        .popBackStack()
-                },
-                onImageClick = {
-                        imageId ->
+                    capturedWorkRepository,
+                onWorkClick = {
+                        workId ->
 
                     navController.navigate(
-                        "detail/$imageId"
+                        "capturedWorkDetail/$workId"
                     )
                 }
+            )
+        }
+
+        composable(
+            route =
+                "capturedWorkDetail/{workId}",
+            arguments =
+                listOf(
+                    navArgument(
+                        "workId"
+                    ) {
+                        type =
+                            NavType.LongType
+                    }
+                )
+        ) {
+                backStackEntry ->
+
+            val workId =
+                backStackEntry
+                    .arguments
+                    ?.getLong(
+                        "workId"
+                    )
+                    ?: return@composable
+
+            CapturedWorkDetailScreen(
+                workId =
+                    workId,
+                repository =
+                    capturedWorkRepository
             )
         }
 

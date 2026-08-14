@@ -11,5 +11,11 @@ data class CapturedWorkWithMedia(
         parentColumn = "id",
         entityColumn = "workId"
     )
-    val media: List<CapturedMediaEntity>
+    val media: List<CapturedMediaEntity>,
+
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "workId"
+    )
+    val tags: List<CapturedTagEntity>
 )
