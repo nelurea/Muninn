@@ -37,13 +37,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +65,7 @@ import io.github.nelurea.muninn.discovery.model.ArtworkPreviewMedia
 import io.github.nelurea.muninn.discovery.model.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
+import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
@@ -82,6 +83,12 @@ fun DiscoveryScreen(
 
     val gridState =
         rememberLazyGridState()
+
+    var xRefreshToken by rememberSaveable {
+        mutableStateOf(
+            0
+        )
+    }
 
     LaunchedEffect(
         gridState,
@@ -118,11 +125,42 @@ fun DiscoveryScreen(
         modifier =
             modifier.fillMaxSize()
     ) {
+        if (
+            viewModel.sourceId ==
+            DiscoverySourceId.X
+        ) {
+            XDiscoveryWebSession(
+                mode =
+                    viewModel.mode,
+                searchQuery =
+                    viewModel.searchQuery,
+                refreshToken =
+                    xRefreshToken,
+                onBatchObserved = {
+                        batch ->
+
+                    viewModel
+                        .notifySourceUpdated(
+                            updatedSourceId =
+                                DiscoverySourceId.X,
+                            updatedMode =
+                                batch.mode,
+                            updatedQuery =
+                                batch.query
+                        )
+                }
+            )
+        }
+
         DiscoveryContent(
             viewModel =
                 viewModel,
             gridState =
                 gridState,
+            onRefreshX = {
+                xRefreshToken +=
+                    1
+            },
             onBack =
                 onBack
         )
@@ -176,6 +214,14 @@ fun DiscoveryScreen(
                         .searchByTag(
                             tag
                         )
+
+                    if (
+                        viewModel.sourceId ==
+                        DiscoverySourceId.X
+                    ) {
+                        xRefreshToken +=
+                            1
+                    }
                 },
                 onSaveAll = {
                     viewModel
@@ -194,6 +240,7 @@ fun DiscoveryScreen(
 private fun DiscoveryContent(
     viewModel: DiscoveryViewModel,
     gridState: LazyGridState,
+    onRefreshX: () -> Unit,
     onBack: () -> Unit
 ) {
     val state =
@@ -249,9 +296,64 @@ private fun DiscoveryContent(
                     8.dp
                 )
         ) {
+            DiscoverySourceButton(
+                label =
+                    "Pixiv",
+                selected =
+                    viewModel.sourceId ==
+                            DiscoverySourceId.PIXIV,
+                enabled =
+                    viewModel.isSourceAvailable(
+                        DiscoverySourceId.PIXIV
+                    ),
+                onClick = {
+                    viewModel.selectSource(
+                        DiscoverySourceId.PIXIV
+                    )
+                }
+            )
+
+            DiscoverySourceButton(
+                label =
+                    "X",
+                selected =
+                    viewModel.sourceId ==
+                            DiscoverySourceId.X,
+                enabled =
+                    viewModel.isSourceAvailable(
+                        DiscoverySourceId.X
+                    ),
+                onClick = {
+                    viewModel.selectSource(
+                        DiscoverySourceId.X
+                    )
+                }
+            )
+        }
+
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 8.dp,
+                        vertical = 8.dp
+                    ),
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    8.dp
+                )
+        ) {
             DiscoveryModeButton(
                 label =
-                    "Latest",
+                    if (
+                        viewModel.sourceId ==
+                        DiscoverySourceId.X
+                    ) {
+                        "For You"
+                    } else {
+                        "Latest"
+                    },
                 selected =
                     viewModel.mode ==
                             DiscoveryMode.LATEST,
@@ -264,7 +366,14 @@ private fun DiscoveryContent(
 
             DiscoveryModeButton(
                 label =
-                    "Bookmarks",
+                    if (
+                        viewModel.sourceId ==
+                        DiscoverySourceId.X
+                    ) {
+                        "Likes"
+                    } else {
+                        "Bookmarks"
+                    },
                 selected =
                     viewModel.mode ==
                             DiscoveryMode.BOOKMARKS,
@@ -287,6 +396,25 @@ private fun DiscoveryContent(
                     )
                 }
             )
+
+            if (
+                viewModel.sourceId ==
+                DiscoverySourceId.X
+            ) {
+                OutlinedButton(
+                    onClick =
+                        onRefreshX,
+                    enabled =
+                        viewModel.mode !=
+                                DiscoveryMode.SEARCH ||
+                                viewModel.searchQuery
+                                    .isNotBlank()
+                ) {
+                    Text(
+                        "Refresh"
+                    )
+                }
+            }
         }
 
         if (
@@ -321,7 +449,15 @@ private fun DiscoveryContent(
                         true,
                     label = {
                         Text(
-                            "Search Pixiv"
+                            when (
+                                viewModel.sourceId
+                            ) {
+                                DiscoverySourceId.PIXIV ->
+                                    "Search Pixiv"
+
+                                DiscoverySourceId.X ->
+                                    "Search X"
+                            }
                         )
                     },
                     keyboardOptions =
@@ -334,6 +470,13 @@ private fun DiscoveryContent(
                             onSearch = {
                                 viewModel
                                     .submitSearch()
+
+                                if (
+                                    viewModel.sourceId ==
+                                    DiscoverySourceId.X
+                                ) {
+                                    onRefreshX()
+                                }
                             }
                         )
                 )
@@ -342,6 +485,13 @@ private fun DiscoveryContent(
                     onClick = {
                         viewModel
                             .submitSearch()
+
+                        if (
+                            viewModel.sourceId ==
+                            DiscoverySourceId.X
+                        ) {
+                            onRefreshX()
+                        }
                     },
                     enabled =
                         viewModel.searchQuery
@@ -399,6 +549,13 @@ private fun DiscoveryContent(
                         Button(
                             onClick = {
                                 viewModel.retry()
+
+                                if (
+                                    viewModel.sourceId ==
+                                    DiscoverySourceId.X
+                                ) {
+                                    onRefreshX()
+                                }
                             },
                             modifier =
                                 Modifier.padding(
@@ -441,7 +598,8 @@ private fun DiscoveryContent(
                             key = {
                                 "${it.source}:${it.sourceItemId}"
                             }
-                        ) { item ->
+                        ) {
+                                item ->
 
                             DiscoveryGridItem(
                                 item =
@@ -509,6 +667,13 @@ private fun DiscoveryContent(
                                     Button(
                                         onClick = {
                                             viewModel.retry()
+
+                                            if (
+                                                viewModel.sourceId ==
+                                                DiscoverySourceId.X
+                                            ) {
+                                                onRefreshX()
+                                            }
                                         },
                                         modifier =
                                             Modifier.padding(
@@ -650,6 +815,8 @@ private fun ArtworkPreviewOverlay(
                         ArtworkPagerPage(
                             media =
                                 media,
+                            source =
+                                preview.source,
                             selected =
                                 media.mediaIndex in
                                         state.selectedMediaIndices,
@@ -706,7 +873,9 @@ private fun ArtworkPreviewOverlay(
                                     !state.isSaving
                             ) {
                                 Text(
-                                    "Pixiv"
+                                    sourceLabel(
+                                        preview.source
+                                    )
                                 )
                             }
 
@@ -829,7 +998,9 @@ private fun ArtworkPreviewInfoPanel(
                                 )
                                 .addHeader(
                                     "Referer",
-                                    "https://www.pixiv.net/"
+                                    sourceReferer(
+                                        preview.source
+                                    )
                                 )
                                 .build()
 
@@ -976,9 +1147,9 @@ private fun ArtworkPreviewInfoPanel(
                         if (
                             selected
                         ) {
-                            "Selected \u00b7 \u2191 remove"
+                            "Selected · ↑ remove"
                         } else {
-                            "\u2193 select"
+                            "↓ select"
                         },
                     color =
                         if (
@@ -1216,9 +1387,9 @@ private fun ArtworkCaption(
                     if (
                         expanded
                     ) {
-                        "\u6298\u308a\u305f\u305f\u3080"
+                        "折りたたむ"
                     } else {
-                        "\u7d9a\u304d\u3092\u8aad\u3080"
+                        "続きを読む"
                     },
                 modifier =
                     Modifier
@@ -1248,6 +1419,7 @@ private fun ArtworkCaption(
 @Composable
 private fun ArtworkPagerPage(
     media: ArtworkPreviewMedia,
+    source: DiscoverySourceId,
     selected: Boolean,
     controlsVisible: Boolean,
     gesturesEnabled: Boolean,
@@ -1268,7 +1440,9 @@ private fun ArtworkPagerPage(
             )
             .addHeader(
                 "Referer",
-                "https://www.pixiv.net/"
+                sourceReferer(
+                    source
+                )
             )
             .build()
 
@@ -1411,7 +1585,7 @@ private fun ArtworkPagerPage(
             ) {
                 Text(
                     text =
-                        "\u2713",
+                        "✓",
                     modifier =
                         Modifier.padding(
                             horizontal = 10.dp,
@@ -1428,6 +1602,39 @@ private fun ArtworkPagerPage(
 }
 
 @Composable
+private fun DiscoverySourceButton(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    if (
+        selected
+    ) {
+        Button(
+            onClick = {},
+            enabled =
+                enabled
+        ) {
+            Text(
+                label
+            )
+        }
+    } else {
+        OutlinedButton(
+            onClick =
+                onClick,
+            enabled =
+                enabled
+        ) {
+            Text(
+                label
+            )
+        }
+    }
+}
+
+@Composable
 private fun DiscoveryModeButton(
     label: String,
     selected: Boolean,
@@ -1437,8 +1644,7 @@ private fun DiscoveryModeButton(
         selected
     ) {
         Button(
-            onClick = {
-            }
+            onClick = {}
         ) {
             Text(
                 label
@@ -1510,7 +1716,9 @@ private fun DiscoveryGridItem(
             )
             .addHeader(
                 "Referer",
-                "https://www.pixiv.net/"
+                sourceReferer(
+                    item.source
+                )
             )
             .build()
 
@@ -1599,7 +1807,7 @@ private fun DiscoveryGridItem(
             ) {
                 DiscoveryBadge(
                     text =
-                        "\u25a3 ${item.mediaCount}",
+                        "▣ ${item.mediaCount}",
                     backgroundColor =
                         Color.Black.copy(
                             alpha = 0.72f
@@ -1648,6 +1856,34 @@ private fun DiscoveryGridItem(
                         1
                 )
             }
+    }
+}
+
+private fun sourceLabel(
+    source: DiscoverySourceId
+): String {
+    return when (
+        source
+    ) {
+        DiscoverySourceId.PIXIV ->
+            "Pixiv"
+
+        DiscoverySourceId.X ->
+            "X"
+    }
+}
+
+private fun sourceReferer(
+    source: DiscoverySourceId
+): String {
+    return when (
+        source
+    ) {
+        DiscoverySourceId.PIXIV ->
+            "https://www.pixiv.net/"
+
+        DiscoverySourceId.X ->
+            "https://x.com/"
     }
 }
 

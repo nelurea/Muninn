@@ -6,7 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.nelurea.muninn.capture.discovery.DiscoveryArtworkSaveMode
-import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
+import io.github.nelurea.muninn.capture.discovery.DiscoveryArtworkSaveUseCase
 import io.github.nelurea.muninn.capture.usecase.SaveCaptureResult
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
@@ -15,9 +15,20 @@ import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 import kotlinx.coroutines.launch
 
 class DiscoveryViewModel(
-    private val source: DiscoverySource,
-    private val previewSource: ArtworkPreviewSource,
-    private val saveUseCase: PixivDiscoverySaveUseCase,
+    private val sources: Map<
+            DiscoverySourceId,
+            DiscoverySource
+            >,
+    private val previewSources: Map<
+            DiscoverySourceId,
+            ArtworkPreviewSource
+            >,
+    private val saveUseCases: Map<
+            DiscoverySourceId,
+            DiscoveryArtworkSaveUseCase
+            >,
+    initialSource: DiscoverySourceId =
+        DiscoverySourceId.PIXIV,
     initialMode: DiscoveryMode =
         DiscoveryMode.LATEST
 ) : ViewModel() {
@@ -29,6 +40,11 @@ class DiscoveryViewModel(
 
     var previewState by mutableStateOf(
         ArtworkPreviewUiState()
+    )
+        private set
+
+    var sourceId by mutableStateOf(
+        initialSource
     )
         private set
 
@@ -58,6 +74,64 @@ class DiscoveryViewModel(
         0
 
     init {
+        require(
+            sources.containsKey(
+                initialSource
+            )
+        ) {
+            "No DiscoverySource is registered for $initialSource."
+        }
+
+        require(
+            previewSources.containsKey(
+                initialSource
+            )
+        ) {
+            "No ArtworkPreviewSource is registered for $initialSource."
+        }
+
+        loadInitial()
+    }
+
+    fun isSourceAvailable(
+        candidate: DiscoverySourceId
+    ): Boolean {
+        return sources.containsKey(
+            candidate
+        ) &&
+                previewSources.containsKey(
+                    candidate
+                )
+    }
+
+    fun selectSource(
+        newSourceId: DiscoverySourceId
+    ) {
+        if (
+            sourceId == newSourceId
+        ) {
+            return
+        }
+
+        if (
+            !isSourceAvailable(
+                newSourceId
+            )
+        ) {
+            return
+        }
+
+        closePreview()
+
+        sourceId =
+            newSourceId
+
+        mode =
+            DiscoveryMode.LATEST
+
+        searchQuery =
+            ""
+
         loadInitial()
     }
 
@@ -143,10 +217,61 @@ class DiscoveryViewModel(
         loadInitial()
     }
 
+    /*
+     * Called when a source observes new data independently
+     * from DiscoverySource.load().
+     *
+     * X uses this because its hidden authenticated WebView
+     * receives timeline batches asynchronously.
+     */
+    fun notifySourceUpdated(
+        updatedSourceId: DiscoverySourceId,
+        updatedMode: DiscoveryMode,
+        updatedQuery: String? = null
+    ) {
+        if (
+            sourceId !=
+            updatedSourceId
+        ) {
+            return
+        }
+
+        if (
+            mode !=
+            updatedMode
+        ) {
+            return
+        }
+
+        if (
+            mode ==
+            DiscoveryMode.SEARCH
+        ) {
+            val currentQuery =
+                searchQuery
+                    .trim()
+
+            val observedQuery =
+                updatedQuery
+                    ?.trim()
+                    .orEmpty()
+
+            if (
+                currentQuery !=
+                observedQuery
+            ) {
+                return
+            }
+        }
+
+        refreshCurrentSource()
+    }
+
     fun openPreview(
         item: DiscoveryItem
     ) {
-        previewGeneration += 1
+        previewGeneration +=
+            1
 
         val requestGeneration =
             previewGeneration
@@ -161,6 +286,14 @@ class DiscoveryViewModel(
 
         viewModelScope.launch {
             runCatching {
+                val previewSource =
+                    previewSources[
+                        item.source
+                    ]
+                        ?: error(
+                            "No ArtworkPreviewSource is registered for ${item.source}."
+                        )
+
                 previewSource.load(
                     item
                 )
@@ -226,7 +359,8 @@ class DiscoveryViewModel(
     }
 
     fun closePreview() {
-        previewGeneration += 1
+        previewGeneration +=
+            1
 
         previewState =
             ArtworkPreviewUiState()
@@ -372,6 +506,27 @@ class DiscoveryViewModel(
             )
 
         viewModelScope.launch {
+            val saveUseCase =
+                saveUseCases[
+                    preview.source
+                ]
+
+            if (
+                saveUseCase == null
+            ) {
+                previewState =
+                    previewState.copy(
+                        isSaving =
+                            false,
+                        saveMessage =
+                            null,
+                        saveError =
+                            "Saving this Discovery source is not supported."
+                    )
+
+                return@launch
+            }
+
             val result =
                 saveUseCase.save(
                     preview =
@@ -442,7 +597,8 @@ class DiscoveryViewModel(
             return
         }
 
-        generation += 1
+        generation +=
+            1
 
         currentPage =
             0
@@ -465,7 +621,9 @@ class DiscoveryViewModel(
             replace =
                 true,
             requestGeneration =
-                generation
+                generation,
+            showLoading =
+                true
         )
     }
 
@@ -483,7 +641,9 @@ class DiscoveryViewModel(
             replace =
                 false,
             requestGeneration =
-                generation
+                generation,
+            showLoading =
+                true
         )
     }
 
@@ -497,8 +657,42 @@ class DiscoveryViewModel(
         }
     }
 
+    private fun refreshCurrentSource() {
+        if (
+            mode ==
+            DiscoveryMode.SEARCH &&
+            searchQuery.isBlank()
+        ) {
+            return
+        }
+
+        generation +=
+            1
+
+        currentPage =
+            0
+
+        hasNextPage =
+            true
+
+        isLoading =
+            false
+
+        loadPage(
+            page =
+                1,
+            replace =
+                true,
+            requestGeneration =
+                generation,
+            showLoading =
+                false
+        )
+    }
+
     private fun clearResults() {
-        generation += 1
+        generation +=
+            1
 
         currentPage =
             0
@@ -516,7 +710,8 @@ class DiscoveryViewModel(
     private fun loadPage(
         page: Int,
         replace: Boolean,
-        requestGeneration: Int
+        requestGeneration: Int,
+        showLoading: Boolean
     ) {
         if (
             isLoading
@@ -524,15 +719,31 @@ class DiscoveryViewModel(
             return
         }
 
+        val source =
+            sources[
+                sourceId
+            ]
+                ?: run {
+                    uiState =
+                        DiscoveryUiState(
+                            error =
+                                "No Discovery source is available for $sourceId."
+                        )
+
+                    return
+                }
+
         isLoading =
             true
 
         uiState =
             uiState.copy(
                 isLoading =
-                    replace,
+                    replace &&
+                            showLoading,
                 isLoadingMore =
-                    !replace,
+                    !replace &&
+                            showLoading,
                 error =
                     null
             )

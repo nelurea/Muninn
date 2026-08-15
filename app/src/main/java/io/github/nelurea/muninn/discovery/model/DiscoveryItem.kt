@@ -17,7 +17,8 @@ data class DiscoveryCreator(
 )
 
 enum class DiscoverySourceId {
-    PIXIV
+    PIXIV,
+    X,
 }
 
 enum class ContentRestriction {

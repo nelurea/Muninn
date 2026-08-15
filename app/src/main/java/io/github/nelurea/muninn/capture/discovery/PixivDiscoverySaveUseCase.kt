@@ -7,29 +7,46 @@ import io.github.nelurea.muninn.capture.model.CaptureMediaDraft
 import io.github.nelurea.muninn.capture.usecase.SaveCaptureResult
 import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
+import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLConnection
-import java.util.UUID
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 enum class DiscoveryArtworkSaveMode {
     ALL,
     SELECTED
 }
 
+interface DiscoveryArtworkSaveUseCase {
+
+    val sourceId: DiscoverySourceId
+
+    suspend fun save(
+        preview: ArtworkPreview,
+        selectedMediaIndices: Set<Int>,
+        mode: DiscoveryArtworkSaveMode,
+        discoveryMode: String?,
+        discoveryQuery: String?
+    ): SaveCaptureResult
+}
+
 class PixivDiscoverySaveUseCase(
     private val context: Context,
     private val saveCaptureUseCase: SaveCaptureUseCase
-) {
+) : DiscoveryArtworkSaveUseCase {
 
-    suspend fun save(
+    override val sourceId =
+        DiscoverySourceId.PIXIV
+
+    override suspend fun save(
         preview: ArtworkPreview,
         selectedMediaIndices: Set<Int>,
         mode: DiscoveryArtworkSaveMode,
@@ -39,6 +56,13 @@ class PixivDiscoverySaveUseCase(
         withContext(
             Dispatchers.IO
         ) {
+            require(
+                preview.source ==
+                        DiscoverySourceId.PIXIV
+            ) {
+                "PixivDiscoverySaveUseCase only supports Pixiv previews."
+            }
+
             val savePlan =
                 buildDiscoveryArtworkSavePlan(
                     preview =
@@ -320,7 +344,7 @@ class PixivDiscoverySaveUseCase(
                 }
 
         return rawName
-            ?: "pixiv-${mediaIndex}.bin"
+            ?: "pixiv-$mediaIndex.bin"
     }
 
     private companion object {
