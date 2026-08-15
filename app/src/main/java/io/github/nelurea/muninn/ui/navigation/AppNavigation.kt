@@ -48,6 +48,8 @@ import kotlinx.coroutines.launch
 import io.github.nelurea.muninn.discovery.x.XArtworkPreviewSource
 import io.github.nelurea.muninn.discovery.x.XDiscoverySource
 import io.github.nelurea.muninn.capture.discovery.XDiscoverySaveUseCase
+import androidx.compose.runtime.DisposableEffect
+import io.github.nelurea.muninn.capture.discovery.DiscoverySaveCoordinator
 
 @Composable
 fun AppNavigation(
@@ -94,6 +96,29 @@ fun AppNavigation(
             )
         }
 
+    val discoverySaveCoordinator =
+        remember {
+            DiscoverySaveCoordinator(
+                saveUseCases =
+                    mapOf(
+                        DiscoverySourceId.PIXIV to
+                                pixivDiscoverySaveUseCase,
+
+                        DiscoverySourceId.X to
+                                xDiscoverySaveUseCase
+                    )
+            )
+        }
+
+    DisposableEffect(
+        discoverySaveCoordinator
+    ) {
+        onDispose {
+            discoverySaveCoordinator
+                .close()
+        }
+    }
+
     val discoveryViewModel =
         remember {
             DiscoveryViewModel(
@@ -113,14 +138,8 @@ fun AppNavigation(
                         DiscoverySourceId.X to
                                 XArtworkPreviewSource()
                     ),
-                saveUseCases =
-                    mapOf(
-                        DiscoverySourceId.PIXIV to
-                                pixivDiscoverySaveUseCase,
-
-                        DiscoverySourceId.X to
-                                xDiscoverySaveUseCase
-                    )
+                saveCoordinator =
+                    discoverySaveCoordinator
             )
         }
 

@@ -59,6 +59,7 @@ import androidx.core.text.HtmlCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.nelurea.muninn.discovery.ArtworkPreviewUiState
+import io.github.nelurea.muninn.discovery.DiscoverySaveQueueUiState
 import io.github.nelurea.muninn.discovery.DiscoveryViewModel
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.ArtworkPreviewMedia
@@ -80,6 +81,9 @@ fun DiscoveryScreen(
 
     val previewState =
         viewModel.previewState
+
+    val saveQueueState =
+        viewModel.saveQueueState
 
     val gridState =
         rememberLazyGridState()
@@ -231,6 +235,27 @@ fun DiscoveryScreen(
                     viewModel
                         .saveSelected()
                 }
+            )
+        }
+
+        if (
+            saveQueueState.message != null
+        ) {
+            DiscoverySaveStatusBar(
+                state =
+                    saveQueueState,
+                onRetry = {
+                    viewModel
+                        .retryFailedSave()
+                },
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.BottomCenter
+                        )
+                        .padding(
+                            12.dp
+                        )
             )
         }
     }
@@ -803,7 +828,7 @@ private fun ArtworkPreviewOverlay(
                         beyondViewportPageCount =
                             1,
                         userScrollEnabled =
-                            !state.isSaving
+                            true
                     ) {
                             page ->
 
@@ -823,7 +848,7 @@ private fun ArtworkPreviewOverlay(
                             controlsVisible =
                                 controlsVisible,
                             gesturesEnabled =
-                                !state.isSaving,
+                                true,
                             onSelect =
                                 onSelect,
                             onDeselect =
@@ -857,9 +882,7 @@ private fun ArtworkPreviewOverlay(
                         ) {
                             Button(
                                 onClick =
-                                    onClose,
-                                enabled =
-                                    !state.isSaving
+                                    onClose
                             ) {
                                 Text(
                                     "Close"
@@ -868,9 +891,7 @@ private fun ArtworkPreviewOverlay(
 
                             OutlinedButton(
                                 onClick =
-                                    onOpenOriginal,
-                                enabled =
-                                    !state.isSaving
+                                    onOpenOriginal
                             ) {
                                 Text(
                                     sourceLabel(
@@ -909,12 +930,6 @@ private fun ArtworkPreviewOverlay(
                                 state
                                     .selectedMediaIndices
                                     .size,
-                            isSaving =
-                                state.isSaving,
-                            saveMessage =
-                                state.saveMessage,
-                            saveError =
-                                state.saveError,
                             onTagClick =
                                 onTagClick,
                             onSaveAll =
@@ -939,9 +954,6 @@ private fun ArtworkPreviewInfoPanel(
     preview: ArtworkPreview,
     selected: Boolean,
     selectedCount: Int,
-    isSaving: Boolean,
-    saveMessage: String?,
-    saveError: String?,
     onTagClick: (String) -> Unit,
     onSaveAll: () -> Unit,
     onSaveSelected: () -> Unit,
@@ -1095,10 +1107,7 @@ private fun ArtworkPreviewInfoPanel(
 
                         Surface(
                             modifier =
-                                Modifier.clickable(
-                                    enabled =
-                                        !isSaving
-                                ) {
+                                Modifier.clickable {
                                     onTagClick(
                                         tag
                                     )
@@ -1147,9 +1156,9 @@ private fun ArtworkPreviewInfoPanel(
                         if (
                             selected
                         ) {
-                            "Selected · ↑ remove"
+                            "Selected · swipe up to remove"
                         } else {
-                            "↓ select"
+                            "Swipe down to select"
                         },
                     color =
                         if (
@@ -1185,61 +1194,17 @@ private fun ArtworkPreviewInfoPanel(
                 )
             }
 
-            saveMessage
-                ?.let {
-                        message ->
-
-                    Text(
-                        text =
-                            message,
-                        color =
-                            MaterialTheme
-                                .colorScheme
-                                .primary,
-                        style =
-                            MaterialTheme
-                                .typography
-                                .labelMedium
-                    )
-                }
-
-            saveError
-                ?.let {
-                        error ->
-
-                    Text(
-                        text =
-                            error,
-                        color =
-                            MaterialTheme
-                                .colorScheme
-                                .error,
-                        style =
-                            MaterialTheme
-                                .typography
-                                .labelMedium
-                    )
-                }
-
             if (
                 preview.media.size == 1
             ) {
                 Button(
                     onClick =
                         onSaveAll,
-                    enabled =
-                        !isSaving,
                     modifier =
                         Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        if (
-                            isSaving
-                        ) {
-                            "Saving..."
-                        } else {
-                            "Save"
-                        }
+                        "Save"
                     )
                 }
             } else {
@@ -1254,21 +1219,13 @@ private fun ArtworkPreviewInfoPanel(
                     Button(
                         onClick =
                             onSaveAll,
-                        enabled =
-                            !isSaving,
                         modifier =
                             Modifier.weight(
                                 1f
                             )
                     ) {
                         Text(
-                            if (
-                                isSaving
-                            ) {
-                                "Saving..."
-                            } else {
-                                "Save all"
-                            }
+                            "Save all"
                         )
                     }
 
@@ -1276,8 +1233,7 @@ private fun ArtworkPreviewInfoPanel(
                         onClick =
                             onSaveSelected,
                         enabled =
-                            !isSaving &&
-                                    selectedCount > 0,
+                            selectedCount > 0,
                         modifier =
                             Modifier.weight(
                                 1f
@@ -1596,6 +1552,85 @@ private fun ArtworkPagerPage(
                     fontWeight =
                         FontWeight.Bold
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiscoverySaveStatusBar(
+    state: DiscoverySaveQueueUiState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val message =
+        state.message
+            ?: return
+
+    Surface(
+        modifier =
+            modifier,
+        shape =
+            RoundedCornerShape(
+                12.dp
+            ),
+        tonalElevation =
+            6.dp,
+        shadowElevation =
+            6.dp
+    ) {
+        Row(
+            modifier =
+                Modifier.padding(
+                    horizontal = 14.dp,
+                    vertical = 10.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    12.dp
+                )
+        ) {
+            if (
+                state.activeCount > 0
+            ) {
+                CircularProgressIndicator(
+                    modifier =
+                        Modifier.size(
+                            20.dp
+                        ),
+                    strokeWidth =
+                        2.dp
+                )
+            }
+
+            Text(
+                text =
+                    message,
+                modifier =
+                    Modifier.weight(
+                        1f,
+                        fill =
+                            false
+                    ),
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodyMedium
+            )
+
+            if (
+                state.failedRequestKey != null
+            ) {
+                OutlinedButton(
+                    onClick =
+                        onRetry
+                ) {
+                    Text(
+                        "Retry"
+                    )
+                }
             }
         }
     }
