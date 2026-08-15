@@ -53,169 +53,10 @@ object XCaptureParser {
                     "capturePackage"
                 )
 
-            val source =
-                capturePackage
-                    .getJSONObject(
-                        "source"
-                    )
-
-            val content =
-                capturePackage
-                    .getJSONObject(
-                        "content"
-                    )
-
-            val author =
-                content
-                    .getJSONObject(
-                        "author"
-                    )
-
-            val tags =
-                buildList {
-                    val tagsJson =
-                        content.optJSONArray(
-                            "tags"
-                        )
-
-                    if (
-                        tagsJson != null
-                    ) {
-                        for (
-                        index in
-                        0 until tagsJson.length()
-                        ) {
-                            val tag =
-                                tagsJson
-                                    .optString(
-                                        index
-                                    )
-                                    .trim()
-
-                            if (
-                                tag.isNotBlank()
-                            ) {
-                                add(
-                                    tag
-                                )
-                            }
-                        }
-                    }
-                }
-
-            val mediaJson =
-                capturePackage
-                    .getJSONArray(
-                        "media"
-                    )
-
-            val media =
-                buildList {
-                    for (
-                    index in
-                    0 until mediaJson.length()
-                    ) {
-                        val item =
-                            mediaJson
-                                .getJSONObject(
-                                    index
-                                )
-
-                        add(
-                            XCaptureMediaPayload(
-                                mediaIndex =
-                                    item.getInt(
-                                        "index"
-                                    ),
-
-                                sourceUrl =
-                                    item.getString(
-                                        "sourceUrl"
-                                    ),
-
-                                mimeType =
-                                    item.optNullableString(
-                                        "mimeType"
-                                    ),
-
-                                fileName =
-                                    item.getString(
-                                        "fileName"
-                                    )
-                            )
-                        )
-                    }
-                }
-
-            if (
-                media.isEmpty()
-            ) {
-                return XCaptureParseResult.Failure(
-                    "X capture does not contain image media"
-                )
-            }
-
-            val payload =
-                XCapturePayload(
-                    sourceType =
-                        source.getString(
-                            "type"
-                        ),
-
-                    sourceId =
-                        source.getString(
-                            "id"
-                        ),
-
-                    canonicalUrl =
-                        source.getString(
-                            "canonicalUrl"
-                        ),
-
-                    capturedAt =
-                        capturePackage.getString(
-                            "capturedAt"
-                        ),
-
-                    publishedAt =
-                        capturePackage.optNullableString(
-                            "publishedAt"
-                        ),
-
-                    authorId =
-                        author.optNullableString(
-                            "id"
-                        ),
-
-                    authorName =
-                        author.optNullableString(
-                            "name"
-                        ),
-
-                    authorHandle =
-                        author.optNullableString(
-                            "handle"
-                        ),
-
-                    title =
-                        content.optNullableString(
-                            "title"
-                        ),
-
-                    caption =
-                        content.optNullableString(
-                            "caption"
-                        ),
-
-                    tags =
-                        tags,
-
-                    media =
-                        media
-                )
-
             XCaptureParseResult.Success(
-                payload
+                parseCapturePackage(
+                    capturePackage
+                )
             )
         } catch (
             exception: Exception
@@ -225,6 +66,169 @@ object XCaptureParser {
                     ?: "Could not parse X capture message"
             )
         }
+    }
+
+    fun parseCapturePackage(
+        capturePackage: JSONObject
+    ): XCapturePayload {
+
+        val source =
+            capturePackage
+                .getJSONObject(
+                    "source"
+                )
+
+        val content =
+            capturePackage
+                .getJSONObject(
+                    "content"
+                )
+
+        val author =
+            content
+                .getJSONObject(
+                    "author"
+                )
+
+        val tags =
+            buildList {
+                val tagsJson =
+                    content.optJSONArray(
+                        "tags"
+                    )
+
+                if (
+                    tagsJson != null
+                ) {
+                    for (
+                    index in
+                    0 until tagsJson.length()
+                    ) {
+                        val tag =
+                            tagsJson
+                                .optString(
+                                    index
+                                )
+                                .trim()
+
+                        if (
+                            tag.isNotBlank()
+                        ) {
+                            add(
+                                tag
+                            )
+                        }
+                    }
+                }
+            }
+
+        val mediaJson =
+            capturePackage
+                .getJSONArray(
+                    "media"
+                )
+
+        val media =
+            buildList {
+                for (
+                index in
+                0 until mediaJson.length()
+                ) {
+                    val item =
+                        mediaJson
+                            .getJSONObject(
+                                index
+                            )
+
+                    add(
+                        XCaptureMediaPayload(
+                            mediaIndex =
+                                item.getInt(
+                                    "index"
+                                ),
+
+                            sourceUrl =
+                                item.getString(
+                                    "sourceUrl"
+                                ),
+
+                            mimeType =
+                                item.optNullableString(
+                                    "mimeType"
+                                ),
+
+                            fileName =
+                                item.getString(
+                                    "fileName"
+                                )
+                        )
+                    )
+                }
+            }
+
+        require(
+            media.isNotEmpty()
+        ) {
+            "X capture does not contain image media"
+        }
+
+        return XCapturePayload(
+            sourceType =
+                source.getString(
+                    "type"
+                ),
+
+            sourceId =
+                source.getString(
+                    "id"
+                ),
+
+            canonicalUrl =
+                source.getString(
+                    "canonicalUrl"
+                ),
+
+            capturedAt =
+                capturePackage.getString(
+                    "capturedAt"
+                ),
+
+            publishedAt =
+                capturePackage.optNullableString(
+                    "publishedAt"
+                ),
+
+            authorId =
+                author.optNullableString(
+                    "id"
+                ),
+
+            authorName =
+                author.optNullableString(
+                    "name"
+                ),
+
+            authorHandle =
+                author.optNullableString(
+                    "handle"
+                ),
+
+            title =
+                content.optNullableString(
+                    "title"
+                ),
+
+            caption =
+                content.optNullableString(
+                    "caption"
+                ),
+
+            tags =
+                tags,
+
+            media =
+                media
+        )
     }
 
     private fun JSONObject.optNullableString(
@@ -244,5 +248,8 @@ object XCaptureParser {
         return getString(
             name
         )
+            .takeIf {
+                it.isNotBlank()
+            }
     }
 }

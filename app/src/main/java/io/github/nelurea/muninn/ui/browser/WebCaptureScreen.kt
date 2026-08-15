@@ -3,7 +3,9 @@ package io.github.nelurea.muninn.ui.browser
 import android.util.Log
 import android.view.MotionEvent
 import android.view.ViewConfiguration
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -43,9 +45,13 @@ import io.github.nelurea.muninn.capture.web.x.XCaptureParseResult
 import io.github.nelurea.muninn.capture.web.x.XCaptureParser
 import io.github.nelurea.muninn.capture.web.x.XMediaDownloadResult
 import io.github.nelurea.muninn.capture.web.x.XMediaDownloader
+import io.github.nelurea.muninn.discovery.x.XDiscoveryBatchParseResult
+import io.github.nelurea.muninn.discovery.x.XDiscoveryBatchParser
+import io.github.nelurea.muninn.discovery.x.XDiscoveryObservationStore
 import io.github.nelurea.muninn.ui.browser.cosmetic.BuiltInCosmeticRules
 import io.github.nelurea.muninn.ui.browser.cosmetic.CosmeticRuleInjector
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 @Composable
 fun WebCaptureScreen(
@@ -187,7 +193,7 @@ fun WebCaptureScreen(
                 }
             ) {
                 Text(
-                    "←"
+                    "Back"
                 )
             }
 
@@ -200,7 +206,7 @@ fun WebCaptureScreen(
                 }
             ) {
                 Text(
-                    "→"
+                    "Forward"
                 )
             }
 
@@ -445,6 +451,31 @@ fun WebCaptureScreen(
                         false
                     }
 
+                    webChromeClient =
+                        object :
+                            WebChromeClient() {
+
+                            override fun onConsoleMessage(
+                                consoleMessage: ConsoleMessage
+                            ): Boolean {
+                                val message =
+                                    consoleMessage.message()
+
+                                if (
+                                    message.contains(
+                                        "[Muninn/X/GraphQL]"
+                                    )
+                                ) {
+                                    Log.i(
+                                        "Muninn/X/GraphQL",
+                                        message
+                                    )
+                                }
+
+                                return true
+                            }
+                        }
+
                     webViewClient =
                         object :
                             WebViewClient() {
@@ -545,13 +576,6 @@ fun WebCaptureScreen(
                                         .PAGE_WORLD_NAME
                                 )
 
-                        /*
-                         * One native bridge is exposed to both
-                         * supported origins.
-                         *
-                         * The message is routed according to
-                         * the verified source origin.
-                         */
                         WebViewCompat
                             .addWebMessageListener(
                                 this,
@@ -746,157 +770,236 @@ fun WebCaptureScreen(
                                     }
 
                                     "https://x.com" -> {
-                                        when (
-                                            val parseResult =
-                                                XCaptureParser
-                                                    .parse(
-                                                        rawMessage
+                                        val messageType =
+                                            runCatching {
+                                                JSONObject(
+                                                    rawMessage
+                                                )
+                                                    .optString(
+                                                        "type"
                                                     )
+                                            }
+                                                .getOrNull()
+
+                                        when (
+                                            messageType
                                         ) {
-                                            is XCaptureParseResult.Success -> {
-                                                val payload =
-                                                    parseResult.payload
-
-                                                val currentWebView =
-                                                    webView
-                                                        ?: return@addWebMessageListener
-
-                                                val userAgent =
-                                                    currentWebView
-                                                        .settings
-                                                        .userAgentString
-
-                                                coroutineScope
-                                                    .launch {
-                                                        val downloader =
-                                                            XMediaDownloader(
-                                                                context
+                                            "X_DISCOVERY_BATCH" -> {
+                                                when (
+                                                    val parseResult =
+                                                        XDiscoveryBatchParser
+                                                            .parse(
+                                                                rawMessage
                                                             )
+                                                ) {
+                                                    is XDiscoveryBatchParseResult.Success -> {
+                                                        val mergeResult =
+                                                            XDiscoveryObservationStore
+                                                                .merge(
+                                                                    parseResult.batch
+                                                                )
 
-                                                        when (
-                                                            val downloadResult =
-                                                                downloader
-                                                                    .download(
-                                                                        payload =
-                                                                            payload,
-                                                                        userAgent =
-                                                                            userAgent
+                                                        Log.d(
+                                                            "Muninn/X/Discovery",
+                                                            buildString {
+                                                                append(
+                                                                    "mode=${parseResult.batch.mode}"
+                                                                )
+
+                                                                parseResult.batch.query
+                                                                    ?.let {
+                                                                            query ->
+
+                                                                        append(
+                                                                            ", query=$query"
+                                                                        )
+                                                                    }
+
+                                                                append(
+                                                                    ", received=${mergeResult.receivedCount}"
+                                                                )
+
+                                                                append(
+                                                                    ", added=${mergeResult.addedCount}"
+                                                                )
+
+                                                                append(
+                                                                    ", total=${mergeResult.totalCount}"
+                                                                )
+                                                            }
+                                                        )
+                                                    }
+
+                                                    is XDiscoveryBatchParseResult.Failure -> {
+                                                        Log.e(
+                                                            "Muninn/X/Discovery",
+                                                            "Batch parse failed: ${parseResult.error}"
+                                                        )
+                                                    }
+                                                }
+                                            }
+
+                                            "X_CAPTURE_RESULT" -> {
+                                                when (
+                                                    val parseResult =
+                                                        XCaptureParser
+                                                            .parse(
+                                                                rawMessage
+                                                            )
+                                                ) {
+                                                    is XCaptureParseResult.Success -> {
+                                                        val payload =
+                                                            parseResult.payload
+
+                                                        val currentWebView =
+                                                            webView
+                                                                ?: return@addWebMessageListener
+
+                                                        val userAgent =
+                                                            currentWebView
+                                                                .settings
+                                                                .userAgentString
+
+                                                        coroutineScope
+                                                            .launch {
+                                                                val downloader =
+                                                                    XMediaDownloader(
+                                                                        context
                                                                     )
-                                                        ) {
-                                                            is XMediaDownloadResult.Success -> {
-                                                                val temporaryDirectory =
-                                                                    downloadResult
-                                                                        .files
-                                                                        .firstOrNull()
-                                                                        ?.parentFile
 
-                                                                try {
-                                                                    val draft =
-                                                                        XCaptureMapper
-                                                                            .toCaptureDraft(
+                                                                when (
+                                                                    val downloadResult =
+                                                                        downloader
+                                                                            .download(
                                                                                 payload =
                                                                                     payload,
-                                                                                downloadedFiles =
-                                                                                    downloadResult.files,
-                                                                                discoveryMode =
-                                                                                    discoveryMode,
-                                                                                discoveryQuery =
-                                                                                    discoveryQuery
+                                                                                userAgent =
+                                                                                    userAgent
                                                                             )
+                                                                ) {
+                                                                    is XMediaDownloadResult.Success -> {
+                                                                        val temporaryDirectory =
+                                                                            downloadResult
+                                                                                .files
+                                                                                .firstOrNull()
+                                                                                ?.parentFile
 
-                                                                    when (
-                                                                        val saveResult =
-                                                                            saveCaptureUseCase
-                                                                                .save(
-                                                                                    draft
-                                                                                )
-                                                                    ) {
-                                                                        is SaveCaptureResult.Success -> {
-                                                                            isCapturing =
-                                                                                false
+                                                                        try {
+                                                                            val draft =
+                                                                                XCaptureMapper
+                                                                                    .toCaptureDraft(
+                                                                                        payload =
+                                                                                            payload,
+                                                                                        downloadedFiles =
+                                                                                            downloadResult.files,
+                                                                                        discoveryMode =
+                                                                                            discoveryMode,
+                                                                                        discoveryQuery =
+                                                                                            discoveryQuery
+                                                                                    )
 
-                                                                            captureStatus =
-                                                                                "Saved ${saveResult.mediaCount} X image(s)"
+                                                                            when (
+                                                                                val saveResult =
+                                                                                    saveCaptureUseCase
+                                                                                        .save(
+                                                                                            draft
+                                                                                        )
+                                                                            ) {
+                                                                                is SaveCaptureResult.Success -> {
+                                                                                    isCapturing =
+                                                                                        false
 
-                                                                            Log.d(
-                                                                                "MuninnXCapture",
-                                                                                "Saved X capture: " +
-                                                                                        "workId=${saveResult.workId}, " +
-                                                                                        "sourceId=${payload.sourceId}, " +
-                                                                                        "mediaCount=${saveResult.mediaCount}"
-                                                                            )
-                                                                        }
+                                                                                    captureStatus =
+                                                                                        "Saved ${saveResult.mediaCount} X image(s)"
 
-                                                                        is SaveCaptureResult.Failure -> {
+                                                                                    Log.d(
+                                                                                        "MuninnXCapture",
+                                                                                        "Saved X capture: " +
+                                                                                                "workId=${saveResult.workId}, " +
+                                                                                                "sourceId=${payload.sourceId}, " +
+                                                                                                "mediaCount=${saveResult.mediaCount}"
+                                                                                    )
+                                                                                }
+
+                                                                                is SaveCaptureResult.Failure -> {
+                                                                                    isCapturing =
+                                                                                        false
+
+                                                                                    captureStatus =
+                                                                                        "X capture failed: " +
+                                                                                                saveResult
+                                                                                                    .errors
+                                                                                                    .joinToString()
+
+                                                                                    Log.e(
+                                                                                        "MuninnXCapture",
+                                                                                        "Save failed: " +
+                                                                                                saveResult
+                                                                                                    .errors
+                                                                                                    .joinToString()
+                                                                                    )
+                                                                                }
+                                                                            }
+                                                                        } catch (
+                                                                            exception: Exception
+                                                                        ) {
                                                                             isCapturing =
                                                                                 false
 
                                                                             captureStatus =
                                                                                 "X capture failed: " +
-                                                                                        saveResult
-                                                                                            .errors
-                                                                                            .joinToString()
+                                                                                        (
+                                                                                                exception.message
+                                                                                                    ?: "unknown error"
+                                                                                                )
 
                                                                             Log.e(
                                                                                 "MuninnXCapture",
-                                                                                "Save failed: " +
-                                                                                        saveResult
-                                                                                            .errors
-                                                                                            .joinToString()
+                                                                                "Capture persistence failed",
+                                                                                exception
                                                                             )
+                                                                        } finally {
+                                                                            temporaryDirectory
+                                                                                ?.deleteRecursively()
                                                                         }
                                                                     }
-                                                                } catch (
-                                                                    exception: Exception
-                                                                ) {
-                                                                    isCapturing =
-                                                                        false
 
-                                                                    captureStatus =
-                                                                        "X capture failed: " +
-                                                                                (
-                                                                                        exception.message
-                                                                                            ?: "unknown error"
-                                                                                        )
+                                                                    is XMediaDownloadResult.Failure -> {
+                                                                        isCapturing =
+                                                                            false
 
-                                                                    Log.e(
-                                                                        "MuninnXCapture",
-                                                                        "Capture persistence failed",
-                                                                        exception
-                                                                    )
-                                                                } finally {
-                                                                    temporaryDirectory
-                                                                        ?.deleteRecursively()
+                                                                        captureStatus =
+                                                                            "X capture failed: ${downloadResult.error}"
+
+                                                                        Log.e(
+                                                                            "MuninnXCapture",
+                                                                            "Media download failed: " +
+                                                                                    downloadResult.error
+                                                                        )
+                                                                    }
                                                                 }
                                                             }
-
-                                                            is XMediaDownloadResult.Failure -> {
-                                                                isCapturing =
-                                                                    false
-
-                                                                captureStatus =
-                                                                    "X capture failed: ${downloadResult.error}"
-
-                                                                Log.e(
-                                                                    "MuninnXCapture",
-                                                                    "Media download failed: " +
-                                                                            downloadResult.error
-                                                                )
-                                                            }
-                                                        }
                                                     }
+
+                                                    is XCaptureParseResult.Failure -> {
+                                                        isCapturing =
+                                                            false
+
+                                                        captureStatus =
+                                                            "X capture failed: ${parseResult.error}"
+
+                                                        Log.e(
+                                                            "MuninnXCapture",
+                                                            "Parse failed: ${parseResult.error}"
+                                                        )
+                                                    }
+                                                }
                                             }
 
-                                            is XCaptureParseResult.Failure -> {
-                                                isCapturing =
-                                                    false
-
-                                                captureStatus =
-                                                    "X capture failed: ${parseResult.error}"
-
-                                                Log.e(
-                                                    "MuninnXCapture",
-                                                    "Parse failed: ${parseResult.error}"
+                                            else -> {
+                                                Log.w(
+                                                    "Muninn/X",
+                                                    "Unsupported bridge message type: $messageType"
                                                 )
                                             }
                                         }
@@ -928,7 +1031,7 @@ fun WebCaptureScreen(
                             )
 
                         /*
-                         * X page-world capture hook.
+                         * X page-world capture / discovery hook.
                          */
                         val xCaptureHook =
                             context.assets
@@ -956,7 +1059,7 @@ fun WebCaptureScreen(
                         )
                     }
 
-                    loadUrl(
+                    this.loadUrl(
                         initialUrl
                     )
                 }

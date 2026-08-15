@@ -5,37 +5,99 @@
   const OriginalXhr =
     window.XMLHttpRequest;
 
+  /*
+   * Individual-post capture cache.
+   *
+   * This remains for the existing #44 capture flow.
+   */
   const observedTweets =
     new Map();
+
+  /*
+   * Observation-only registry used while implementing
+   * X Discovery.
+   *
+   * This prevents the GraphQL diagnostic log from being
+   * flooded by repeated requests during one page lifetime.
+   */
+  const observedGraphqlOperations =
+    new Set();
+
+
+  /*
+   * X GraphQL operations verified on-device for Issue #46.
+   *
+   * DiscoveryMode mapping:
+   *
+   * HomeTimeline
+   *   -> LATEST
+   *   -> X "For You"
+   *
+   * Likes
+   *   -> BOOKMARKS
+   *   -> liked posts
+   *
+   * SearchTimeline
+   *   -> SEARCH
+   */
+  const DISCOVERY_OPERATIONS =
+    new Map([
+      [
+        "HomeTimeline",
+        "LATEST"
+      ],
+      [
+        "Likes",
+        "BOOKMARKS"
+      ],
+      [
+        "SearchTimeline",
+        "SEARCH"
+      ]
+    ]);
 
 
   /*
    * Observe X GraphQL responses as early as possible.
    *
-   * X is a SPA, so the information needed for capture
-   * may have arrived before the user presses Capture.
+   * X is a SPA, so the data needed for capture or Discovery
+   * may arrive before the user explicitly asks Muninn to
+   * use it.
    */
 
-  window.fetch = async function (...args) {
-    const response =
-      await ORIGINAL_FETCH.apply(
-        this,
-        args
-      );
+  window.fetch =
+    async function (...args) {
+      const response =
+        await ORIGINAL_FETCH.apply(
+          this,
+          args
+        );
 
-    try {
-      await observeFetchResponse(
-        response
-      );
-    } catch (error) {
-      console.warn(
-        "[Muninn/X] Failed to inspect fetch response:",
-        error
-      );
-    }
+      try {
+        observeGraphqlOperation(
+          response.url,
+          "fetch"
+        );
+      } catch (error) {
+        console.warn(
+          "[Muninn/X/GraphQL] Failed to observe fetch operation:",
+          error
+        );
+      }
 
-    return response;
-  };
+      try {
+        await observeFetchResponse(
+          response
+        );
+      } catch (error) {
+        console.warn(
+          "[Muninn/X] Failed to inspect fetch response:",
+          error
+        );
+      }
+
+      return response;
+    };
 
 
   class MuninnXXMLHttpRequest
@@ -47,6 +109,18 @@
       this.addEventListener(
         "load",
         () => {
+          try {
+            observeGraphqlOperation(
+              this.responseURL,
+              "xhr"
+            );
+          } catch (error) {
+            console.warn(
+              "[Muninn/X/GraphQL] Failed to observe XHR operation:",
+              error
+            );
+          }
+
           try {
             observeXhrResponse(
               this
@@ -67,12 +141,155 @@
     MuninnXXMLHttpRequest;
 
 
+  /*
+   * ---------------------------------------------------------
+   * GraphQL operation observation
+   * ---------------------------------------------------------
+   */
+
+  function observeGraphqlOperation(
+    rawUrl,
+    transport
+  ) {
+    const operation =
+      parseGraphqlOperation(
+        rawUrl
+      );
+
+    if (!operation) {
+      return;
+    }
+
+    if (
+      observedGraphqlOperations.has(
+        operation
+      )
+    ) {
+      return;
+    }
+
+    observedGraphqlOperations.add(
+      operation
+    );
+
+    console.info(
+      `[Muninn/X/GraphQL] transport=${transport} operation=${operation}`
+    );
+  }
+
+
+  function parseGraphqlOperation(
+    rawUrl
+  ) {
+    const parsed =
+      parseXUrl(
+        rawUrl
+      );
+
+    if (!parsed) {
+      return null;
+    }
+
+    const pathParts =
+      parsed.pathname
+        .split(
+          "/"
+        )
+        .filter(
+          Boolean
+        );
+
+    const graphqlIndex =
+      pathParts.indexOf(
+        "graphql"
+      );
+
+    if (
+      graphqlIndex < 0
+    ) {
+      return null;
+    }
+
+    /*
+     * Typical form:
+     *
+     * /i/api/graphql/{queryId}/{operationName}
+     */
+
+    const operationName =
+      pathParts[
+        graphqlIndex + 2
+      ];
+
+    if (
+      typeof operationName !==
+        "string" ||
+      operationName.length ===
+        0
+    ) {
+      return null;
+    }
+
+    try {
+      return decodeURIComponent(
+        operationName
+      );
+    } catch {
+      return operationName;
+    }
+  }
+
+
+  function parseXUrl(
+    rawUrl
+  ) {
+    if (!rawUrl) {
+      return null;
+    }
+
+    let url;
+
+    try {
+      url =
+        new URL(
+          rawUrl,
+          location.href
+        );
+    } catch {
+      return null;
+    }
+
+    if (
+      url.hostname !==
+        "x.com" &&
+      !url.hostname.endsWith(
+        ".x.com"
+      )
+    ) {
+      return null;
+    }
+
+    return url;
+  }
+
+
+  /*
+   * ---------------------------------------------------------
+   * Response observation
+   * ---------------------------------------------------------
+   */
+
   async function observeFetchResponse(
     response
   ) {
-    if (
-      !parseRelevantOperation(
+    const operation =
+      parseGraphqlOperation(
         response.url
+      );
+
+    if (
+      !isRelevantOperation(
+        operation
       )
     ) {
       return;
@@ -90,7 +307,9 @@
       return;
     }
 
-    collectObservedTweets(
+    processObservedResponse(
+      operation,
+      response.url,
       payload
     );
   }
@@ -99,9 +318,14 @@
   function observeXhrResponse(
     xhr
   ) {
-    if (
-      !parseRelevantOperation(
+    const operation =
+      parseGraphqlOperation(
         xhr.responseURL
+      );
+
+    if (
+      !isRelevantOperation(
+        operation
       )
     ) {
       return;
@@ -131,72 +355,109 @@
       return;
     }
 
-    collectObservedTweets(
+    processObservedResponse(
+      operation,
+      xhr.responseURL,
       payload
     );
   }
 
 
-  function parseRelevantOperation(
-    rawUrl
+  function isRelevantOperation(
+    operation
   ) {
-    if (!rawUrl) {
-      return null;
+    if (!operation) {
+      return false;
     }
 
-    let url;
+    return (
+      operation ===
+        "TweetResultByRestId" ||
+      operation ===
+        "TweetDetail" ||
+      DISCOVERY_OPERATIONS.has(
+        operation
+      )
+    );
+  }
 
-    try {
-      url =
-        new URL(
-          rawUrl,
-          location.href
-        );
-    } catch {
-      return null;
-    }
 
+  function processObservedResponse(
+    operation,
+    rawUrl,
+    payload
+  ) {
     if (
-      url.origin !==
-      "https://x.com"
+      operation ===
+        "TweetResultByRestId" ||
+      operation ===
+        "TweetDetail"
     ) {
-      return null;
+      collectObservedTweets(
+        payload
+      );
     }
 
     if (
-      url.pathname.includes(
-        "/TweetResultByRestId"
+      DISCOVERY_OPERATIONS.has(
+        operation
       )
     ) {
-      return "TweetResultByRestId";
+      sendDiscoveryBatch(
+        operation,
+        rawUrl,
+        payload
+      );
     }
-
-    if (
-      url.pathname.includes(
-        "/TweetDetail"
-      )
-    ) {
-      return "TweetDetail";
-    }
-
-    return null;
   }
 
 
   /*
-   * TweetResultByRestId has a simple result location.
-   * TweetDetail may contain multiple tweet objects nested
-   * inside timeline instructions.
-   *
-   * Traverse only the relevant GraphQL response and cache
-   * tweet-shaped objects by rest_id.
+   * ---------------------------------------------------------
+   * Existing single-post capture observation
+   * ---------------------------------------------------------
    */
 
   function collectObservedTweets(
     root
   ) {
+    const results =
+      collectTweetResults(
+        root
+      );
+
+    for (
+      const result
+      of results
+    ) {
+      observedTweets.set(
+        result.rest_id,
+        result
+      );
+    }
+  }
+
+
+  /*
+   * Traverse a relevant GraphQL response and return unique
+   * tweet-shaped objects.
+   *
+   * The same traversal is used for:
+   *
+   * - TweetDetail / TweetResultByRestId
+   * - HomeTimeline
+   * - Likes
+   * - SearchTimeline
+   */
+
+  function collectTweetResults(
+    root
+  ) {
     const visited =
       new Set();
+
+    const results =
+      new Map();
 
     function visit(
       value
@@ -231,7 +492,7 @@
           candidate
         )
       ) {
-        observedTweets.set(
+        results.set(
           candidate.rest_id,
           candidate
         );
@@ -269,6 +530,10 @@
     visit(
       root
     );
+
+    return Array.from(
+      results.values()
+    );
   }
 
 
@@ -279,13 +544,16 @@
       value;
 
     /*
-     * X occasionally wraps tweet data in result/tweet
-     * objects such as TweetWithVisibilityResults.
+     * X may wrap tweet data in structures such as:
+     *
+     * - result
+     * - tweet
+     * - TweetWithVisibilityResults
      */
 
     for (
       let index = 0;
-      index < 4;
+      index < 6;
       index += 1
     ) {
       if (
@@ -354,7 +622,203 @@
 
 
   /*
-   * Called from Android WebCaptureScreen.
+   * ---------------------------------------------------------
+   * Discovery
+   * ---------------------------------------------------------
+   */
+
+  function sendDiscoveryBatch(
+    operation,
+    rawUrl,
+    root
+  ) {
+    const mode =
+      DISCOVERY_OPERATIONS.get(
+        operation
+      );
+
+    if (!mode) {
+      return;
+    }
+
+    const tweetResults =
+      collectTweetResults(
+        root
+      );
+
+    if (
+      tweetResults.length ===
+        0
+    ) {
+      return;
+    }
+
+    /*
+     * Discovery currently handles image works only.
+     *
+     * Ignore:
+     *
+     * - text-only posts
+     * - video-only posts
+     * - unsupported / incomplete tweet objects
+     *
+     * A malformed individual item must not make the entire
+     * timeline batch fail.
+     */
+    const items =
+      [];
+
+    for (
+      const result
+      of tweetResults
+    ) {
+      try {
+        const capturePackage =
+          createCapturePackage(
+            result
+          );
+
+        if (
+          !capturePackage.media ||
+          capturePackage.media.length ===
+            0
+        ) {
+          continue;
+        }
+
+        items.push(
+          capturePackage
+        );
+      } catch {
+        /*
+         * Expected for text-only, video-only, ads, deleted
+         * posts, incomplete timeline entries, etc.
+         *
+         * Silently ignore them for Discovery.
+         */
+      }
+    }
+
+    if (
+      items.length ===
+        0
+    ) {
+      return;
+    }
+
+    const query =
+      mode ===
+        "SEARCH"
+        ? extractSearchQuery(
+            rawUrl
+          )
+        : null;
+
+    sendResult({
+      type:
+        "X_DISCOVERY_BATCH",
+
+      mode,
+
+      query,
+
+      items
+    });
+
+    console.info(
+      `[Muninn/X/Discovery] operation=${operation} mode=${mode} items=${items.length}`
+    );
+  }
+
+
+  /*
+   * SearchTimeline normally carries its search expression
+   * inside the JSON-encoded "variables" query parameter.
+   *
+   * We only extract it to associate observed results with
+   * the corresponding Muninn Discovery query.
+   */
+
+  function extractSearchQuery(
+    rawUrl
+  ) {
+    const url =
+      parseXUrl(
+        rawUrl
+      );
+
+    if (!url) {
+      return null;
+    }
+
+    const variablesText =
+      url.searchParams.get(
+        "variables"
+      );
+
+    if (!variablesText) {
+      return null;
+    }
+
+    let variables;
+
+    try {
+      variables =
+        JSON.parse(
+          variablesText
+        );
+    } catch {
+      return null;
+    }
+
+    const candidates = [
+      variables.rawQuery,
+      variables.query,
+      variables.searchQuery
+    ];
+
+    for (
+      const candidate
+      of candidates
+    ) {
+      if (
+        typeof candidate ===
+          "string" &&
+        candidate.trim().length >
+          0
+      ) {
+        return candidate.trim();
+      }
+    }
+
+    return null;
+  }
+
+
+  /*
+   * Optional diagnostic helpers.
+   */
+
+  window.__muninnListXGraphqlOperations =
+    function () {
+      return Array.from(
+        observedGraphqlOperations
+      );
+    };
+
+
+  window.__muninnGetObservedXPostIds =
+    function () {
+      return Array.from(
+        observedTweets.keys()
+      );
+    };
+
+
+  /*
+   * ---------------------------------------------------------
+   * Existing #44 single-post capture
+   * ---------------------------------------------------------
    */
 
   window.__muninnCaptureX =
@@ -431,6 +895,19 @@
     );
   }
 
+
+  /*
+   * ---------------------------------------------------------
+   * Shared Tweet -> Capture Package mapper
+   * ---------------------------------------------------------
+   *
+   * This is intentionally shared by:
+   *
+   * - existing X capture
+   * - X Discovery
+   *
+   * so both paths use the same canonical representation.
+   */
 
   function createCapturePackage(
     result
@@ -549,7 +1026,7 @@
 
     for (
       let index = 0;
-      index < 4;
+      index < 6;
       index += 1
     ) {
       if (
@@ -589,7 +1066,8 @@
     if (
       typeof value !==
         "string" ||
-      value.length === 0
+      value.length ===
+        0
     ) {
       return null;
     }
@@ -633,7 +1111,8 @@
       Array.isArray(
         range
       ) &&
-      range.length === 2 &&
+      range.length ===
+        2 &&
       Number.isInteger(
         range[0]
       ) &&
@@ -680,6 +1159,12 @@
   }
 
 
+  /*
+   * ---------------------------------------------------------
+   * Media
+   * ---------------------------------------------------------
+   */
+
   function buildMediaList(
     legacy
   ) {
@@ -691,7 +1176,8 @@
       !Array.isArray(
         rawMedia
       ) ||
-      rawMedia.length === 0
+      rawMedia.length ===
+        0
     ) {
       throw new Error(
         "This X post does not contain image media."
@@ -706,7 +1192,8 @@
       );
 
     if (
-      photoMedia.length === 0
+      photoMedia.length ===
+        0
     ) {
       throw new Error(
         "This X post does not contain supported photo media."
@@ -714,11 +1201,11 @@
     }
 
     /*
-     * #44 currently captures photo media only.
+     * Photo-only capture remains the current supported
+     * media model.
      *
-     * If the post mixes photos with unsupported media,
-     * preserve the supported photos rather than failing
-     * the entire capture.
+     * If a post mixes photos and unsupported media,
+     * preserve the supported photos.
      */
 
     return photoMedia.map(
@@ -752,7 +1239,8 @@
     if (
       typeof mediaUrl !==
         "string" ||
-      mediaUrl.length === 0
+      mediaUrl.length ===
+        0
     ) {
       return null;
     }
@@ -905,6 +1393,12 @@
     );
   }
 
+
+  /*
+   * ---------------------------------------------------------
+   * Native bridge
+   * ---------------------------------------------------------
+   */
 
   function sendResult(
     result

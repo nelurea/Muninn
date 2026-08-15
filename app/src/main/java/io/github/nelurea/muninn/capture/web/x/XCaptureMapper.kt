@@ -10,7 +10,9 @@ object XCaptureMapper {
         payload: XCapturePayload,
         downloadedFiles: List<File>,
         discoveryMode: String? = null,
-        discoveryQuery: String? = null
+        discoveryQuery: String? = null,
+        highlightedMediaIndices: Set<Int> =
+            emptySet()
     ): CaptureDraft {
 
         require(
@@ -43,7 +45,11 @@ object XCaptureMapper {
                         sourceFile =
                             downloadedFiles[
                                 index
-                            ]
+                            ],
+
+                        isHighlighted =
+                            item.mediaIndex in
+                                    highlightedMediaIndices
                     )
                 }
 

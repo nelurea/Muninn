@@ -2,23 +2,36 @@ package io.github.nelurea.muninn.ui.navigation
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
 import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
+import io.github.nelurea.muninn.data.db.StateVocabularyEntity
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import io.github.nelurea.muninn.data.repository.ImageRepository
 import io.github.nelurea.muninn.data.repository.ResolvedCaptureRepository
 import io.github.nelurea.muninn.data.repository.SessionRepository
 import io.github.nelurea.muninn.discovery.DiscoveryViewModel
+import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import io.github.nelurea.muninn.discovery.pixiv.PixivArtworkPreviewSource
 import io.github.nelurea.muninn.discovery.pixiv.PixivDiscoverySource
 import io.github.nelurea.muninn.ui.browser.WebCaptureScreen
+import io.github.nelurea.muninn.ui.capture.CapturedWorkDetailScreen
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
 import io.github.nelurea.muninn.ui.discovery.DiscoveryScreen
@@ -30,21 +43,11 @@ import io.github.nelurea.muninn.ui.session.SessionDetailScreen
 import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
 import io.github.nelurea.muninn.ui.session.SessionListScreen
 import io.github.nelurea.muninn.ui.session.SessionListViewModel
-import io.github.nelurea.muninn.discovery.pixiv.PixivArtworkPreviewSource
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.ui.Modifier
-import io.github.nelurea.muninn.capture.discovery.PixivDiscoverySaveUseCase
-import io.github.nelurea.muninn.ui.capture.CapturedWorkDetailScreen
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
-import io.github.nelurea.muninn.data.db.StateVocabularyEntity
 import io.github.nelurea.muninn.ui.session.SessionStatePicker
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import io.github.nelurea.muninn.discovery.x.XArtworkPreviewSource
+import io.github.nelurea.muninn.discovery.x.XDiscoverySource
+import io.github.nelurea.muninn.capture.discovery.XDiscoverySaveUseCase
 
 @Composable
 fun AppNavigation(
@@ -81,15 +84,43 @@ fun AppNavigation(
             )
         }
 
+    val xDiscoverySaveUseCase =
+        remember {
+            XDiscoverySaveUseCase(
+                context =
+                    context.applicationContext,
+                saveCaptureUseCase =
+                    saveCaptureUseCase
+            )
+        }
+
     val discoveryViewModel =
         remember {
             DiscoveryViewModel(
-                source =
-                    PixivDiscoverySource(),
-                previewSource =
-                    PixivArtworkPreviewSource(),
-                saveUseCase =
-                    pixivDiscoverySaveUseCase
+                sources =
+                    mapOf(
+                        DiscoverySourceId.PIXIV to
+                                PixivDiscoverySource(),
+
+                        DiscoverySourceId.X to
+                                XDiscoverySource()
+                    ),
+                previewSources =
+                    mapOf(
+                        DiscoverySourceId.PIXIV to
+                                PixivArtworkPreviewSource(),
+
+                        DiscoverySourceId.X to
+                                XArtworkPreviewSource()
+                    ),
+                saveUseCases =
+                    mapOf(
+                        DiscoverySourceId.PIXIV to
+                                pixivDiscoverySaveUseCase,
+
+                        DiscoverySourceId.X to
+                                xDiscoverySaveUseCase
+                    )
             )
         }
 
@@ -131,7 +162,7 @@ fun AppNavigation(
                     navController.navigate(
                         "sessions"
                     )
-                },
+                }
             )
         }
 
@@ -352,32 +383,45 @@ fun AppNavigation(
                 rememberCoroutineScope()
 
             var showStatePicker by remember {
-                mutableStateOf(false)
+                mutableStateOf(
+                    false
+                )
             }
 
             var activeSessionId by remember {
-                mutableStateOf<Long?>(null)
+                mutableStateOf<Long?>(
+                    null
+                )
             }
 
             var stateVocabulary by remember {
-                mutableStateOf<List<StateVocabularyEntity>>(
+                mutableStateOf<
+                        List<StateVocabularyEntity>
+                        >(
                     emptyList()
                 )
             }
 
             var selectedStateIds by remember {
-                mutableStateOf<Set<Long>>(
+                mutableStateOf<
+                        Set<Long>
+                        >(
                     emptySet()
                 )
             }
 
             var newStateLabel by remember {
-                mutableStateOf("")
+                mutableStateOf(
+                    ""
+                )
             }
 
-            LaunchedEffect(Unit) {
+            LaunchedEffect(
+                Unit
+            ) {
                 val resolution =
-                    sessionRepository.resolveSession()
+                    sessionRepository
+                        .resolveSession()
 
                 activeSessionId =
                     resolution.sessionId
@@ -386,7 +430,9 @@ fun AppNavigation(
                     sessionRepository
                         .getStateVocabulary()
 
-                if (resolution.isNew) {
+                if (
+                    resolution.isNew
+                ) {
                     showStatePicker =
                         true
                 }
@@ -490,28 +536,28 @@ fun AppNavigation(
                                         state.id
 
                             scope.launch {
-                                    sessionRepository
-                                        .removeStateFromSession(
-                                            sessionId =
-                                                sessionId,
-                                            stateVocabularyId =
-                                                state.id
-                                        )
-                                }
+                                sessionRepository
+                                    .removeStateFromSession(
+                                        sessionId =
+                                            sessionId,
+                                        stateVocabularyId =
+                                            state.id
+                                    )
+                            }
                         } else {
                             selectedStateIds =
                                 selectedStateIds +
                                         state.id
 
                             scope.launch {
-                                    sessionRepository
-                                        .addStateToSession(
-                                            sessionId =
-                                                sessionId,
-                                            label =
-                                                state.label
-                                        )
-                                }
+                                sessionRepository
+                                    .addStateToSession(
+                                        sessionId =
+                                            sessionId,
+                                        label =
+                                            state.label
+                                    )
+                            }
                         }
                     },
                     onAddState = {
@@ -527,31 +573,31 @@ fun AppNavigation(
                             label.isNotBlank()
                         ) {
                             scope.launch {
+                                sessionRepository
+                                    .addStateToSession(
+                                        sessionId =
+                                            sessionId,
+                                        label =
+                                            label
+                                    )
+
+                                stateVocabulary =
                                     sessionRepository
-                                        .addStateToSession(
-                                            sessionId =
-                                                sessionId,
-                                            label =
-                                                label
+                                        .getStateVocabulary()
+
+                                selectedStateIds =
+                                    sessionRepository
+                                        .getStatesForSession(
+                                            sessionId
                                         )
+                                        .map {
+                                            it.id
+                                        }
+                                        .toSet()
 
-                                    stateVocabulary =
-                                        sessionRepository
-                                            .getStateVocabulary()
-
-                                    selectedStateIds =
-                                        sessionRepository
-                                            .getStatesForSession(
-                                                sessionId
-                                            )
-                                            .map {
-                                                it.id
-                                            }
-                                            .toSet()
-
-                                    newStateLabel =
-                                        ""
-                                }
+                                newStateLabel =
+                                    ""
+                            }
                         }
                     },
                     onDone = {
