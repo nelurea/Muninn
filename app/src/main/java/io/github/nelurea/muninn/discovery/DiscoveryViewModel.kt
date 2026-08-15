@@ -6,12 +6,15 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.nelurea.muninn.capture.discovery.DiscoveryArtworkSaveMode
-import io.github.nelurea.muninn.capture.discovery.DiscoveryArtworkSaveUseCase
-import io.github.nelurea.muninn.capture.usecase.SaveCaptureResult
+import io.github.nelurea.muninn.capture.discovery.DiscoverySaveCoordinator
+import io.github.nelurea.muninn.capture.discovery.DiscoverySaveEnqueueResult
+import io.github.nelurea.muninn.capture.discovery.DiscoverySaveRequestKey
+import io.github.nelurea.muninn.capture.discovery.DiscoverySaveStatus
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class DiscoveryViewModel(
@@ -23,10 +26,8 @@ class DiscoveryViewModel(
             DiscoverySourceId,
             ArtworkPreviewSource
             >,
-    private val saveUseCases: Map<
-            DiscoverySourceId,
-            DiscoveryArtworkSaveUseCase
-            >,
+    private val saveCoordinator:
+    DiscoverySaveCoordinator,
     initialSource: DiscoverySourceId =
         DiscoverySourceId.PIXIV,
     initialMode: DiscoveryMode =
@@ -40,6 +41,11 @@ class DiscoveryViewModel(
 
     var previewState by mutableStateOf(
         ArtworkPreviewUiState()
+    )
+        private set
+
+    var saveQueueState by mutableStateOf(
+        DiscoverySaveQueueUiState()
     )
         private set
 
@@ -90,6 +96,89 @@ class DiscoveryViewModel(
             "No ArtworkPreviewSource is registered for $initialSource."
         }
 
+        viewModelScope.launch {
+            saveCoordinator
+                .states
+                .collectLatest {
+                        states ->
+
+                    val activeCount =
+                        states
+                            .values
+                            .count {
+                                it.status ==
+                                        DiscoverySaveStatus.QUEUED ||
+                                        it.status ==
+                                        DiscoverySaveStatus.SAVING
+                            }
+
+                    val failed =
+                        states
+                            .values
+                            .lastOrNull {
+                                it.status ==
+                                        DiscoverySaveStatus.FAILED
+                            }
+
+                    val saved =
+                        states
+                            .values
+                            .lastOrNull {
+                                it.status ==
+                                        DiscoverySaveStatus.SAVED
+                            }
+
+                    saveQueueState =
+                        when {
+                            activeCount > 0 -> {
+                                DiscoverySaveQueueUiState(
+                                    activeCount =
+                                        activeCount,
+                                    message =
+                                        if (
+                                            activeCount == 1
+                                        ) {
+                                            "Saving in background…"
+                                        } else {
+                                            "Saving $activeCount works in background…"
+                                        }
+                                )
+                            }
+
+                            failed != null -> {
+                                DiscoverySaveQueueUiState(
+                                    message =
+                                        failed.error
+                                            ?: "Background save failed.",
+                                    failedRequestKey =
+                                        failed.key
+                                )
+                            }
+
+                            saved != null -> {
+                                val mediaCount =
+                                    saved.mediaCount
+                                        ?: 0
+
+                                DiscoverySaveQueueUiState(
+                                    message =
+                                        if (
+                                            mediaCount == 1
+                                        ) {
+                                            "Saved 1 page."
+                                        } else {
+                                            "Saved $mediaCount pages."
+                                        }
+                                )
+                            }
+
+                            else -> {
+                                DiscoverySaveQueueUiState()
+                            }
+                        }
+                }
+        }
+
         loadInitial()
     }
 
@@ -108,7 +197,8 @@ class DiscoveryViewModel(
         newSourceId: DiscoverySourceId
     ) {
         if (
-            sourceId == newSourceId
+            sourceId ==
+            newSourceId
         ) {
             return
         }
@@ -139,7 +229,8 @@ class DiscoveryViewModel(
         newMode: DiscoveryMode
     ) {
         if (
-            mode == newMode
+            mode ==
+            newMode
         ) {
             return
         }
@@ -155,6 +246,7 @@ class DiscoveryViewModel(
             searchQuery.isBlank()
         ) {
             clearResults()
+
             return
         }
 
@@ -188,6 +280,7 @@ class DiscoveryViewModel(
             normalizedQuery.isBlank()
         ) {
             clearResults()
+
             return
         }
 
@@ -317,12 +410,6 @@ class DiscoveryViewModel(
                             isLoading =
                                 false,
                             error =
-                                null,
-                            isSaving =
-                                false,
-                            saveMessage =
-                                null,
-                            saveError =
                                 null
                         )
                 }
@@ -346,13 +433,7 @@ class DiscoveryViewModel(
                                 false,
                             error =
                                 error.message
-                                    ?: "Failed to load artwork preview.",
-                            isSaving =
-                                false,
-                            saveMessage =
-                                null,
-                            saveError =
-                                null
+                                    ?: "Failed to load artwork preview."
                         )
                 }
         }
@@ -404,11 +485,7 @@ class DiscoveryViewModel(
                 selectedMediaIndices =
                     previewState
                         .selectedMediaIndices +
-                            mediaIndex,
-                saveMessage =
-                    null,
-                saveError =
-                    null
+                            mediaIndex
             )
     }
 
@@ -427,11 +504,7 @@ class DiscoveryViewModel(
                 selectedMediaIndices =
                     previewState
                         .selectedMediaIndices -
-                            mediaIndex,
-                saveMessage =
-                    null,
-                saveError =
-                    null
+                            mediaIndex
             )
     }
 
@@ -452,37 +525,21 @@ class DiscoveryViewModel(
     private fun savePreview(
         saveMode: DiscoveryArtworkSaveMode
     ) {
-        if (
-            previewState.isSaving
-        ) {
-            return
-        }
-
         val preview =
             previewState.preview
                 ?: return
 
         val selectedMediaIndices =
-            previewState.selectedMediaIndices
+            previewState
+                .selectedMediaIndices
 
         if (
             saveMode ==
             DiscoveryArtworkSaveMode.SELECTED &&
             selectedMediaIndices.isEmpty()
         ) {
-            previewState =
-                previewState.copy(
-                    saveMessage =
-                        null,
-                    saveError =
-                        "Select at least one page first."
-                )
-
             return
         }
-
-        val requestGeneration =
-            previewGeneration
 
         val discoveryMode =
             mode.name
@@ -495,40 +552,9 @@ class DiscoveryViewModel(
                             it.isNotBlank()
                 }
 
-        previewState =
-            previewState.copy(
-                isSaving =
-                    true,
-                saveMessage =
-                    null,
-                saveError =
-                    null
-            )
-
-        viewModelScope.launch {
-            val saveUseCase =
-                saveUseCases[
-                    preview.source
-                ]
-
-            if (
-                saveUseCase == null
-            ) {
-                previewState =
-                    previewState.copy(
-                        isSaving =
-                            false,
-                        saveMessage =
-                            null,
-                        saveError =
-                            "Saving this Discovery source is not supported."
-                    )
-
-                return@launch
-            }
-
+        when (
             val result =
-                saveUseCase.save(
+                saveCoordinator.enqueue(
                     preview =
                         preview,
                     selectedMediaIndices =
@@ -540,49 +566,70 @@ class DiscoveryViewModel(
                     discoveryQuery =
                         discoveryQuery
                 )
-
-            if (
-                requestGeneration !=
-                previewGeneration
-            ) {
-                return@launch
+        ) {
+            is DiscoverySaveEnqueueResult.Accepted -> {
+                /*
+                 * Save state is now owned entirely by
+                 * DiscoverySaveCoordinator.
+                 */
             }
 
-            when (
-                result
-            ) {
-                is SaveCaptureResult.Success -> {
-                    previewState =
-                        previewState.copy(
-                            isSaving =
-                                false,
-                            saveMessage =
-                                if (
-                                    result.mediaCount == 1
-                                ) {
-                                    "Saved 1 page."
-                                } else {
-                                    "Saved ${result.mediaCount} pages."
-                                },
-                            saveError =
-                                null
-                        )
-                }
+            is DiscoverySaveEnqueueResult.AlreadyRunning -> {
+                saveQueueState =
+                    saveQueueState.copy(
+                        message =
+                            "Already saving in background."
+                    )
+            }
 
-                is SaveCaptureResult.Failure -> {
-                    previewState =
-                        previewState.copy(
-                            isSaving =
-                                false,
-                            saveMessage =
-                                null,
-                            saveError =
-                                result.errors
-                                    .joinToString(
-                                        separator = "\n"
-                                    )
-                        )
-                }
+            is DiscoverySaveEnqueueResult.Failure -> {
+                saveQueueState =
+                    DiscoverySaveQueueUiState(
+                        message =
+                            result.error
+                    )
+            }
+        }
+    }
+
+    fun retryFailedSave() {
+        val key =
+            saveQueueState
+                .failedRequestKey
+                ?: return
+
+        when (
+            val result =
+                saveCoordinator.retry(
+                    key
+                )
+        ) {
+            is DiscoverySaveEnqueueResult.Accepted -> {
+                saveQueueState =
+                    saveQueueState.copy(
+                        message =
+                            "Retrying save…",
+                        failedRequestKey =
+                            null
+                    )
+            }
+
+            is DiscoverySaveEnqueueResult.AlreadyRunning -> {
+                saveQueueState =
+                    saveQueueState.copy(
+                        message =
+                            "Already saving in background.",
+                        failedRequestKey =
+                            null
+                    )
+            }
+
+            is DiscoverySaveEnqueueResult.Failure -> {
+                saveQueueState =
+                    saveQueueState.copy(
+                        message =
+                            result.error
+                    )
             }
         }
     }
@@ -594,6 +641,7 @@ class DiscoveryViewModel(
             searchQuery.isBlank()
         ) {
             clearResults()
+
             return
         }
 
@@ -916,14 +964,17 @@ data class ArtworkPreviewUiState(
         false,
 
     val error: String? =
+        null
+)
+
+data class DiscoverySaveQueueUiState(
+    val activeCount: Int =
+        0,
+
+    val message: String? =
         null,
 
-    val isSaving: Boolean =
-        false,
-
-    val saveMessage: String? =
-        null,
-
-    val saveError: String? =
+    val failedRequestKey:
+    DiscoverySaveRequestKey? =
         null
 )
