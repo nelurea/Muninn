@@ -50,6 +50,7 @@ import io.github.nelurea.muninn.discovery.x.XDiscoverySource
 import io.github.nelurea.muninn.capture.discovery.XDiscoverySaveUseCase
 import androidx.compose.runtime.DisposableEffect
 import io.github.nelurea.muninn.capture.discovery.DiscoverySaveCoordinator
+import io.github.nelurea.muninn.capture.storage.UserSelectedMediaStorage
 
 @Composable
 fun AppNavigation(
@@ -67,8 +68,10 @@ fun AppNavigation(
     val saveCaptureUseCase =
         remember {
             SaveCaptureUseCase(
-                context =
-                    context.applicationContext,
+                mediaStorage =
+                    UserSelectedMediaStorage(
+                        context.applicationContext
+                    ),
                 repository =
                     capturedWorkRepository,
                 sessionRepository =
