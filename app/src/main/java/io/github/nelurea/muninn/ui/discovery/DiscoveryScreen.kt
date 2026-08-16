@@ -30,10 +30,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -76,6 +82,18 @@ fun DiscoveryScreen(
         )
     }
 
+    var xLoadMoreToken by rememberSaveable {
+        mutableIntStateOf(
+            0
+        )
+    }
+
+    var xIsLoadingMore by rememberSaveable {
+        mutableStateOf(
+            false
+        )
+    }
+
     LaunchedEffect(
         gridState,
         state.items.size,
@@ -96,13 +114,28 @@ fun DiscoveryScreen(
                     shouldLoad ->
 
                 if (
-                    shouldLoad &&
-                    state.hasNextPage &&
-                    !state.isLoading &&
-                    !state.isLoadingMore
+                    !shouldLoad ||
+                    state.isLoading ||
+                    state.isLoadingMore
+                ) {
+                    return@collect
+                }
+
+                if (
+                    state.hasNextPage
                 ) {
                     viewModel
                         .loadNextPage()
+                } else if (
+                    viewModel.sourceId ==
+                    DiscoverySourceId.X &&
+                    !xIsLoadingMore
+                ) {
+                    xIsLoadingMore =
+                        true
+
+                    xLoadMoreToken +=
+                        1
                 }
             }
     }
@@ -122,6 +155,14 @@ fun DiscoveryScreen(
                     viewModel.searchQuery,
                 refreshToken =
                     xRefreshToken,
+                loadMoreToken =
+                    xLoadMoreToken,
+                onLoadMoreStateChange = {
+                        loading ->
+
+                    xIsLoadingMore =
+                        loading
+                },
                 onBatchObserved = {
                         batch ->
 
@@ -143,6 +184,19 @@ fun DiscoveryScreen(
                 viewModel,
             gridState =
                 gridState,
+            xIsLoadingMore =
+                xIsLoadingMore,
+            onLoadMoreX = {
+                if (
+                    !xIsLoadingMore
+                ) {
+                    xIsLoadingMore =
+                        true
+
+                    xLoadMoreToken +=
+                        1
+                }
+            },
             onRefreshX = {
                 xRefreshToken +=
                     1
@@ -252,11 +306,100 @@ fun DiscoveryScreen(
 private fun DiscoveryContent(
     viewModel: DiscoveryViewModel,
     gridState: LazyGridState,
+    xIsLoadingMore: Boolean,
+    onLoadMoreX: () -> Unit,
     onRefreshX: () -> Unit,
     onBack: () -> Unit
 ) {
     val state =
         viewModel.uiState
+
+    var xEndLoadMoreTriggered by remember {
+        mutableStateOf(
+            false
+        )
+    }
+
+    /*
+     * Once the current load-more finishes, allow another
+     * ordinary upward scroll at the end to trigger the next
+     * request.
+     */
+    LaunchedEffect(
+        xIsLoadingMore
+    ) {
+        if (
+            !xIsLoadingMore
+        ) {
+            xEndLoadMoreTriggered =
+                false
+        }
+    }
+
+    val xBottomScrollConnection =
+        remember(
+            gridState,
+            viewModel.sourceId,
+            xIsLoadingMore
+        ) {
+            object :
+                NestedScrollConnection {
+
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource
+                ): Offset {
+                    if (
+                        source !=
+                        NestedScrollSource.UserInput
+                    ) {
+                        return Offset.Zero
+                    }
+
+                    if (
+                        viewModel.sourceId !=
+                        DiscoverySourceId.X
+                    ) {
+                        return Offset.Zero
+                    }
+
+                    if (
+                        xIsLoadingMore ||
+                        xEndLoadMoreTriggered
+                    ) {
+                        return Offset.Zero
+                    }
+
+                    if (
+                        gridState.canScrollForward
+                    ) {
+                        return Offset.Zero
+                    }
+
+                    /*
+                     * The visible grid is already at its end.
+                     *
+                     * A normal continued upward scroll produces
+                     * negative unconsumed Y. Treat any such
+                     * input as the user's intent to continue
+                     * browsing rather than as a separate
+                     * pull-to-refresh gesture.
+                     */
+                    if (
+                        available.y <
+                        0f
+                    ) {
+                        xEndLoadMoreTriggered =
+                            true
+
+                        onLoadMoreX()
+                    }
+
+                    return Offset.Zero
+                }
+            }
+        }
 
     Column(
         modifier =
@@ -683,7 +826,11 @@ private fun DiscoveryContent(
                         state =
                             gridState,
                         modifier =
-                            Modifier.fillMaxSize(),
+                            Modifier
+                                .fillMaxSize()
+                                .nestedScroll(
+                                    xBottomScrollConnection
+                                ),
                         contentPadding =
                             PaddingValues(
                                 8.dp
@@ -719,7 +866,8 @@ private fun DiscoveryContent(
                         }
 
                         if (
-                            state.isLoadingMore
+                            state.isLoadingMore ||
+                            xIsLoadingMore
                         ) {
                             item(
                                 span = {
