@@ -12,9 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -26,12 +28,18 @@ import io.github.nelurea.muninn.discovery.x.XDiscoveryBatch
 import io.github.nelurea.muninn.discovery.x.XDiscoveryBatchParseResult
 import io.github.nelurea.muninn.discovery.x.XDiscoveryBatchParser
 import io.github.nelurea.muninn.discovery.x.XDiscoveryObservationStore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun XDiscoveryWebSession(
     mode: DiscoveryMode,
     searchQuery: String,
     refreshToken: Int,
+    loadMoreToken: Int,
+    onLoadMoreStateChange: (
+        Boolean
+    ) -> Unit,
     onBatchObserved: (
         XDiscoveryBatch
     ) -> Unit,
@@ -55,6 +63,33 @@ fun XDiscoveryWebSession(
         )
     }
 
+    var xLoadMoreActive by remember {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var xLoadMoreRetryCount by remember {
+        mutableIntStateOf(
+            0
+        )
+    }
+
+    var xAutoRefreshAttempted by remember {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var xLastAutoRefreshAtMs by remember {
+        mutableStateOf(
+            0L
+        )
+    }
+
+    val coroutineScope =
+        rememberCoroutineScope()
+
     val currentMode =
         rememberUpdatedState(
             mode
@@ -69,6 +104,64 @@ fun XDiscoveryWebSession(
         rememberUpdatedState(
             onBatchObserved
         )
+
+    val currentOnLoadMoreStateChange =
+        rememberUpdatedState(
+            onLoadMoreStateChange
+        )
+
+    fun tryAutoRefreshAfterStall(
+        currentWebView: WebView
+    ): Boolean {
+        if (
+            xAutoRefreshAttempted
+        ) {
+            return false
+        }
+
+        val now =
+            System.currentTimeMillis()
+
+        val cooldownElapsed =
+            xLastAutoRefreshAtMs == 0L ||
+                    now - xLastAutoRefreshAtMs >=
+                    X_AUTO_REFRESH_COOLDOWN_MS
+
+        if (
+            !cooldownElapsed
+        ) {
+            Log.d(
+                LOG_TAG,
+                "Automatic X refresh skipped because cooldown is active."
+            )
+
+            return false
+        }
+
+        val refreshed =
+            refreshCurrentXDiscoveryPage(
+                webView =
+                    currentWebView,
+                mode =
+                    currentMode.value,
+                searchQuery =
+                    currentSearchQuery.value
+            )
+
+        if (
+            !refreshed
+        ) {
+            return false
+        }
+
+        xAutoRefreshAttempted =
+            true
+
+        xLastAutoRefreshAtMs =
+            now
+
+        return true
+    }
 
     DisposableEffect(
         Unit
@@ -217,7 +310,85 @@ fun XDiscoveryWebSession(
                     webView =
                         this,
                     onBatchObserved = {
-                            batch ->
+                            batch,
+                            addedCount ->
+
+                        if (
+                            xLoadMoreActive
+                        ) {
+                            if (
+                                addedCount > 0
+                            ) {
+                                xLoadMoreActive =
+                                    false
+
+                                xLoadMoreRetryCount =
+                                    0
+
+                                xAutoRefreshAttempted =
+                                    false
+
+                                currentOnLoadMoreStateChange
+                                    .value(
+                                        false
+                                    )
+                            } else if (
+                                xLoadMoreRetryCount <
+                                MAX_X_LOAD_MORE_RETRIES
+                            ) {
+                                xLoadMoreRetryCount +=
+                                    1
+
+                                val retryNumber =
+                                    xLoadMoreRetryCount
+
+                                Log.d(
+                                    LOG_TAG,
+                                    "X timeline added 0 items; retrying ($retryNumber/$MAX_X_LOAD_MORE_RETRIES)."
+                                )
+
+                                coroutineScope.launch {
+                                    delay(
+                                        X_LOAD_MORE_RETRY_DELAY_MS
+                                    )
+
+                                    if (
+                                        xLoadMoreActive
+                                    ) {
+                                        requestMoreXTimeline(
+                                            this@apply
+                                        )
+                                    }
+                                }
+                            } else {
+                                Log.d(
+                                    LOG_TAG,
+                                    "X timeline load-more retries exhausted."
+                                )
+
+                                val autoRefreshStarted =
+                                    tryAutoRefreshAfterStall(
+                                        this@apply
+                                    )
+
+                                if (
+                                    autoRefreshStarted
+                                ) {
+                                    Log.d(
+                                        LOG_TAG,
+                                        "Automatic X refresh started after stalled load-more."
+                                    )
+                                } else {
+                                    xLoadMoreActive =
+                                        false
+
+                                    currentOnLoadMoreStateChange
+                                        .value(
+                                            false
+                                        )
+                                }
+                            }
+                        }
 
                         currentOnBatchObserved
                             .value(
@@ -231,12 +402,132 @@ fun XDiscoveryWebSession(
 
     LaunchedEffect(
         webView,
+        loadMoreToken
+    ) {
+        if (
+            loadMoreToken <= 0
+        ) {
+            return@LaunchedEffect
+        }
+
+        val currentWebView =
+            webView
+                ?: return@LaunchedEffect
+
+        xLoadMoreActive =
+            true
+
+        xLoadMoreRetryCount =
+            0
+
+        xAutoRefreshAttempted =
+            false
+
+        currentOnLoadMoreStateChange
+            .value(
+                true
+            )
+
+        requestMoreXTimeline(
+            currentWebView
+        )
+
+        /*
+         * X can occasionally ignore a synthetic scroll
+         * without producing another HomeTimeline response.
+         * Never leave the Discovery loading indicator active
+         * indefinitely in that case.
+         */
+        delay(
+            X_LOAD_MORE_TIMEOUT_MS
+        )
+
+        if (
+            xLoadMoreActive
+        ) {
+            Log.d(
+                LOG_TAG,
+                "X timeline load-more timed out."
+            )
+
+            val autoRefreshAlreadyStarted =
+                xAutoRefreshAttempted
+
+            val autoRefreshStarted =
+                if (
+                    autoRefreshAlreadyStarted
+                ) {
+                    true
+                } else {
+                    tryAutoRefreshAfterStall(
+                        currentWebView
+                    )
+                }
+
+            if (
+                autoRefreshStarted
+            ) {
+                /*
+                 * Give the refreshed X page one bounded
+                 * opportunity to produce a new timeline batch.
+                 */
+                delay(
+                    X_AUTO_REFRESH_TIMEOUT_MS
+                )
+            }
+
+            if (
+                xLoadMoreActive
+            ) {
+                Log.d(
+                    LOG_TAG,
+                    "X timeline did not recover after fallback."
+                )
+
+                xLoadMoreActive =
+                    false
+
+                xLoadMoreRetryCount =
+                    0
+
+                xAutoRefreshAttempted =
+                    false
+
+                currentOnLoadMoreStateChange
+                    .value(
+                        false
+                    )
+            }
+        }
+    }
+
+
+    LaunchedEffect(
+        webView,
         mode,
         refreshToken
     ) {
         val currentWebView =
             webView
                 ?: return@LaunchedEffect
+
+        if (
+            xLoadMoreActive
+        ) {
+            xLoadMoreActive =
+                false
+
+            xLoadMoreRetryCount =
+                0
+
+            xAutoRefreshAttempted =
+                false
+
+            currentOnLoadMoreStateChange
+                .value(
+                    false
+                )
+        }
 
         val navigationKey =
             when (
@@ -342,10 +633,128 @@ fun XDiscoveryWebSession(
     }
 }
 
+private fun refreshCurrentXDiscoveryPage(
+    webView: WebView,
+    mode: DiscoveryMode,
+    searchQuery: String
+): Boolean {
+    val currentUrl =
+        webView.url
+            ?.takeIf {
+                it.startsWith(
+                    "$X_ORIGIN/"
+                )
+            }
+
+    val fallbackUrl =
+        when (
+            mode
+        ) {
+            DiscoveryMode.LATEST ->
+                X_HOME_URL
+
+            DiscoveryMode.BOOKMARKS ->
+                null
+
+            DiscoveryMode.SEARCH -> {
+                val query =
+                    searchQuery.trim()
+
+                if (
+                    query.isBlank()
+                ) {
+                    null
+                } else {
+                    buildXSearchUrl(
+                        query
+                    )
+                }
+            }
+        }
+
+    val targetUrl =
+        currentUrl
+            ?: fallbackUrl
+            ?: return false
+
+    Log.d(
+        LOG_TAG,
+        "Refreshing hidden X Discovery page after stalled pagination."
+    )
+
+    /*
+     * Reload only the authenticated hidden WebView.
+     *
+     * XDiscoveryObservationStore and the visible Discovery
+     * list are intentionally left intact, so newly observed
+     * items are merged without resetting the user's position.
+     */
+    webView.loadUrl(
+        targetUrl
+    )
+
+    return true
+}
+
+
+private fun requestMoreXTimeline(
+    webView: WebView
+) {
+    Log.d(
+        LOG_TAG,
+        "Requesting more X timeline items."
+    )
+
+    webView.evaluateJavascript(
+        """
+        (() => {
+          const scrollingElement =
+            document.scrollingElement ||
+            document.documentElement;
+
+          if (!scrollingElement) {
+            return false;
+          }
+
+          const viewport =
+            window.innerHeight || 800;
+
+          scrollingElement.scrollTo({
+            top:
+              Math.max(
+                0,
+                scrollingElement.scrollHeight -
+                  viewport * 1.5
+              ),
+            behavior:
+              "instant"
+          });
+
+          setTimeout(
+            () => {
+              scrollingElement.scrollTo({
+                top:
+                  scrollingElement.scrollHeight,
+                behavior:
+                  "instant"
+              });
+            },
+            180
+          );
+
+          return true;
+        })();
+        """.trimIndent(),
+        null
+    )
+}
+
+
 private fun WebView.installXDiscoveryBridge(
     webView: WebView,
     onBatchObserved: (
-        XDiscoveryBatch
+        XDiscoveryBatch,
+        Int
     ) -> Unit
 ) {
     if (
@@ -446,7 +855,8 @@ private fun WebView.installXDiscoveryBridge(
                     )
 
                     onBatchObserved(
-                        batch
+                        batch,
+                        mergeResult.addedCount
                     )
                 }
 
@@ -566,6 +976,21 @@ private const val X_ORIGIN =
 
 private const val X_HOME_URL =
     "$X_ORIGIN/home"
+
+private const val MAX_X_LOAD_MORE_RETRIES =
+    3
+
+private const val X_LOAD_MORE_RETRY_DELAY_MS =
+    700L
+
+private const val X_LOAD_MORE_TIMEOUT_MS =
+    1_500L
+
+private const val X_AUTO_REFRESH_TIMEOUT_MS =
+    1_500L
+
+private const val X_AUTO_REFRESH_COOLDOWN_MS =
+    30_000L
 
 private val X_PROFILE_URL_REGEX =
     Regex(

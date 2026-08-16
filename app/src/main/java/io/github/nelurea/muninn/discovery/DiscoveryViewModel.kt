@@ -14,6 +14,7 @@ import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -79,6 +80,15 @@ class DiscoveryViewModel(
     private var previewGeneration =
         0
 
+    private var saveStatusGeneration =
+        0
+
+    private var xSyncInProgress =
+        false
+
+    private var xSyncPending =
+        false
+
     init {
         require(
             sources.containsKey(
@@ -101,6 +111,12 @@ class DiscoveryViewModel(
                 .states
                 .collectLatest {
                         states ->
+
+                    saveStatusGeneration +=
+                        1
+
+                    val statusGeneration =
+                        saveStatusGeneration
 
                     val activeCount =
                         states
@@ -160,18 +176,35 @@ class DiscoveryViewModel(
                                     saved.mediaCount
                                         ?: 0
 
+                                val message =
+                                    when {
+                                        mediaCount == 0 ->
+                                            "Already saved."
+
+                                        mediaCount == 1 ->
+                                            "Saved 1 page."
+
+                                        else ->
+                                            "Saved $mediaCount pages."
+                                    }
+
+                                viewModelScope.launch {
+                                    delay(
+                                        2_500L
+                                    )
+
+                                    if (
+                                        saveStatusGeneration ==
+                                        statusGeneration
+                                    ) {
+                                        saveQueueState =
+                                            DiscoverySaveQueueUiState()
+                                    }
+                                }
+
                                 DiscoverySaveQueueUiState(
                                     message =
-                                        when {
-                                            mediaCount == 0 ->
-                                                "Already saved."
-
-                                            mediaCount == 1 ->
-                                                "Saved 1 page."
-
-                                            else ->
-                                                "Saved $mediaCount pages."
-                                        }
+                                        message
                                 )
                             }
 
@@ -358,6 +391,15 @@ class DiscoveryViewModel(
             ) {
                 return
             }
+        }
+
+        if (
+            sourceId ==
+            DiscoverySourceId.X
+        ) {
+            syncObservedXSource()
+
+            return
         }
 
         refreshCurrentSource()
@@ -666,6 +708,21 @@ class DiscoveryViewModel(
                     true
             )
 
+        if (
+            sourceId ==
+            DiscoverySourceId.X
+        ) {
+            /*
+             * X data arrives asynchronously from the hidden
+             * authenticated WebView.
+             *
+             * Do not consume page 1 while the observation
+             * store is still empty. The first observed batch
+             * will synchronize the available pages.
+             */
+            return
+        }
+
         loadPage(
             page =
                 1,
@@ -717,6 +774,15 @@ class DiscoveryViewModel(
             return
         }
 
+        if (
+            sourceId ==
+            DiscoverySourceId.X
+        ) {
+            syncObservedXSource()
+
+            return
+        }
+
         generation +=
             1
 
@@ -739,6 +805,175 @@ class DiscoveryViewModel(
             showLoading =
                 false
         )
+    }
+
+    private fun syncObservedXSource() {
+        if (
+            sourceId !=
+            DiscoverySourceId.X
+        ) {
+            return
+        }
+
+        if (
+            xSyncInProgress
+        ) {
+            xSyncPending =
+                true
+
+            return
+        }
+
+        val source =
+            sources[
+                DiscoverySourceId.X
+            ]
+                ?: return
+
+        val requestGeneration =
+            generation
+
+        val requestedMode =
+            mode
+
+        val requestedQuery =
+            if (
+                requestedMode ==
+                DiscoveryMode.SEARCH
+            ) {
+                searchQuery
+            } else {
+                null
+            }
+
+        xSyncInProgress =
+            true
+
+        xSyncPending =
+            false
+
+        viewModelScope.launch {
+            try {
+                var page =
+                    1
+
+                var lastPage =
+                    0
+
+                var moreObservedPages =
+                    true
+
+                var observedItems =
+                    emptyList<DiscoveryItem>()
+
+                while (
+                    moreObservedPages
+                ) {
+                    val result =
+                        source.load(
+                            mode =
+                                requestedMode,
+                            page =
+                                page,
+                            query =
+                                requestedQuery
+                        )
+
+                    if (
+                        requestGeneration !=
+                        generation
+                    ) {
+                        return@launch
+                    }
+
+                    observedItems =
+                        mergeItems(
+                            current =
+                                observedItems,
+                            additional =
+                                result.items
+                        )
+
+                    lastPage =
+                        result.page
+
+                    moreObservedPages =
+                        result.hasNextPage
+
+                    page +=
+                        1
+                }
+
+                if (
+                    requestGeneration !=
+                    generation
+                ) {
+                    return@launch
+                }
+
+                currentPage =
+                    lastPage
+
+                /*
+                 * false means Muninn has consumed everything
+                 * currently observed. DiscoveryScreen can then
+                 * ask the hidden WebView to obtain more.
+                 */
+                hasNextPage =
+                    false
+
+                uiState =
+                    uiState.copy(
+                        items =
+                            mergeItems(
+                                current =
+                                    uiState.items,
+                                additional =
+                                    observedItems
+                            ),
+                        isLoading =
+                            false,
+                        isLoadingMore =
+                            false,
+                        hasNextPage =
+                            false,
+                        error =
+                            null
+                    )
+            } catch (
+                error: Exception
+            ) {
+                if (
+                    requestGeneration ==
+                    generation
+                ) {
+                    uiState =
+                        uiState.copy(
+                            isLoading =
+                                false,
+                            isLoadingMore =
+                                false,
+                            error =
+                                error.message
+                                    ?: "Failed to synchronize X Discovery."
+                        )
+                }
+            } finally {
+                xSyncInProgress =
+                    false
+
+                if (
+                    xSyncPending &&
+                    requestGeneration ==
+                    generation
+                ) {
+                    xSyncPending =
+                        false
+
+                    syncObservedXSource()
+                }
+            }
+        }
     }
 
     private fun clearResults() {

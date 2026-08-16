@@ -987,9 +987,9 @@ private fun ArtworkCaption(
                     if (
                         expanded
                     ) {
-                        "折りたたむ"
+                        "Collapse"
                     } else {
-                        "続きを読む"
+                        "Read more"
                     },
                 modifier =
                     Modifier
