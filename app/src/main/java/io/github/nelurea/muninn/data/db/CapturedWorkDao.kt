@@ -57,6 +57,49 @@ abstract class CapturedWorkDao {
         """
     SELECT *
     FROM captured_works
+    WHERE sourceType = :sourceType
+      AND sourceId = :sourceId
+    LIMIT 1
+    """
+    )
+    abstract suspend fun getBySourceIdentity(
+        sourceType: String,
+        sourceId: String
+    ): CapturedWorkWithMedia?
+
+    @Transaction
+    open suspend fun appendMediaToWork(
+        workId: Long,
+        media: List<CapturedMediaEntity>
+    ) {
+        if (media.isNotEmpty()) {
+            insertMedia(
+                media.map {
+                    it.copy(
+                        workId = workId
+                    )
+                }
+            )
+        }
+    }
+
+    @Query(
+        """
+    UPDATE captured_media
+    SET isHighlighted = 1
+    WHERE workId = :workId
+      AND mediaIndex IN (:mediaIndices)
+    """
+    )
+    abstract suspend fun markMediaHighlighted(
+        workId: Long,
+        mediaIndices: List<Int>
+    )
+    @Transaction
+    @Query(
+        """
+    SELECT *
+    FROM captured_works
     ORDER BY capturedAt DESC
     """
     )

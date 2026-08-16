@@ -43,6 +43,39 @@ class CapturedWorkRepository(
         )
     }
 
+    suspend fun getBySourceIdentity(
+        sourceType: String,
+        sourceId: String
+    ): CapturedWorkWithMedia? {
+        return dao.getBySourceIdentity(
+            sourceType = sourceType,
+            sourceId = sourceId
+        )
+    }
+
+    suspend fun appendMediaToWork(
+        workId: Long,
+        media: List<CapturedMediaEntity>
+    ) {
+        dao.appendMediaToWork(
+            workId = workId,
+            media = media
+        )
+    }
+
+    suspend fun markMediaHighlighted(
+        workId: Long,
+        mediaIndices: List<Int>
+    ) {
+        if (mediaIndices.isEmpty()) {
+            return
+        }
+
+        dao.markMediaHighlighted(
+            workId = workId,
+            mediaIndices = mediaIndices
+        )
+    }
     suspend fun getPurposeVocabulary():
             List<PurposeVocabularyEntity> {
         return dao.getPurposeVocabulary()

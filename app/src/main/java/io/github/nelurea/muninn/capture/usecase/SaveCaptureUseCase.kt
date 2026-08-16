@@ -27,7 +27,216 @@ class SaveCaptureUseCase(
     private val sessionRepository: SessionRepository
 ) {
 
+    data class MediaSavePreparation(
+        val workId: Long?,
+        val missingMediaIndices: Set<Int>
+    )
+
+    suspend fun prepareMediaSave(
+        sourceType: String,
+        sourceId: String,
+        requestedMediaIndices: Set<Int>,
+        highlightedMediaIndices: Set<Int>
+    ): MediaSavePreparation {
+
+        val existing =
+            repository.getBySourceIdentity(
+                sourceType = sourceType,
+                sourceId = sourceId
+            )
+
+        if (
+            existing == null
+        ) {
+            return MediaSavePreparation(
+                workId = null,
+                missingMediaIndices =
+                    requestedMediaIndices
+            )
+        }
+
+        val existingIndices =
+            existing.media
+                .map {
+                    it.mediaIndex
+                }
+                .toSet()
+
+        repository.markMediaHighlighted(
+            workId =
+                existing.work.id,
+            mediaIndices =
+                highlightedMediaIndices
+                    .filter {
+                        it in existingIndices
+                    }
+        )
+
+        return MediaSavePreparation(
+            workId =
+                existing.work.id,
+            missingMediaIndices =
+                requestedMediaIndices -
+                    existingIndices
+        )
+    }
     suspend fun save(
+        draft: CaptureDraft
+    ): SaveCaptureResult {
+
+        val existing =
+            try {
+                repository.getBySourceIdentity(
+                    sourceType =
+                        draft.sourceType,
+                    sourceId =
+                        draft.sourceId
+                )
+            } catch (
+                exception: Exception
+            ) {
+                return SaveCaptureResult.Failure(
+                    listOf(
+                        "Could not check existing capture: ${exception.message}"
+                    )
+                )
+            }
+
+        if (
+            existing != null
+        ) {
+            return appendToExistingCapture(
+                draft = draft,
+                workId = existing.work.id,
+                existingMedia = existing.media
+            )
+        }
+
+        return saveNewCapture(
+            draft
+        )
+    }
+
+    private suspend fun appendToExistingCapture(
+        draft: CaptureDraft,
+        workId: Long,
+        existingMedia: List<CapturedMediaEntity>
+    ): SaveCaptureResult {
+
+        val existingIndices =
+            existingMedia
+                .map {
+                    it.mediaIndex
+                }
+                .toSet()
+
+        val missingMedia =
+            draft.media
+                .filter {
+                    it.mediaIndex !in existingIndices
+                }
+
+        val highlightedExistingIndices =
+            draft.media
+                .filter {
+                    it.mediaIndex in existingIndices &&
+                        it.isHighlighted
+                }
+                .map {
+                    it.mediaIndex
+                }
+
+        if (
+            missingMedia.isEmpty()
+        ) {
+            return try {
+                repository.markMediaHighlighted(
+                    workId = workId,
+                    mediaIndices = highlightedExistingIndices
+                )
+
+                SaveCaptureResult.Success(
+                    workId = workId,
+                    mediaCount = 0
+                )
+            } catch (
+                exception: Exception
+            ) {
+                SaveCaptureResult.Failure(
+                    listOf(
+                        "Could not update existing capture: ${exception.message}"
+                    )
+                )
+            }
+        }
+
+        val localUris =
+            when (
+                val result =
+                    mediaStorage.store(
+                        missingMedia
+                    )
+            ) {
+                is MediaStorageResult.Success ->
+                    result.localUris
+
+                is MediaStorageResult.Failure ->
+                    return SaveCaptureResult.Failure(
+                        listOf(
+                            "Could not store media files: ${result.error}"
+                        )
+                    )
+            }
+
+        val media =
+            missingMedia.mapIndexed {
+                    index,
+                    item ->
+
+                CapturedMediaEntity(
+                    workId = workId,
+                    mediaIndex = item.mediaIndex,
+                    localUri = localUris[index],
+                    sourceUrl = item.sourceUrl,
+                    mimeType = item.mimeType,
+                    fileName = item.fileName,
+                    isHighlighted = item.isHighlighted
+                )
+            }
+
+        return try {
+            repository.appendMediaToWork(
+                workId = workId,
+                media = media
+            )
+
+            repository.markMediaHighlighted(
+                workId = workId,
+                mediaIndices = highlightedExistingIndices
+            )
+
+            SaveCaptureResult.Success(
+                workId = workId,
+                mediaCount = media.size
+            )
+        } catch (
+            exception: Exception
+        ) {
+            runCatching {
+                mediaStorage.delete(
+                    localUris
+                )
+            }
+
+            SaveCaptureResult.Failure(
+                listOf(
+                    "Could not update existing capture: ${exception.message}"
+                )
+            )
+        }
+    }
+
+    private suspend fun saveNewCapture(
         draft: CaptureDraft
     ): SaveCaptureResult {
 

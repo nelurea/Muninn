@@ -95,6 +95,58 @@ class XDiscoverySaveUseCase(
                     )
                 )
             }
+            val requestedMediaIndices =
+                selectedPayload
+                    .media
+                    .map {
+                        it.mediaIndex
+                    }
+                    .toSet()
+
+            val preparation =
+                try {
+                    saveCaptureUseCase.prepareMediaSave(
+                        sourceType =
+                            "x",
+                        sourceId =
+                            preview.sourceItemId,
+                        requestedMediaIndices =
+                            requestedMediaIndices,
+                        highlightedMediaIndices =
+                            selectedMediaIndices
+                    )
+                } catch (
+                    exception: Exception
+                ) {
+                    return@withContext SaveCaptureResult.Failure(
+                        listOf(
+                            "Could not check existing capture: ${exception.message}"
+                        )
+                    )
+                }
+
+            if (
+                preparation.missingMediaIndices.isEmpty()
+            ) {
+                return@withContext SaveCaptureResult.Success(
+                    workId =
+                        preparation.workId
+                            ?: 0L,
+                    mediaCount =
+                        0
+                )
+            }
+
+            val missingPayload =
+                selectedPayload.copy(
+                    media =
+                        selectedPayload
+                            .media
+                            .filter {
+                                it.mediaIndex in
+                                    preparation.missingMediaIndices
+                            }
+                )
 
             val downloader =
                 XMediaDownloader(
@@ -105,7 +157,7 @@ class XDiscoverySaveUseCase(
                 val downloadResult =
                     downloader.download(
                         payload =
-                            selectedPayload,
+                            missingPayload,
                         userAgent =
                             USER_AGENT
                     )
@@ -122,7 +174,7 @@ class XDiscoverySaveUseCase(
                             XCaptureMapper
                                 .toCaptureDraft(
                                     payload =
-                                        selectedPayload,
+                                        missingPayload,
                                     downloadedFiles =
                                         downloadResult.files,
                                     discoveryMode =
