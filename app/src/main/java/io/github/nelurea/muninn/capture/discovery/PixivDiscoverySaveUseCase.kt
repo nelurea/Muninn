@@ -1,6 +1,8 @@
 package io.github.nelurea.muninn.capture.discovery
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import android.webkit.CookieManager
 import io.github.nelurea.muninn.capture.model.CaptureDraft
 import io.github.nelurea.muninn.capture.model.CaptureMediaDraft
@@ -17,6 +19,11 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -56,6 +63,9 @@ class PixivDiscoverySaveUseCase(
         withContext(
             Dispatchers.IO
         ) {
+            val totalStartedAt =
+                SystemClock.elapsedRealtime()
+
             require(
                 preview.source ==
                         DiscoverySourceId.PIXIV
@@ -94,6 +104,9 @@ class PixivDiscoverySaveUseCase(
                     }
                     .toSet()
 
+            val prepareStartedAt =
+                SystemClock.elapsedRealtime()
+
             val preparation =
                 try {
                     saveCaptureUseCase.prepareMediaSave(
@@ -116,9 +129,21 @@ class PixivDiscoverySaveUseCase(
                     )
                 }
 
+            Log.d(
+                "Muninn/SavePerf",
+                "pixiv source=${preview.sourceItemId} " +
+                    "prepare=${SystemClock.elapsedRealtime() - prepareStartedAt}ms"
+            )
+
             if (
                 preparation.missingMediaIndices.isEmpty()
             ) {
+                Log.d(
+                    "Muninn/SavePerf",
+                    "pixiv source=${preview.sourceItemId} " +
+                        "alreadySaved=true " +
+                        "total=${SystemClock.elapsedRealtime() - totalStartedAt}ms"
+                )
                 return@withContext SaveCaptureResult.Success(
                     workId =
                         preparation.workId
@@ -151,9 +176,23 @@ class PixivDiscoverySaveUseCase(
             }
 
             try {
+                val downloadStartedAt =
+                    SystemClock.elapsedRealtime()
+
+                val downloadSemaphore =
+                    Semaphore(
+                        permits =
+                            MAX_PARALLEL_DOWNLOADS
+                    )
+
                 val mediaDrafts =
-                    missingPlanItems.map {
-                            planItem ->
+                    coroutineScope {
+                        missingPlanItems
+                            .map {
+                                    planItem ->
+
+                                async {
+                                    downloadSemaphore.withPermit {
 
                         val fileName =
                             resolveFileName(
@@ -199,7 +238,18 @@ class PixivDiscoverySaveUseCase(
                             isHighlighted =
                                 planItem.isHighlighted
                         )
+                                    }
+                                }
+                            }
+                            .awaitAll()
                     }
+
+                Log.d(
+                    "Muninn/SavePerf",
+                    "pixiv source=${preview.sourceItemId} " +
+                        "download=${SystemClock.elapsedRealtime() - downloadStartedAt}ms " +
+                        "pages=${mediaDrafts.size}"
+                )
 
                 val draft =
                     CaptureDraft(
@@ -248,9 +298,22 @@ class PixivDiscoverySaveUseCase(
                             mediaDrafts
                     )
 
-                saveCaptureUseCase.save(
-                    draft
+                val persistStartedAt =
+                    SystemClock.elapsedRealtime()
+
+                val result =
+                    saveCaptureUseCase.save(
+                        draft
+                    )
+
+                Log.d(
+                    "Muninn/SavePerf",
+                    "pixiv source=${preview.sourceItemId} " +
+                        "persist=${SystemClock.elapsedRealtime() - persistStartedAt}ms " +
+                        "total=${SystemClock.elapsedRealtime() - totalStartedAt}ms"
                 )
+
+                result
             } catch (
                 exception: Exception
             ) {
@@ -398,6 +461,8 @@ class PixivDiscoverySaveUseCase(
         const val PIXIV_ORIGIN =
             "https://www.pixiv.net/"
 
+        const val MAX_PARALLEL_DOWNLOADS =
+            3
         const val CONNECT_TIMEOUT_MS =
             15_000
 

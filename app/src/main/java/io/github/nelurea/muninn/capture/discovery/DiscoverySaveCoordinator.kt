@@ -20,6 +20,10 @@ enum class DiscoverySaveStatus {
     FAILED
 }
 
+data class DiscoverySaveWorkKey(
+    val source: DiscoverySourceId,
+    val sourceItemId: String
+)
 data class DiscoverySaveRequestKey(
     val source: DiscoverySourceId,
     val sourceItemId: String,
@@ -79,6 +83,10 @@ class DiscoverySaveCoordinator(
                 Job
                 >()
 
+    private val activeWorkKeys =
+        mutableSetOf<
+                DiscoverySaveWorkKey
+                >()
     private val requests =
         mutableMapOf<
                 DiscoverySaveRequestKey,
@@ -196,9 +204,26 @@ class DiscoverySaveCoordinator(
                     "Saving this Discovery source is not supported."
                 )
 
+        val workKey =
+            DiscoverySaveWorkKey(
+                source =
+                    request.key.source,
+                sourceItemId =
+                    request.key.sourceItemId
+            )
+
         synchronized(
             lock
         ) {
+            if (
+                workKey in
+                activeWorkKeys
+            ) {
+                return DiscoverySaveEnqueueResult.AlreadyRunning(
+                    request.key
+                )
+            }
+
             val existingJob =
                 jobs[
                     request.key
@@ -227,81 +252,90 @@ class DiscoverySaveCoordinator(
                 )
             )
 
+            activeWorkKeys +=
+                workKey
+
             val job =
                 scope.launch {
-                    updateState(
-                        DiscoverySaveJobState(
-                            key =
-                                request.key,
-                            status =
-                                DiscoverySaveStatus.SAVING
-                        )
-                    )
-
-                    val result =
-                        try {
-                            saveUseCase.save(
-                                preview =
-                                    request.preview,
-                                selectedMediaIndices =
-                                    request.selectedMediaIndices,
-                                mode =
-                                    request.key.mode,
-                                discoveryMode =
-                                    request.discoveryMode,
-                                discoveryQuery =
-                                    request.discoveryQuery
+                    try {
+                        updateState(
+                            DiscoverySaveJobState(
+                                key =
+                                    request.key,
+                                status =
+                                    DiscoverySaveStatus.SAVING
                             )
-                        } catch (
-                            exception: Exception
+                        )
+
+                        val result =
+                            try {
+                                saveUseCase.save(
+                                    preview =
+                                        request.preview,
+                                    selectedMediaIndices =
+                                        request.selectedMediaIndices,
+                                    mode =
+                                        request.key.mode,
+                                    discoveryMode =
+                                        request.discoveryMode,
+                                    discoveryQuery =
+                                        request.discoveryQuery
+                                )
+                            } catch (
+                                exception: Exception
+                            ) {
+                                SaveCaptureResult.Failure(
+                                    listOf(
+                                        exception.message
+                                            ?: "Background save failed."
+                                    )
+                                )
+                            }
+
+                        when (
+                            result
                         ) {
-                            SaveCaptureResult.Failure(
-                                listOf(
-                                    exception.message
-                                        ?: "Background save failed."
+                            is SaveCaptureResult.Success -> {
+                                updateState(
+                                    DiscoverySaveJobState(
+                                        key =
+                                            request.key,
+                                        status =
+                                            DiscoverySaveStatus.SAVED,
+                                        mediaCount =
+                                            result.mediaCount
+                                    )
                                 )
+                            }
+
+                            is SaveCaptureResult.Failure -> {
+                                updateState(
+                                    DiscoverySaveJobState(
+                                        key =
+                                            request.key,
+                                        status =
+                                            DiscoverySaveStatus.FAILED,
+                                        error =
+                                            result.errors
+                                                .joinToString(
+                                                    separator = "\n"
+                                                )
+                                    )
+                                )
+                            }
+                        }
+                    } finally {
+                        synchronized(
+                            lock
+                        ) {
+                            jobs.remove(
+                                request.key
+                            )
+
+                            activeWorkKeys.remove(
+                                workKey
                             )
                         }
-
-                    when (
-                        result
-                    ) {
-                        is SaveCaptureResult.Success -> {
-                            updateState(
-                                DiscoverySaveJobState(
-                                    key =
-                                        request.key,
-                                    status =
-                                        DiscoverySaveStatus.SAVED,
-                                    mediaCount =
-                                        result.mediaCount
-                                )
-                            )
-                        }
-
-                        is SaveCaptureResult.Failure -> {
-                            updateState(
-                                DiscoverySaveJobState(
-                                    key =
-                                        request.key,
-                                    status =
-                                        DiscoverySaveStatus.FAILED,
-                                    error =
-                                        result.errors
-                                            .joinToString(
-                                                separator = "\n"
-                                            )
-                                )
-                            )
-                        }
-                    }
-
-                    synchronized(
-                        lock
-                    ) {
-                        jobs.remove(
-                            request.key
-                        )
                     }
                 }
 

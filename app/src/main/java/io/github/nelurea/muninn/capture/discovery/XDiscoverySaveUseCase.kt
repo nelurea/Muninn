@@ -1,6 +1,8 @@
 package io.github.nelurea.muninn.capture.discovery
 
 import android.content.Context
+import android.os.SystemClock
+import android.util.Log
 import io.github.nelurea.muninn.capture.usecase.SaveCaptureResult
 import io.github.nelurea.muninn.capture.usecase.SaveCaptureUseCase
 import io.github.nelurea.muninn.capture.web.x.XCaptureMapper
@@ -33,6 +35,9 @@ class XDiscoverySaveUseCase(
         withContext(
             Dispatchers.IO
         ) {
+            val totalStartedAt =
+                SystemClock.elapsedRealtime()
+
             if (
                 preview.source !=
                 DiscoverySourceId.X
@@ -103,6 +108,9 @@ class XDiscoverySaveUseCase(
                     }
                     .toSet()
 
+            val prepareStartedAt =
+                SystemClock.elapsedRealtime()
+
             val preparation =
                 try {
                     saveCaptureUseCase.prepareMediaSave(
@@ -125,9 +133,21 @@ class XDiscoverySaveUseCase(
                     )
                 }
 
+            Log.d(
+                "Muninn/SavePerf",
+                "x source=${preview.sourceItemId} " +
+                    "prepare=${SystemClock.elapsedRealtime() - prepareStartedAt}ms"
+            )
+
             if (
                 preparation.missingMediaIndices.isEmpty()
             ) {
+                Log.d(
+                    "Muninn/SavePerf",
+                    "x source=${preview.sourceItemId} " +
+                        "alreadySaved=true " +
+                        "total=${SystemClock.elapsedRealtime() - totalStartedAt}ms"
+                )
                 return@withContext SaveCaptureResult.Success(
                     workId =
                         preparation.workId
@@ -153,6 +173,9 @@ class XDiscoverySaveUseCase(
                     context
                 )
 
+            val downloadStartedAt =
+                SystemClock.elapsedRealtime()
+
             when (
                 val downloadResult =
                     downloader.download(
@@ -163,6 +186,13 @@ class XDiscoverySaveUseCase(
                     )
             ) {
                 is XMediaDownloadResult.Success -> {
+                    Log.d(
+                        "Muninn/SavePerf",
+                        "x source=${preview.sourceItemId} " +
+                            "download=${SystemClock.elapsedRealtime() - downloadStartedAt}ms " +
+                            "pages=${downloadResult.files.size}"
+                    )
+
                     val temporaryDirectory =
                         downloadResult
                             .files
@@ -185,9 +215,22 @@ class XDiscoverySaveUseCase(
                                         selectedMediaIndices
                                 )
 
-                        saveCaptureUseCase.save(
-                            draft
+                        val persistStartedAt =
+                            SystemClock.elapsedRealtime()
+
+                        val result =
+                            saveCaptureUseCase.save(
+                                draft
+                            )
+
+                        Log.d(
+                            "Muninn/SavePerf",
+                            "x source=${preview.sourceItemId} " +
+                                "persist=${SystemClock.elapsedRealtime() - persistStartedAt}ms " +
+                                "total=${SystemClock.elapsedRealtime() - totalStartedAt}ms"
                         )
+
+                        result
                     } catch (
                         exception: Exception
                     ) {

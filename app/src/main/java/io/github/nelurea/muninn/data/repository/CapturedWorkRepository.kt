@@ -1,5 +1,7 @@
 package io.github.nelurea.muninn.data.repository
 
+import io.github.nelurea.muninn.capture.usecase.CapturePersistence
+
 import io.github.nelurea.muninn.data.db.CapturedMediaEntity
 import io.github.nelurea.muninn.data.db.CapturedTagEntity
 import io.github.nelurea.muninn.data.db.CapturedWorkDao
@@ -16,9 +18,9 @@ import io.github.nelurea.muninn.data.db.MediaFocusEntity
 
 class CapturedWorkRepository(
     private val dao: CapturedWorkDao
-) {
+) : CapturePersistence {
 
-    suspend fun saveCapture(
+    override suspend fun saveCapture(
         work: CapturedWorkEntity,
         media: List<CapturedMediaEntity>,
         tags: List<CapturedTagEntity>
@@ -43,7 +45,7 @@ class CapturedWorkRepository(
         )
     }
 
-    suspend fun getBySourceIdentity(
+    override suspend fun getBySourceIdentity(
         sourceType: String,
         sourceId: String
     ): CapturedWorkWithMedia? {
@@ -53,7 +55,7 @@ class CapturedWorkRepository(
         )
     }
 
-    suspend fun appendMediaToWork(
+    override suspend fun appendMediaToWork(
         workId: Long,
         media: List<CapturedMediaEntity>
     ) {
@@ -63,7 +65,7 @@ class CapturedWorkRepository(
         )
     }
 
-    suspend fun markMediaHighlighted(
+    override suspend fun markMediaHighlighted(
         workId: Long,
         mediaIndices: List<Int>
     ) {

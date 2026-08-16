@@ -6,9 +6,6 @@ import io.github.nelurea.muninn.capture.storage.MediaStorageResult
 import io.github.nelurea.muninn.data.db.CapturedMediaEntity
 import io.github.nelurea.muninn.data.db.CapturedTagEntity
 import io.github.nelurea.muninn.data.db.CapturedWorkEntity
-import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
-import io.github.nelurea.muninn.data.repository.SessionRepository
-
 sealed interface SaveCaptureResult {
 
     data class Success(
@@ -23,8 +20,8 @@ sealed interface SaveCaptureResult {
 
 class SaveCaptureUseCase(
     private val mediaStorage: MediaStorage,
-    private val repository: CapturedWorkRepository,
-    private val sessionRepository: SessionRepository
+    private val repository: CapturePersistence,
+    private val sessionRepository: CaptureSessionStore
 ) {
 
     data class MediaSavePreparation(
