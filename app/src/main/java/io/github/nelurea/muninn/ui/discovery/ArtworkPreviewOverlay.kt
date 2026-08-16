@@ -987,9 +987,9 @@ private fun ArtworkCaption(
                     if (
                         expanded
                     ) {
-                        "謚倥ｊ縺溘◆繧"
+                        "折りたたむ"
                     } else {
-                        "邯壹″繧定ｪｭ繧"
+                        "続きを読む"
                     },
                 modifier =
                     Modifier

@@ -1,5 +1,7 @@
 package io.github.nelurea.muninn.data.repository
 
+import io.github.nelurea.muninn.capture.usecase.CaptureSessionStore
+
 import io.github.nelurea.muninn.data.db.SessionDao
 import io.github.nelurea.muninn.data.db.SessionEntity
 import io.github.nelurea.muninn.data.db.SessionStateEntity
@@ -13,7 +15,7 @@ data class SessionResolution(
 
 class SessionRepository(
     private val dao: SessionDao
-) {
+) : CaptureSessionStore {
 
     companion object {
         private const val SESSION_TIMEOUT_MS =
@@ -130,13 +132,13 @@ class SessionRepository(
         }
     }
 
-    suspend fun getOrCreateSession():
+    override suspend fun getOrCreateSession():
             Long {
         return resolveSession()
             .sessionId
     }
 
-    suspend fun touch(
+    override suspend fun touch(
         sessionId: Long
     ) {
         dao.updateActivity(
