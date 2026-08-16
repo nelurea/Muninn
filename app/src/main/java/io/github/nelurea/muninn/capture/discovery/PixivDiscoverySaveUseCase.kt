@@ -87,6 +87,52 @@ class PixivDiscoverySaveUseCase(
                             )
                         )
                 }
+            val requestedMediaIndices =
+                planItems
+                    .map {
+                        it.mediaIndex
+                    }
+                    .toSet()
+
+            val preparation =
+                try {
+                    saveCaptureUseCase.prepareMediaSave(
+                        sourceType =
+                            "pixiv",
+                        sourceId =
+                            preview.sourceItemId,
+                        requestedMediaIndices =
+                            requestedMediaIndices,
+                        highlightedMediaIndices =
+                            selectedMediaIndices
+                    )
+                } catch (
+                    exception: Exception
+                ) {
+                    return@withContext SaveCaptureResult.Failure(
+                        listOf(
+                            "Could not check existing capture: ${exception.message}"
+                        )
+                    )
+                }
+
+            if (
+                preparation.missingMediaIndices.isEmpty()
+            ) {
+                return@withContext SaveCaptureResult.Success(
+                    workId =
+                        preparation.workId
+                            ?: 0L,
+                    mediaCount =
+                        0
+                )
+            }
+
+            val missingPlanItems =
+                planItems.filter {
+                    it.mediaIndex in
+                        preparation.missingMediaIndices
+                }
 
             val temporaryDirectory =
                 File(
@@ -106,7 +152,7 @@ class PixivDiscoverySaveUseCase(
 
             try {
                 val mediaDrafts =
-                    planItems.map {
+                    missingPlanItems.map {
                             planItem ->
 
                         val fileName =

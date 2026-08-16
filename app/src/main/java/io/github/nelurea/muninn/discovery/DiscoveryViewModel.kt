@@ -162,12 +162,15 @@ class DiscoveryViewModel(
 
                                 DiscoverySaveQueueUiState(
                                     message =
-                                        if (
-                                            mediaCount == 1
-                                        ) {
-                                            "Saved 1 page."
-                                        } else {
-                                            "Saved $mediaCount pages."
+                                        when {
+                                            mediaCount == 0 ->
+                                                "Already saved."
+
+                                            mediaCount == 1 ->
+                                                "Saved 1 page."
+
+                                            else ->
+                                                "Saved $mediaCount pages."
                                         }
                                 )
                             }
