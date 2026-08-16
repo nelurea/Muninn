@@ -230,7 +230,18 @@ fun DiscoveryScreen(
                             Alignment.BottomCenter
                         )
                         .padding(
-                            12.dp
+
+                            start = 12.dp,
+                            end = 12.dp,
+                            bottom =
+                                if (
+                                    previewState.item != null
+                                ) {
+                                    112.dp
+                                } else {
+                                    12.dp
+                                }
+
                         )
             )
         }

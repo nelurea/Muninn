@@ -1,5 +1,7 @@
 package io.github.nelurea.muninn.capturepackage.transport
 
+import io.github.nelurea.muninn.capture.storage.UserSelectedMediaStorage
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -132,7 +134,10 @@ class CapturePackageReceiveActivity : ComponentActivity() {
                             )
 
                         val saveCaptureUseCase = SaveCaptureUseCase(
-                            context = this@CapturePackageReceiveActivity,
+                            mediaStorage =
+                                UserSelectedMediaStorage(
+                                    this@CapturePackageReceiveActivity
+                                ),
                             repository = repository,
                             sessionRepository = sessionRepository
                         )

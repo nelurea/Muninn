@@ -1,5 +1,7 @@
 package io.github.nelurea.muninn.ui.screen
 
+import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,8 +19,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 
@@ -27,13 +31,20 @@ fun GalleryScreen(
     repository: CapturedWorkRepository,
     onWorkClick: (Long) -> Unit
 ) {
+    val context =
+        LocalContext.current
+
     var works by remember {
-        mutableStateOf<List<CapturedWorkWithMedia>>(
+        mutableStateOf<
+            List<CapturedWorkWithMedia>
+        >(
             emptyList()
         )
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(
+        Unit
+    ) {
         works =
             repository
                 .getAllWithMedia()
@@ -41,7 +52,8 @@ fun GalleryScreen(
 
     LazyColumn {
         items(
-            items = works,
+            items =
+                works,
             key = {
                 it.work.id
             }
@@ -71,17 +83,42 @@ fun GalleryScreen(
                     ?.let {
                             media ->
 
+                        val localUri =
+                            Uri.parse(
+                                media.localUri
+                            )
+
                         AsyncImage(
                             model =
-                                media.localUri,
+                                ImageRequest
+                                    .Builder(
+                                        context
+                                    )
+                                    .data(
+                                        localUri
+                                    )
+                                    .build(),
                             contentDescription =
                                 null,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(280.dp),
+                                    .height(
+                                        280.dp
+                                    ),
                             contentScale =
-                                ContentScale.Fit
+                                ContentScale.Fit,
+                            onError = {
+                                    state ->
+
+                                Log.e(
+                                    "Muninn/Gallery",
+                                    "Failed to load ${media.localUri}",
+                                    state
+                                        .result
+                                        .throwable
+                                )
+                            }
                         )
                     }
 
@@ -97,8 +134,11 @@ fun GalleryScreen(
                             it.isNotBlank()
                         }
                         ?.let {
+                                title ->
+
                             Text(
-                                text = it,
+                                text =
+                                    title,
                                 style =
                                     MaterialTheme
                                         .typography

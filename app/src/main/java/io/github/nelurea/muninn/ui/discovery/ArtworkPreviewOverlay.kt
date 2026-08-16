@@ -1,6 +1,7 @@
 package io.github.nelurea.muninn.ui.discovery
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -255,9 +256,6 @@ fun ArtworkPreviewOverlay(
                                 media,
                             source =
                                 preview.source,
-                            selected =
-                                media.mediaIndex in
-                                        state.selectedMediaIndices,
                             controlsVisible =
                                 controlsVisible,
                             onDismiss =
@@ -356,10 +354,6 @@ fun ArtworkPreviewOverlay(
                                     .size,
                             onTagClick =
                                 onTagClick,
-                            onSaveAll =
-                                onSaveAll,
-                            onSaveSelected =
-                                onSaveSelected,
                             modifier =
                                 Modifier
                                     .align(
@@ -371,10 +365,18 @@ fun ArtworkPreviewOverlay(
                         )
                     }
 
-                    ArtworkSelectionButton(
+                    ArtworkPreviewActionBar(
                         selected =
                             selected,
-                        onClick = {
+                        selectedCount =
+                            state
+                                .selectedMediaIndices
+                                .size,
+                        controlsVisible =
+                            controlsVisible,
+                        showSaveSelected =
+                            preview.media.size > 1,
+                        onToggleSelected = {
                             if (
                                 selected
                             ) {
@@ -387,6 +389,10 @@ fun ArtworkPreviewOverlay(
                                 )
                             }
                         },
+                        onSaveSelected =
+                            onSaveSelected,
+                        onSaveAll =
+                            onSaveAll,
                         modifier =
                             Modifier
                                 .align(
@@ -394,7 +400,7 @@ fun ArtworkPreviewOverlay(
                                 )
                                 .padding(
                                     end = 16.dp,
-                                    bottom = 24.dp
+                                    bottom = 18.dp
                                 )
                     )
                 }
@@ -404,77 +410,211 @@ fun ArtworkPreviewOverlay(
 }
 
 @Composable
-private fun ArtworkSelectionButton(
+private fun ArtworkPreviewActionBar(
     selected: Boolean,
-    onClick: () -> Unit,
+    selectedCount: Int,
+    controlsVisible: Boolean,
+    showSaveSelected: Boolean,
+    onToggleSelected: () -> Unit,
+    onSaveSelected: () -> Unit,
+    onSaveAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (
-        selected
+    Column(
+        modifier =
+            modifier.alpha(
+                if (
+                    controlsVisible
+                ) {
+                    1f
+                } else {
+                    0.50f
+                }
+            ),
+        horizontalAlignment =
+            Alignment.CenterHorizontally
     ) {
-        Button(
+        ArtworkPreviewActionButton(
+            label =
+                if (
+                    selected
+                ) {
+                    "Deselect page"
+                } else {
+                    "Select page"
+                },
+            enabled =
+                true,
+            selected =
+                selected,
+            symbol =
+                "\u2713",
             onClick =
-                onClick,
+                onToggleSelected
+        )
+
+        Spacer(
             modifier =
-                modifier.size(
-                    64.dp
-                ),
-            shape =
-                CircleShape,
-            contentPadding =
-                PaddingValues(
-                    0.dp
+                Modifier.height(
+                    18.dp
                 )
+        )
+
+        if (
+            showSaveSelected
         ) {
-            Text(
-                text =
-                    "✓",
-                style =
-                    MaterialTheme
-                        .typography
-                        .headlineMedium,
-                fontWeight =
-                    FontWeight.Bold
+            ArtworkPreviewActionButton(
+                label =
+                    "Save selected",
+                enabled =
+                    selectedCount > 0,
+                iconRes =
+                    R.drawable.ic_save_selected,
+                onClick =
+                    onSaveSelected
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        8.dp
+                    )
             )
         }
-    } else {
-        OutlinedButton(
+
+        ArtworkPreviewActionButton(
+            label =
+                "Save all",
+            enabled =
+                true,
+            iconRes =
+                R.drawable.ic_save_all,
             onClick =
-                onClick,
-            modifier =
-                modifier.size(
-                    64.dp
-                ),
-            shape =
-                CircleShape,
-            contentPadding =
-                PaddingValues(
-                    0.dp
+                onSaveAll
+        )
+    }
+}
+
+@Composable
+private fun ArtworkPreviewActionButton(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    selected: Boolean = false,
+    iconRes: Int? = null,
+    symbol: String? = null
+) {
+    val context =
+        LocalContext.current
+
+    Surface(
+        modifier =
+            Modifier
+                .size(
+                    56.dp
                 )
-        ) {
-            Text(
-                text =
-                    "✓",
-                color =
-                    Color.White,
-                style =
+                .pointerInput(
+                    enabled,
+                    label
+                ) {
+                    detectTapGestures(
+                        onTap = {
+                            if (
+                                enabled
+                            ) {
+                                onClick()
+                            }
+                        },
+                        onLongPress = {
+                            Toast
+                                .makeText(
+                                    context,
+                                    label,
+                                    Toast.LENGTH_SHORT
+                                )
+                                .show()
+                        }
+                    )
+                },
+        shape =
+            CircleShape,
+        color =
+            when {
+                selected ->
                     MaterialTheme
-                        .typography
-                        .headlineMedium,
-                fontWeight =
-                    FontWeight.Bold
-            )
+                        .colorScheme
+                        .primary
+
+                enabled ->
+                    Color.Black.copy(
+                        alpha = 0.72f
+                    )
+
+                else ->
+                    Color.Black.copy(
+                        alpha = 0.40f
+                    )
+            },
+        shadowElevation =
+            0.dp
+    ) {
+        Box(
+            modifier =
+                Modifier.fillMaxSize(),
+            contentAlignment =
+                Alignment.Center
+        ) {
+            if (
+                iconRes != null
+            ) {
+                Icon(
+                    painter =
+                        painterResource(
+                            iconRes
+                        ),
+                    contentDescription =
+                        label,
+                    modifier =
+                        Modifier.size(
+                            26.dp
+                        ),
+                    tint =
+                        if (
+                            enabled
+                        ) {
+                            Color.White
+                        } else {
+                            Color.White.copy(
+                                alpha = 0.30f
+                            )
+                        }
+                )
+            } else if (
+                symbol != null
+            ) {
+                Text(
+                    text =
+                        symbol,
+                    color =
+                        Color.White,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .headlineMedium,
+                    fontWeight =
+                        FontWeight.Bold
+                )
+            }
         }
     }
 }
+
 
 @Composable
 private fun ArtworkPreviewInfoPanel(
     preview: ArtworkPreview,
     selectedCount: Int,
     onTagClick: (String) -> Unit,
-    onSaveAll: () -> Unit,
-    onSaveSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context =
@@ -720,63 +860,11 @@ private fun ArtworkPreviewInfoPanel(
                 }
             }
 
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.End,
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick =
-                        onSaveAll
-                ) {
-                    Icon(
-                        painter =
-                            painterResource(
-                                R.drawable.ic_save_all
-                            ),
-                        contentDescription =
-                            "Save all",
-                        tint =
-                            Color.White
-                    )
-                }
 
-                if (
-                    preview.media.size > 1
-                ) {
-                    IconButton(
-                        onClick =
-                            onSaveSelected,
-                        enabled =
-                            selectedCount > 0
-                    ) {
-                        Icon(
-                            painter =
-                                painterResource(
-                                    R.drawable.ic_save_selected
-                                ),
-                            contentDescription =
-                                "Save selected",
-                            tint =
-                                if (
-                                    selectedCount > 0
-                                ) {
-                                    Color.White
-                                } else {
-                                    Color.White.copy(
-                                        alpha = 0.35f
-                                    )
-                                }
-                        )
-                    }
-                }
-            }
         }
     }
 }
+
 
 @Composable
 private fun ArtworkCaption(
@@ -905,7 +993,6 @@ private fun ArtworkCaption(
 private fun ArtworkPagerPage(
     media: ArtworkPreviewMedia,
     source: DiscoverySourceId,
-    selected: Boolean,
     controlsVisible: Boolean,
     onDismiss: () -> Unit,
     onDismissDrag: (Float) -> Unit,
@@ -1032,45 +1119,6 @@ private fun ArtworkPagerPage(
             }
         )
 
-        if (
-            selected &&
-            !controlsVisible
-        ) {
-            Surface(
-                modifier =
-                    Modifier
-                        .align(
-                            Alignment.TopEnd
-                        )
-                        .padding(
-                            12.dp
-                        ),
-                shape =
-                    RoundedCornerShape(
-                        999.dp
-                    ),
-                color =
-                    MaterialTheme
-                        .colorScheme
-                        .primary
-                        .copy(
-                            alpha = 0.88f
-                        )
-            ) {
-                Text(
-                    text =
-                        "✓",
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 10.dp,
-                            vertical = 6.dp
-                        ),
-                    color =
-                        Color.White,
-                    fontWeight =
-                        FontWeight.Bold
-                )
-            }
-        }
+
     }
 }
