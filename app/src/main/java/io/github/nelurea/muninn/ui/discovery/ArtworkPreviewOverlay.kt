@@ -5,7 +5,10 @@ import android.widget.Toast
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,13 +45,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.text.HtmlCompat
 import coil.compose.AsyncImage
@@ -143,7 +149,7 @@ fun ArtworkPreviewOverlay(
                     ) {
                         Text(
                             text =
-                                "×",
+                                "\u00D7",
                             color =
                                 Color.White,
                             style =
@@ -207,7 +213,7 @@ fun ArtworkPreviewOverlay(
                     ) {
                         Text(
                             text =
-                                "×",
+                                "\u00D7",
                             color =
                                 Color.White,
                             style =
@@ -223,6 +229,13 @@ fun ArtworkPreviewOverlay(
                 val preview =
                     state.preview
 
+                var currentPageZoomed by remember(
+                    preview.sourceItemId
+                ) {
+                    mutableStateOf(
+                        false
+                    )
+                }
                 val pagerState =
                     rememberPagerState(
                         pageCount = {
@@ -242,7 +255,7 @@ fun ArtworkPreviewOverlay(
                         beyondViewportPageCount =
                             1,
                         userScrollEnabled =
-                            true
+                            !currentPageZoomed
                     ) {
                             page ->
 
@@ -258,6 +271,20 @@ fun ArtworkPreviewOverlay(
                                 preview.source,
                             controlsVisible =
                                 controlsVisible,
+                            active =
+                                page ==
+                                    pagerState.currentPage,
+                            onZoomedChange = {
+                                    zoomed ->
+
+                                if (
+                                    page ==
+                                    pagerState.currentPage
+                                ) {
+                                    currentPageZoomed =
+                                        zoomed
+                                }
+                            },
                             onDismiss =
                                 onClose,
                             onDismissDrag = {
@@ -312,7 +339,7 @@ fun ArtworkPreviewOverlay(
                             ) {
                                 Text(
                                     text =
-                                        "×",
+                                        "\u00D7",
                                     color =
                                         Color.White,
                                     style =
@@ -960,9 +987,9 @@ private fun ArtworkCaption(
                     if (
                         expanded
                     ) {
-                        "折りたたむ"
+                        "謚倥ｊ縺溘◆繧"
                     } else {
-                        "続きを読む"
+                        "邯壹″繧定ｪｭ繧"
                     },
                 modifier =
                     Modifier
@@ -994,6 +1021,8 @@ private fun ArtworkPagerPage(
     media: ArtworkPreviewMedia,
     source: DiscoverySourceId,
     controlsVisible: Boolean,
+    active: Boolean,
+    onZoomedChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onDismissDrag: (Float) -> Unit,
     onDismissDragReset: () -> Unit,
@@ -1018,13 +1047,43 @@ private fun ArtworkPagerPage(
             )
             .build()
 
-    var verticalDragTotal by remember(
+    var scale by remember(
+        media.mediaIndex
+    ) {
+        mutableFloatStateOf(
+            1f
+        )
+    }
+
+    var offsetX by remember(
         media.mediaIndex
     ) {
         mutableFloatStateOf(
             0f
         )
     }
+
+    var offsetY by remember(
+        media.mediaIndex
+    ) {
+        mutableFloatStateOf(
+            0f
+        )
+    }
+
+    var viewportSize by remember(
+        media.mediaIndex
+    ) {
+        mutableStateOf(
+            IntSize.Zero
+        )
+    }
+
+    val zoomed =
+        scale > 1.01f
+
+    val snapToOneThreshold =
+        1.08f
 
     val dismissThreshold =
         with(
@@ -1033,57 +1092,343 @@ private fun ArtworkPagerPage(
             72.dp.toPx()
         }
 
+    androidx.compose.runtime.LaunchedEffect(
+        active
+    ) {
+        if (
+            !active
+        ) {
+            scale =
+                1f
+
+            offsetX =
+                0f
+
+            offsetY =
+                0f
+
+            onDismissDragReset()
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(
+        active,
+        zoomed
+    ) {
+        if (
+            active
+        ) {
+            onZoomedChange(
+                zoomed
+            )
+        }
+    }
+
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
+                .onSizeChanged {
+                        size ->
+
+                    viewportSize =
+                        size
+                }
                 .pointerInput(
-                    media.mediaIndex
+                    media.mediaIndex,
+                    active
                 ) {
-                    detectVerticalDragGestures(
-                        onDragStart = {
-                            verticalDragTotal =
-                                0f
+                    awaitEachGesture {
+                        awaitFirstDown(
+                            requireUnconsumed =
+                                false
+                        )
 
-                            onDismissDrag(
-                                0f
-                            )
-                        },
-                        onVerticalDrag = {
-                                change,
-                                dragAmount ->
+                        val touchSlop =
+                            viewConfiguration
+                                .touchSlop
 
-                            verticalDragTotal +=
-                                dragAmount
+                        var gestureMode =
+                            0
 
-                            onDismissDrag(
-                                verticalDragTotal
-                            )
+                        var totalX =
+                            0f
 
-                            change.consume()
-                        },
-                        onDragEnd = {
+                        var totalY =
+                            0f
+
+                        var dismissOffset =
+                            0f
+
+                        do {
+                            val event =
+                                awaitPointerEvent()
+
+                            val pressed =
+                                event.changes
+                                    .filter {
+                                        it.pressed
+                                    }
+
+                            val pointerCount =
+                                pressed.size
+
                             if (
-                                abs(
-                                    verticalDragTotal
-                                ) >=
-                                dismissThreshold
+                                gestureMode == 0
                             ) {
-                                onDismiss()
-                            } else {
-                                onDismissDragReset()
+                                if (
+                                    pointerCount >= 2 ||
+                                    scale > 1.01f
+                                ) {
+                                    gestureMode =
+                                        2
+
+                                    onDismissDragReset()
+                                } else if (
+                                    pointerCount == 1
+                                ) {
+                                    val change =
+                                        pressed.first()
+
+                                    val deltaX =
+                                        change.position.x -
+                                            change.previousPosition.x
+
+                                    val deltaY =
+                                        change.position.y -
+                                            change.previousPosition.y
+
+                                    totalX +=
+                                        deltaX
+
+                                    totalY +=
+                                        deltaY
+
+                                    if (
+                                        abs(
+                                            totalY
+                                        ) >
+                                        touchSlop &&
+                                        abs(
+                                            totalY
+                                        ) >
+                                        abs(
+                                            totalX
+                                        ) *
+                                            1.15f
+                                    ) {
+                                        gestureMode =
+                                            1
+
+                                        dismissOffset =
+                                            totalY
+
+                                        onDismissDrag(
+                                            dismissOffset
+                                        )
+
+                                        change.consume()
+                                    } else if (
+                                        abs(
+                                            totalX
+                                        ) >
+                                        touchSlop &&
+                                        abs(
+                                            totalX
+                                        ) >
+                                        abs(
+                                            totalY
+                                        )
+                                    ) {
+                                        gestureMode =
+                                            3
+                                    }
+                                }
                             }
 
-                            verticalDragTotal =
-                                0f
-                        },
-                        onDragCancel = {
-                            verticalDragTotal =
-                                0f
+                            when (
+                                gestureMode
+                            ) {
+                                1 -> {
+                                    if (
+                                        pointerCount >= 2
+                                    ) {
+                                        gestureMode =
+                                            2
 
-                            onDismissDragReset()
+                                        dismissOffset =
+                                            0f
+
+                                        onDismissDragReset()
+                                    } else {
+                                        pressed
+                                            .firstOrNull()
+                                            ?.let {
+                                                    change ->
+
+                                                val deltaY =
+                                                    change.position.y -
+                                                        change.previousPosition.y
+
+                                                dismissOffset +=
+                                                    deltaY
+
+                                                onDismissDrag(
+                                                    dismissOffset
+                                                )
+
+                                                change.consume()
+                                            }
+                                    }
+                                }
+
+                                2 -> {
+                                    val zoomChange =
+                                        if (
+                                            pointerCount >= 2
+                                        ) {
+                                            event.calculateZoom()
+                                        } else {
+                                            1f
+                                        }
+
+                                    val panChange =
+                                        event.calculatePan()
+
+                                    val newScale =
+                                        (
+                                            scale *
+                                                zoomChange
+                                            ).coerceIn(
+                                            1f,
+                                            5f
+                                        )
+
+                                    if (
+                                        newScale <=
+                                        1.01f
+                                    ) {
+                                        scale =
+                                            1f
+
+                                        offsetX =
+                                            0f
+
+                                        offsetY =
+                                            0f
+
+                                        onZoomedChange(
+                                            false
+                                        )
+                                    } else {
+                                        val maxOffsetX =
+                                            viewportSize.width *
+                                                (
+                                                    newScale -
+                                                        1f
+                                                    ) /
+                                                2f
+
+                                        val maxOffsetY =
+                                            viewportSize.height *
+                                                (
+                                                    newScale -
+                                                        1f
+                                                    ) /
+                                                2f
+
+                                        scale =
+                                            newScale
+
+                                        offsetX =
+                                            (
+                                                offsetX +
+                                                    panChange.x
+                                                ).coerceIn(
+                                                -maxOffsetX,
+                                                maxOffsetX
+                                            )
+
+                                        offsetY =
+                                            (
+                                                offsetY +
+                                                    panChange.y
+                                                ).coerceIn(
+                                                -maxOffsetY,
+                                                maxOffsetY
+                                            )
+
+                                        onZoomedChange(
+                                            true
+                                        )
+                                    }
+
+                                    event.changes
+                                        .forEach {
+                                                change ->
+
+                                            if (
+                                                change.pressed
+                                            ) {
+                                                change.consume()
+                                            }
+                                        }
+                                }
+
+                                3 -> {
+
+                                }
+                            }
+                        } while (
+                            event.changes
+                                .any {
+                                    it.pressed
+                                }
+                        )
+
+                        when (
+                            gestureMode
+                        ) {
+                            1 -> {
+                                if (
+                                    abs(
+                                        dismissOffset
+                                    ) >=
+                                    dismissThreshold
+                                ) {
+                                    onDismiss()
+                                } else {
+                                    onDismissDragReset()
+                                }
+                            }
+
+                            2 -> {
+                                onDismissDragReset()
+
+                                if (
+                                    scale <
+                                    snapToOneThreshold
+                                ) {
+                                    scale =
+                                        1f
+
+                                    offsetX =
+                                        0f
+
+                                    offsetY =
+                                        0f
+
+                                    onZoomedChange(
+                                        false
+                                    )
+                                } else {
+                                    onZoomedChange(
+                                        true
+                                    )
+                                }
+                            }
                         }
-                    )
+                    }
                 }
                 .pointerInput(
                     media.mediaIndex
@@ -1107,18 +1452,29 @@ private fun ArtworkPagerPage(
                     .fillMaxSize()
                     .padding(
                         vertical = 56.dp
-                    ),
+                    )
+                    .graphicsLayer {
+                        scaleX =
+                            scale
+
+                        scaleY =
+                            scale
+
+                        translationX =
+                            offsetX
+
+                        translationY =
+                            offsetY
+                    },
             contentScale =
                 ContentScale.Fit,
             onError = {
                 Log.e(
                     "Muninn/ArtworkPreview",
                     "Failed to load ${media.previewUrl}: " +
-                            it.result.throwable
+                        it.result.throwable
                 )
             }
         )
-
-
     }
 }
