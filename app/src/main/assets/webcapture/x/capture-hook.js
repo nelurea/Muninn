@@ -627,6 +627,126 @@
    * ---------------------------------------------------------
    */
 
+  /*
+   * Issue #54 diagnostic.
+   *
+   * Inspect raw timeline wrapper objects for explicit
+   * promotion / advertising fields before collectTweetResults()
+   * discards that wrapper context.
+   */
+  /*
+   * Return every Tweet id that belongs to an explicitly
+   * promoted timeline entry.
+   *
+   * X currently marks these entries with:
+   *
+   *   entryId: "promoted-tweet-<id>"
+   *
+   * Filter the entire entry rather than only the primary
+   * Tweet id so quoted / nested Tweet objects inside an ad
+   * cannot leak into Discovery.
+   */
+  function collectPromotedTweetIds(
+    root
+  ) {
+    const visited =
+      new Set();
+
+    const promotedTweetIds =
+      new Set();
+
+    function visit(
+      value
+    ) {
+      if (
+        value === null ||
+        typeof value !==
+          "object" ||
+        visited.has(
+          value
+        )
+      ) {
+        return;
+      }
+
+      visited.add(
+        value
+      );
+
+      const entryId =
+        typeof value.entryId ===
+          "string"
+          ? value.entryId
+          : typeof value.entry_id ===
+              "string"
+            ? value.entry_id
+            : null;
+
+      if (
+        entryId !== null &&
+        entryId.startsWith(
+          "promoted-tweet-"
+        )
+      ) {
+        const promotedResults =
+          collectTweetResults(
+            value
+          );
+
+        for (
+          const result
+          of promotedResults
+        ) {
+          promotedTweetIds.add(
+            result.rest_id
+          );
+        }
+
+        /*
+         * Everything below this entry belongs to the
+         * promoted timeline item and has already been
+         * collected above.
+         */
+        return;
+      }
+
+      if (
+        Array.isArray(
+          value
+        )
+      ) {
+        for (
+          const child
+          of value
+        ) {
+          visit(
+            child
+          );
+        }
+
+        return;
+      }
+
+      for (
+        const child
+        of Object.values(
+          value
+        )
+      ) {
+        visit(
+          child
+        );
+      }
+    }
+
+    visit(
+      root
+    );
+
+    return promotedTweetIds;
+  }
+
+
   function sendDiscoveryBatch(
     operation,
     rawUrl,
@@ -641,10 +761,21 @@
       return;
     }
 
+    const promotedTweetIds =
+      collectPromotedTweetIds(
+        root
+      );
+
     const tweetResults =
       collectTweetResults(
         root
-      );
+      )
+        .filter(
+          (result) =>
+            !promotedTweetIds.has(
+              result.rest_id
+            )
+        );
 
     if (
       tweetResults.length ===
