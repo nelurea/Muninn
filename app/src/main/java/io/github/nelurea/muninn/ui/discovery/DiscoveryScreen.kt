@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -18,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -420,12 +423,15 @@ private fun DiscoveryContent(
                     12.dp
                 )
         ) {
-            Button(
+            IconButton(
                 onClick =
                     onBack
             ) {
-                Text(
-                    "Back"
+                Icon(
+                    imageVector =
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription =
+                        "Back"
                 )
             }
 
@@ -448,8 +454,10 @@ private fun DiscoveryContent(
                     ),
             horizontalArrangement =
                 Arrangement.spacedBy(
-                    8.dp
-                )
+                    6.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
             DiscoverySourceButton(
                 label =
@@ -490,13 +498,16 @@ private fun DiscoveryContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(
+                        rememberScrollState()
+                    )
                     .padding(
                         horizontal = 8.dp,
-                        vertical = 8.dp
+                        vertical = 6.dp
                     ),
             horizontalArrangement =
                 Arrangement.spacedBy(
-                    8.dp
+                    6.dp
                 ),
             verticalAlignment =
                 Alignment.CenterVertically
@@ -688,7 +699,7 @@ private fun DiscoveryContent(
 
                         Text(
                             text =
-                                "Loading…",
+                                "Loading...",
                             modifier =
                                 Modifier.padding(
                                     top = 12.dp
@@ -718,7 +729,7 @@ private fun DiscoveryContent(
                     ) {
                         Text(
                             text =
-                                "Couldn’t load Discovery",
+                                "Couldn't load Discovery",
                             style =
                                 MaterialTheme
                                     .typography
@@ -894,7 +905,7 @@ private fun DiscoveryContent(
 
                                     Text(
                                         text =
-                                            "Loading more…",
+                                            "Loading...",
                                         style =
                                             MaterialTheme
                                                 .typography
@@ -927,7 +938,7 @@ private fun DiscoveryContent(
                                 ) {
                                     Text(
                                         text =
-                                            "Couldn’t load more items",
+                                            "Couldn't load more items",
                                         fontWeight =
                                             FontWeight.SemiBold
                                     )

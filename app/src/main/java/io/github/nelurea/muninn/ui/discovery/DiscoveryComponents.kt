@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -120,60 +121,38 @@ fun DiscoverySourceButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    if (
-        selected
-    ) {
-        Button(
-            onClick = {},
-            enabled =
-                enabled
-        ) {
+    FilterChip(
+        selected =
+            selected,
+        onClick =
+            onClick,
+        enabled =
+            enabled,
+        label = {
             Text(
                 label
             )
         }
-    } else {
-        OutlinedButton(
-            onClick =
-                onClick,
-            enabled =
-                enabled
-        ) {
-            Text(
-                label
-            )
-        }
-    }
+    )
 }
-
 @Composable
 fun DiscoveryModeButton(
     label: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    if (
-        selected
-    ) {
-        Button(
-            onClick = {}
-        ) {
+    FilterChip(
+        selected =
+            selected,
+        onClick =
+            onClick,
+        label = {
             Text(
                 label
             )
         }
-    } else {
-        OutlinedButton(
-            onClick =
-                onClick
-        ) {
-            Text(
-                label
-            )
-        }
-    }
+    )
 }
-
 @Composable
 private fun DiscoveryBadge(
     text: String,
