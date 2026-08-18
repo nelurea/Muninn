@@ -755,6 +755,51 @@ class DiscoveryViewModel(
         )
     }
 
+    fun notifyXAccountChanged() {
+        io.github.nelurea.muninn.discovery.x.XDiscoveryObservationStore
+            .clearAll()
+
+        generation +=
+            1
+
+        xSyncPending =
+            false
+
+        if (
+            previewState.item
+                ?.source ==
+            DiscoverySourceId.X
+        ) {
+            previewGeneration +=
+                1
+
+            previewState =
+                ArtworkPreviewUiState()
+        }
+
+        if (
+            sourceId !=
+            DiscoverySourceId.X
+        ) {
+            return
+        }
+
+        currentPage =
+            0
+
+        hasNextPage =
+            true
+
+        isLoading =
+            false
+
+        uiState =
+            DiscoveryUiState(
+                isLoading =
+                    true
+            )
+    }
+
     fun retry() {
         if (
             uiState.items.isEmpty()

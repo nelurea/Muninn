@@ -33,6 +33,10 @@
         </activity>
 
         <activity
+            android:name=".ui.browser.XLoginActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".debug.observation.ObservationActivity"
             android:exported="true">
         </activity>
