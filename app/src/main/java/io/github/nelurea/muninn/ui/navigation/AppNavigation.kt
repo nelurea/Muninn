@@ -30,7 +30,6 @@ import io.github.nelurea.muninn.discovery.DiscoveryViewModel
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 import io.github.nelurea.muninn.discovery.pixiv.PixivArtworkPreviewSource
 import io.github.nelurea.muninn.discovery.pixiv.PixivDiscoverySource
-import io.github.nelurea.muninn.ui.browser.WebCaptureScreen
 import io.github.nelurea.muninn.ui.capture.CapturedWorkDetailScreen
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureScreen
 import io.github.nelurea.muninn.ui.capture.ResolvedCaptureViewModel
@@ -170,11 +169,7 @@ fun AppNavigation(
                         "discovery"
                     )
                 },
-                onWebCaptureClick = {
-                    navController.navigate(
-                        "webCapture"
-                    )
-                },
+
                 onSettingsClick = {
                     navController.navigate(
                         "settings"
@@ -522,59 +517,16 @@ fun AppNavigation(
                 onItemClick = {
                         item ->
 
-                    val discoveryMode =
-                        discoveryViewModel
-                            .mode
-                            .name
-
-                    val discoveryQuery =
-                        discoveryViewModel
-                            .searchQuery
-                            .takeIf {
-                                discoveryViewModel
-                                    .mode
-                                    .name ==
-                                        "SEARCH" &&
-                                        it.isNotBlank()
-                            }
-
-                    navController.navigate(
-                        buildString {
-                            append(
-                                "webCapture?url="
+                    val intent =
+                        Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(
+                                item.canonicalUrl
                             )
+                        )
 
-                            append(
-                                Uri.encode(
-                                    item.canonicalUrl
-                                )
-                            )
-
-                            append(
-                                "&discoveryMode="
-                            )
-
-                            append(
-                                Uri.encode(
-                                    discoveryMode
-                                )
-                            )
-
-                            discoveryQuery
-                                ?.let {
-                                        query ->
-
-                                    append(
-                                        "&discoveryQuery="
-                                    )
-
-                                    append(
-                                        Uri.encode(
-                                            query
-                                        )
-                                    )
-                                }
-                        }
+                    context.startActivity(
+                        intent
                     )
                 },
                 onBack = {
@@ -690,116 +642,6 @@ fun AppNavigation(
             }
         }
 
-        composable(
-            route =
-                "webCapture"
-        ) {
-            WebCaptureScreen(
-                saveCaptureUseCase =
-                    saveCaptureUseCase,
-                initialUrl =
-                    "https://www.pixiv.net/",
-                onBack = {
-                    navController
-                        .popBackStack()
-                }
-            )
-        }
 
-        composable(
-            route =
-                "webCapture?url={url}" +
-                        "&discoveryMode={discoveryMode}" +
-                        "&discoveryQuery={discoveryQuery}",
-            arguments =
-                listOf(
-                    navArgument(
-                        "url"
-                    ) {
-                        type =
-                            NavType.StringType
-
-                        nullable =
-                            true
-
-                        defaultValue =
-                            null
-                    },
-
-                    navArgument(
-                        "discoveryMode"
-                    ) {
-                        type =
-                            NavType.StringType
-
-                        nullable =
-                            true
-
-                        defaultValue =
-                            null
-                    },
-
-                    navArgument(
-                        "discoveryQuery"
-                    ) {
-                        type =
-                            NavType.StringType
-
-                        nullable =
-                            true
-
-                        defaultValue =
-                            null
-                    }
-                )
-        ) {
-                backStackEntry ->
-
-            val initialUrl =
-                backStackEntry
-                    .arguments
-                    ?.getString(
-                        "url"
-                    )
-                    ?.takeIf {
-                        it.isNotBlank()
-                    }
-                    ?: "https://www.pixiv.net/"
-
-            val discoveryMode =
-                backStackEntry
-                    .arguments
-                    ?.getString(
-                        "discoveryMode"
-                    )
-                    ?.takeIf {
-                        it.isNotBlank()
-                    }
-
-            val discoveryQuery =
-                backStackEntry
-                    .arguments
-                    ?.getString(
-                        "discoveryQuery"
-                    )
-                    ?.takeIf {
-                        it.isNotBlank()
-                    }
-
-            WebCaptureScreen(
-                saveCaptureUseCase =
-                    saveCaptureUseCase,
-                initialUrl =
-                    initialUrl,
-                discoveryMode =
-                    discoveryMode,
-                discoveryQuery =
-                    discoveryQuery,
-                onBack = {
-                    navController
-                        .popBackStack()
-                }
-            )
-        }
     }
 }

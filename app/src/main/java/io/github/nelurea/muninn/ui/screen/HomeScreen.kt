@@ -10,7 +10,6 @@ fun HomeScreen(
     onGalleryClick: () -> Unit,
     onSessionsClick: () -> Unit,
     onDiscoveryClick: () -> Unit,
-    onWebCaptureClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Column {
@@ -27,12 +26,6 @@ fun HomeScreen(
             onClick = onSessionsClick
         ) {
             Text("Sessions")
-        }
-
-        Button(
-            onClick = onWebCaptureClick
-        ) {
-            Text("Web Capture")
         }
 
         Button(
