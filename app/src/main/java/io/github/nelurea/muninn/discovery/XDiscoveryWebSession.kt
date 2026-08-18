@@ -32,6 +32,7 @@ import io.github.nelurea.muninn.discovery.x.XDiscoveryObservationStore
 import io.github.nelurea.muninn.discovery.x.XProfileHandleStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 @Composable
 fun XDiscoveryWebSession(
@@ -139,6 +140,130 @@ fun XDiscoveryWebSession(
         rememberUpdatedState(
             onLoadMoreStateChange
         )
+
+    suspend fun trySelectXHomeTimelineTab(
+        currentWebView: WebView,
+        targetIndex: Int
+    ): Boolean =
+        suspendCancellableCoroutine {
+                continuation ->
+
+            currentWebView.evaluateJavascript(
+                """
+                (() => {
+                  if (
+                    location.pathname !==
+                    '/home'
+                  ) {
+                    return false;
+                  }
+
+                  const tabs =
+                    Array.from(
+                      document.querySelectorAll(
+                        '[role="tab"]'
+                      )
+                    );
+
+                  const tab =
+                    tabs[$targetIndex];
+
+                  if (!tab) {
+                    return false;
+                  }
+
+                  if (
+                    tab.getAttribute(
+                      'aria-selected'
+                    ) !==
+                    'true'
+                  ) {
+                    tab.click();
+                  }
+
+                  return true;
+                })();
+                """.trimIndent()
+            ) {
+                    result ->
+
+                if (
+                    continuation.isActive
+                ) {
+                    continuation.resumeWith(
+                        Result.success(
+                            result ==
+                                "true"
+                        )
+                    )
+                }
+            }
+        }
+
+    fun selectXHomeTimelineTab(
+        currentWebView: WebView,
+        targetMode: DiscoveryMode
+    ) {
+        val targetIndex =
+            when (
+                targetMode
+            ) {
+                DiscoveryMode.LATEST ->
+                    0
+
+                DiscoveryMode.FOLLOWING ->
+                    1
+
+                else ->
+                    return
+            }
+
+        coroutineScope.launch {
+            repeat(
+                X_HOME_TAB_SELECT_POLL_COUNT
+            ) {
+                if (
+                    currentMode.value !=
+                    targetMode
+                ) {
+                    return@launch
+                }
+
+                val selected =
+                    trySelectXHomeTimelineTab(
+                        currentWebView =
+                            currentWebView,
+                        targetIndex =
+                            targetIndex
+                    )
+
+                if (
+                    selected
+                ) {
+                    Log.d(
+                        LOG_TAG,
+                        "Selected X Home tab for $targetMode."
+                    )
+
+                    return@launch
+                }
+
+                delay(
+                    X_HOME_TAB_SELECT_POLL_INTERVAL_MS
+                )
+            }
+
+            if (
+                currentMode.value ==
+                targetMode
+            ) {
+                Log.e(
+                    LOG_TAG,
+                    "Timed out selecting X Home tab for $targetMode."
+                )
+            }
+        }
+    }
 
     fun tryResolveXProfileAndLoadLikes(
         currentWebView: WebView,
@@ -352,6 +477,22 @@ fun XDiscoveryWebSession(
                                 url =
                                     url
                             )
+
+                            when (
+                                currentMode.value
+                            ) {
+                                DiscoveryMode.LATEST,
+                                DiscoveryMode.FOLLOWING ->
+                                    selectXHomeTimelineTab(
+                                        currentWebView =
+                                            view,
+                                        targetMode =
+                                            currentMode.value
+                                    )
+
+                                else ->
+                                    Unit
+                            }
                         }
 
                         override fun doUpdateVisitedHistory(
@@ -876,6 +1017,15 @@ fun XDiscoveryWebSession(
 
                 bookmarksRetryCount =
                     0
+
+                Log.d(
+                    LOG_TAG,
+                    "Loading X Following."
+                )
+
+                currentWebView.loadUrl(
+                    X_HOME_URL
+                )
             }
 
             DiscoveryMode.BOOKMARKS -> {
@@ -1002,7 +1152,7 @@ private fun refreshCurrentXDiscoveryPage(
                 X_HOME_URL
 
             DiscoveryMode.FOLLOWING ->
-                null
+                X_HOME_URL
 
             DiscoveryMode.BOOKMARKS ->
                 null
@@ -1350,6 +1500,12 @@ private const val X_ORIGIN =
 
 private const val X_HOME_URL =
     "$X_ORIGIN/home"
+
+private const val X_HOME_TAB_SELECT_POLL_INTERVAL_MS =
+    200L
+
+private const val X_HOME_TAB_SELECT_POLL_COUNT =
+    25
 
 private const val MAX_X_LOAD_MORE_RETRIES =
     3
