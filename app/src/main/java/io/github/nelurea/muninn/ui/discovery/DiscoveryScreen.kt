@@ -532,6 +532,23 @@ private fun DiscoveryContent(
                 }
             )
 
+            if (
+                viewModel.sourceId ==
+                DiscoverySourceId.X
+            ) {
+                DiscoveryModeButton(
+                    label =
+                        "Following",
+                    selected =
+                        viewModel.mode ==
+                                DiscoveryMode.FOLLOWING,
+                    onClick = {
+                        viewModel.selectMode(
+                            DiscoveryMode.FOLLOWING
+                        )
+                    }
+                )
+            }
             DiscoveryModeButton(
                 label =
                     if (
