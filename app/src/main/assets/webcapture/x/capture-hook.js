@@ -47,6 +47,10 @@
         "LATEST"
       ],
       [
+        "HomeLatestTimeline",
+        "FOLLOWING"
+      ],
+      [
         "Likes",
         "BOOKMARKS"
       ],
