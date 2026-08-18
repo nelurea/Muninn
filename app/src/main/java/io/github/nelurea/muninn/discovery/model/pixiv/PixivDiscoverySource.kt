@@ -39,6 +39,12 @@ class PixivDiscoverySource(
                 )
             }
 
+            DiscoveryMode.FOLLOWING -> {
+                throw PixivDiscoveryException(
+                    "Following mode is only available for X."
+                )
+            }
+
             DiscoveryMode.BOOKMARKS -> {
                 loadBookmarks(
                     page =

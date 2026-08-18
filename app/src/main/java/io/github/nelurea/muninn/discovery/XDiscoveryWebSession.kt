@@ -387,6 +387,10 @@ fun XDiscoveryWebSession(
                                 currentMode.value ==
                                     DiscoveryMode.LATEST
 
+                            DiscoveryMode.FOLLOWING ->
+                                currentMode.value ==
+                                    DiscoveryMode.FOLLOWING
+
                             DiscoveryMode.BOOKMARKS ->
                                 currentMode.value ==
                                     DiscoveryMode.BOOKMARKS &&
@@ -809,6 +813,9 @@ fun XDiscoveryWebSession(
                 DiscoveryMode.LATEST ->
                     "LATEST:$refreshToken"
 
+                DiscoveryMode.FOLLOWING ->
+                    "FOLLOWING:$refreshToken"
+
                 DiscoveryMode.BOOKMARKS ->
                     "BOOKMARKS:$refreshToken"
 
@@ -858,6 +865,17 @@ fun XDiscoveryWebSession(
                 currentWebView.loadUrl(
                     X_HOME_URL
                 )
+            }
+
+            DiscoveryMode.FOLLOWING -> {
+                bookmarksNavigationState =
+                    XBookmarksNavigationState.IDLE
+
+                bookmarksUserId =
+                    null
+
+                bookmarksRetryCount =
+                    0
             }
 
             DiscoveryMode.BOOKMARKS -> {
@@ -982,6 +1000,9 @@ private fun refreshCurrentXDiscoveryPage(
         ) {
             DiscoveryMode.LATEST ->
                 X_HOME_URL
+
+            DiscoveryMode.FOLLOWING ->
+                null
 
             DiscoveryMode.BOOKMARKS ->
                 null
