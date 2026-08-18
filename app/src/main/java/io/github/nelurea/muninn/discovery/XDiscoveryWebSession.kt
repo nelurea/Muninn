@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.JavaScriptExecutionWorld
 import androidx.webkit.WebViewCompat
@@ -28,6 +29,7 @@ import io.github.nelurea.muninn.discovery.x.XDiscoveryBatch
 import io.github.nelurea.muninn.discovery.x.XDiscoveryBatchParseResult
 import io.github.nelurea.muninn.discovery.x.XDiscoveryBatchParser
 import io.github.nelurea.muninn.discovery.x.XDiscoveryObservationStore
+import io.github.nelurea.muninn.discovery.x.XProfileHandleStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -51,6 +53,16 @@ fun XDiscoveryWebSession(
         )
     }
 
+    val context =
+        LocalContext.current
+
+    val xProfileHandleStore =
+        remember {
+            XProfileHandleStore(
+                context.applicationContext
+            )
+        }
+
     var bookmarksNavigationState by remember {
         mutableStateOf(
             XBookmarksNavigationState.IDLE
@@ -66,6 +78,12 @@ fun XDiscoveryWebSession(
     var bookmarksRetryCount by remember {
         mutableIntStateOf(
             0
+        )
+    }
+
+    var bookmarksUsingCachedHandle by remember {
+        mutableStateOf(
+            false
         )
     }
 
@@ -164,6 +182,21 @@ fun XDiscoveryWebSession(
         ) {
             return false
         }
+
+        bookmarksUserId
+            ?.let {
+                    userId ->
+
+                xProfileHandleStore.put(
+                    userId =
+                        userId,
+                    handle =
+                        username
+                )
+            }
+
+        bookmarksUsingCachedHandle =
+            false
 
         bookmarksNavigationState =
             XBookmarksNavigationState.LOADING_LIKES
@@ -582,6 +615,30 @@ fun XDiscoveryWebSession(
                 }
 
                 if (
+                    bookmarksUsingCachedHandle
+                ) {
+                    xProfileHandleStore.remove(
+                        userId
+                    )
+
+                    bookmarksUsingCachedHandle =
+                        false
+
+                    bookmarksRetryCount =
+                        0
+
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.RESOLVING_PROFILE
+
+                    Log.d(
+                        LOG_TAG,
+                        "Cached X profile did not produce Likes; resolving again."
+                    )
+
+                    currentWebView.loadUrl(
+                        "$X_ORIGIN/i/user/$userId"
+                    )
+                } else if (
                     bookmarksRetryCount <
                     MAX_X_BOOKMARKS_NAVIGATION_RETRIES
                 ) {
@@ -830,17 +887,44 @@ fun XDiscoveryWebSession(
                 bookmarksRetryCount =
                     0
 
-                bookmarksNavigationState =
-                    XBookmarksNavigationState.RESOLVING_PROFILE
+                val cachedHandle =
+                    xProfileHandleStore.get(
+                        userId
+                    )
 
-                Log.d(
-                    LOG_TAG,
-                    "Loading X Likes."
-                )
+                if (
+                    cachedHandle != null
+                ) {
+                    bookmarksUsingCachedHandle =
+                        true
 
-                currentWebView.loadUrl(
-                    "$X_ORIGIN/i/user/$userId"
-                )
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.LOADING_LIKES
+
+                    Log.d(
+                        LOG_TAG,
+                        "Loading X Likes from cached profile."
+                    )
+
+                    currentWebView.loadUrl(
+                        "$X_ORIGIN/$cachedHandle/likes"
+                    )
+                } else {
+                    bookmarksUsingCachedHandle =
+                        false
+
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.RESOLVING_PROFILE
+
+                    Log.d(
+                        LOG_TAG,
+                        "Resolving X profile for Likes."
+                    )
+
+                    currentWebView.loadUrl(
+                        "$X_ORIGIN/i/user/$userId"
+                    )
+                }
             }
 
             DiscoveryMode.SEARCH -> {
