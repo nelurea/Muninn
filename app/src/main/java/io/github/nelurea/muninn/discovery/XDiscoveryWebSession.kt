@@ -51,9 +51,21 @@ fun XDiscoveryWebSession(
         )
     }
 
-    var likesNavigationStarted by remember {
+    var bookmarksNavigationState by remember {
         mutableStateOf(
-            false
+            XBookmarksNavigationState.IDLE
+        )
+    }
+
+    var bookmarksUserId by remember {
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    var bookmarksRetryCount by remember {
+        mutableIntStateOf(
+            0
         )
     }
 
@@ -110,6 +122,63 @@ fun XDiscoveryWebSession(
             onLoadMoreStateChange
         )
 
+    fun tryResolveXProfileAndLoadLikes(
+        currentWebView: WebView,
+        url: String?
+    ): Boolean {
+        if (
+            currentMode.value !=
+            DiscoveryMode.BOOKMARKS ||
+            bookmarksNavigationState !=
+            XBookmarksNavigationState.RESOLVING_PROFILE
+        ) {
+            return false
+        }
+
+        val normalizedUrl =
+            url
+                ?.substringBefore(
+                    "?"
+                )
+                ?.trimEnd(
+                    '/'
+                )
+                ?: return false
+
+        val profileMatch =
+            X_PROFILE_URL_REGEX
+                .matchEntire(
+                    normalizedUrl
+                )
+                ?: return false
+
+        val username =
+            profileMatch
+                .groupValues[
+                1
+            ]
+
+        if (
+            username.lowercase() in
+            X_RESERVED_PATHS
+        ) {
+            return false
+        }
+
+        bookmarksNavigationState =
+            XBookmarksNavigationState.LOADING_LIKES
+
+        Log.d(
+            LOG_TAG,
+            "Resolved X profile; loading Likes."
+        )
+
+        currentWebView.loadUrl(
+            "$normalizedUrl/likes"
+        )
+
+        return true
+    }
     fun tryAutoRefreshAfterStall(
         currentWebView: WebView
     ): Boolean {
@@ -244,64 +313,30 @@ fun XDiscoveryWebSession(
                                 url
                             )
 
-                            if (
-                                currentMode.value !=
-                                DiscoveryMode.BOOKMARKS ||
-                                likesNavigationStarted
-                            ) {
-                                return
-                            }
+                            tryResolveXProfileAndLoadLikes(
+                                currentWebView =
+                                    view,
+                                url =
+                                    url
+                            )
+                        }
 
-                            val normalizedUrl =
-                                url
-                                    ?.substringBefore(
-                                        "?"
-                                    )
-                                    ?.trimEnd(
-                                        '/'
-                                    )
-                                    ?: return
-
-                            /*
-                             * /i/user/<id> redirects to the
-                             * authenticated user's canonical
-                             * profile URL:
-                             *
-                             * https://x.com/<username>
-                             */
-                            val profileMatch =
-                                X_PROFILE_URL_REGEX
-                                    .matchEntire(
-                                        normalizedUrl
-                                    )
-                                    ?: return
-
-                            val username =
-                                profileMatch
-                                    .groupValues[
-                                    1
-                                ]
-
-                            if (
-                                username.lowercase() in
-                                X_RESERVED_PATHS
-                            ) {
-                                return
-                            }
-
-                            likesNavigationStarted =
-                                true
-
-                            val likesUrl =
-                                "$normalizedUrl/likes"
-
-                            Log.d(
-                                LOG_TAG,
-                                "Resolved X Likes page."
+                        override fun doUpdateVisitedHistory(
+                            view: WebView,
+                            url: String?,
+                            isReload: Boolean
+                        ) {
+                            super.doUpdateVisitedHistory(
+                                view,
+                                url,
+                                isReload
                             )
 
-                            view.loadUrl(
-                                likesUrl
+                            tryResolveXProfileAndLoadLikes(
+                                currentWebView =
+                                    view,
+                                url =
+                                    url
                             )
                         }
                     }
@@ -309,9 +344,60 @@ fun XDiscoveryWebSession(
                 installXDiscoveryBridge(
                     webView =
                         this,
+                    shouldAcceptBatch = {
+                            batch ->
+
+                        when (
+                            batch.mode
+                        ) {
+                            DiscoveryMode.LATEST ->
+                                currentMode.value ==
+                                    DiscoveryMode.LATEST
+
+                            DiscoveryMode.BOOKMARKS ->
+                                currentMode.value ==
+                                    DiscoveryMode.BOOKMARKS &&
+                                    (
+                                            bookmarksNavigationState ==
+                                                XBookmarksNavigationState.LOADING_LIKES ||
+                                            bookmarksNavigationState ==
+                                                XBookmarksNavigationState.READY
+                                            )
+
+                            DiscoveryMode.SEARCH -> {
+                                val currentQuery =
+                                    currentSearchQuery
+                                        .value
+                                        .trim()
+
+                                val observedQuery =
+                                    batch.query
+                                        ?.trim()
+                                        .orEmpty()
+
+                                currentMode.value ==
+                                    DiscoveryMode.SEARCH &&
+                                        currentQuery ==
+                                        observedQuery
+                            }
+                        }
+                    },
                     onBatchObserved = {
                             batch,
                             addedCount ->
+
+                        if (
+                            batch.mode ==
+                            DiscoveryMode.BOOKMARKS &&
+                            currentMode.value ==
+                            DiscoveryMode.BOOKMARKS
+                        ) {
+                            bookmarksNavigationState =
+                                XBookmarksNavigationState.READY
+
+                            bookmarksRetryCount =
+                                0
+                        }
 
                         if (
                             xLoadMoreActive
@@ -399,6 +485,136 @@ fun XDiscoveryWebSession(
             }
         }
     )
+
+    LaunchedEffect(
+        webView,
+        bookmarksNavigationState,
+        bookmarksUserId,
+        bookmarksRetryCount
+    ) {
+        val currentWebView =
+            webView
+                ?: return@LaunchedEffect
+
+        val userId =
+            bookmarksUserId
+                ?: return@LaunchedEffect
+
+        when (
+            bookmarksNavigationState
+        ) {
+            XBookmarksNavigationState.RESOLVING_PROFILE -> {
+                repeat(
+                    X_PROFILE_RESOLVE_POLL_COUNT
+                ) {
+                    if (
+                        currentMode.value !=
+                        DiscoveryMode.BOOKMARKS ||
+                        bookmarksNavigationState !=
+                        XBookmarksNavigationState.RESOLVING_PROFILE
+                    ) {
+                        return@LaunchedEffect
+                    }
+
+                    if (
+                        tryResolveXProfileAndLoadLikes(
+                            currentWebView =
+                                currentWebView,
+                            url =
+                                currentWebView.url
+                        )
+                    ) {
+                        return@LaunchedEffect
+                    }
+
+                    delay(
+                        X_PROFILE_RESOLVE_POLL_INTERVAL_MS
+                    )
+                }
+
+                if (
+                    currentMode.value !=
+                    DiscoveryMode.BOOKMARKS ||
+                    bookmarksNavigationState !=
+                    XBookmarksNavigationState.RESOLVING_PROFILE
+                ) {
+                    return@LaunchedEffect
+                }
+
+                if (
+                    bookmarksRetryCount <
+                    MAX_X_BOOKMARKS_NAVIGATION_RETRIES
+                ) {
+                    bookmarksRetryCount +=
+                        1
+
+                    Log.d(
+                        LOG_TAG,
+                        "Retrying X profile resolution."
+                    )
+
+                    currentWebView.loadUrl(
+                        "$X_ORIGIN/i/user/$userId"
+                    )
+                } else {
+                    Log.e(
+                        LOG_TAG,
+                        "X profile resolution timed out."
+                    )
+
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.IDLE
+                }
+            }
+
+            XBookmarksNavigationState.LOADING_LIKES -> {
+                delay(
+                    X_BOOKMARKS_BATCH_TIMEOUT_MS
+                )
+
+                if (
+                    currentMode.value !=
+                    DiscoveryMode.BOOKMARKS ||
+                    bookmarksNavigationState !=
+                    XBookmarksNavigationState.LOADING_LIKES
+                ) {
+                    return@LaunchedEffect
+                }
+
+                if (
+                    bookmarksRetryCount <
+                    MAX_X_BOOKMARKS_NAVIGATION_RETRIES
+                ) {
+                    bookmarksRetryCount +=
+                        1
+
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.RESOLVING_PROFILE
+
+                    Log.d(
+                        LOG_TAG,
+                        "X Likes batch timed out; resolving profile again."
+                    )
+
+                    currentWebView.loadUrl(
+                        "$X_ORIGIN/i/user/$userId"
+                    )
+                } else {
+                    Log.e(
+                        LOG_TAG,
+                        "X Likes batch timed out."
+                    )
+
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.IDLE
+                }
+            }
+
+            XBookmarksNavigationState.IDLE,
+            XBookmarksNavigationState.READY ->
+                Unit
+        }
+    }
 
     LaunchedEffect(
         webView,
@@ -568,6 +784,15 @@ fun XDiscoveryWebSession(
             mode
         ) {
             DiscoveryMode.LATEST -> {
+                bookmarksNavigationState =
+                    XBookmarksNavigationState.IDLE
+
+                bookmarksUserId =
+                    null
+
+                bookmarksRetryCount =
+                    0
+
                 Log.d(
                     LOG_TAG,
                     "Loading X For You."
@@ -585,6 +810,12 @@ fun XDiscoveryWebSession(
                 if (
                     userId == null
                 ) {
+                    bookmarksNavigationState =
+                        XBookmarksNavigationState.IDLE
+
+                    bookmarksUserId =
+                        null
+
                     Log.e(
                         LOG_TAG,
                         "Authenticated X user id is unavailable."
@@ -593,8 +824,14 @@ fun XDiscoveryWebSession(
                     return@LaunchedEffect
                 }
 
-                likesNavigationStarted =
-                    false
+                bookmarksUserId =
+                    userId
+
+                bookmarksRetryCount =
+                    0
+
+                bookmarksNavigationState =
+                    XBookmarksNavigationState.RESOLVING_PROFILE
 
                 Log.d(
                     LOG_TAG,
@@ -602,11 +839,20 @@ fun XDiscoveryWebSession(
                 )
 
                 currentWebView.loadUrl(
-                    "https://x.com/i/user/$userId"
+                    "$X_ORIGIN/i/user/$userId"
                 )
             }
 
             DiscoveryMode.SEARCH -> {
+                bookmarksNavigationState =
+                    XBookmarksNavigationState.IDLE
+
+                bookmarksUserId =
+                    null
+
+                bookmarksRetryCount =
+                    0
+
                 val query =
                     currentSearchQuery
                         .value
@@ -752,6 +998,9 @@ private fun requestMoreXTimeline(
 
 private fun WebView.installXDiscoveryBridge(
     webView: WebView,
+    shouldAcceptBatch: (
+        XDiscoveryBatch
+    ) -> Boolean,
     onBatchObserved: (
         XDiscoveryBatch,
         Int
@@ -826,6 +1075,19 @@ private fun WebView.installXDiscoveryBridge(
                 is XDiscoveryBatchParseResult.Success -> {
                     val batch =
                         parseResult.batch
+
+                    if (
+                        !shouldAcceptBatch(
+                            batch
+                        )
+                    ) {
+                        Log.d(
+                            LOG_TAG,
+                            "Ignoring stale X Discovery batch for ${batch.mode}."
+                        )
+
+                        return@addWebMessageListener
+                    }
 
                     val mergeResult =
                         XDiscoveryObservationStore
@@ -968,6 +1230,13 @@ private fun buildXSearchUrl(
     }
 }
 
+private enum class XBookmarksNavigationState {
+    IDLE,
+    RESOLVING_PROFILE,
+    LOADING_LIKES,
+    READY
+}
+
 private const val LOG_TAG =
     "Muninn/X/DiscoveryWeb"
 
@@ -991,6 +1260,18 @@ private const val X_AUTO_REFRESH_TIMEOUT_MS =
 
 private const val X_AUTO_REFRESH_COOLDOWN_MS =
     30_000L
+
+private const val X_PROFILE_RESOLVE_POLL_INTERVAL_MS =
+    200L
+
+private const val X_PROFILE_RESOLVE_POLL_COUNT =
+    25
+
+private const val X_BOOKMARKS_BATCH_TIMEOUT_MS =
+    8_000L
+
+private const val MAX_X_BOOKMARKS_NAVIGATION_RETRIES =
+    2
 
 private val X_PROFILE_URL_REGEX =
     Regex(

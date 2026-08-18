@@ -299,6 +299,44 @@ fun AppNavigation(
         composable(
             "settings"
         ) {
+            val xSessionState =
+                remember {
+                    io.github.nelurea.muninn.discovery.x.XWebSessionState()
+                }
+
+            val xUserId =
+                remember {
+                    androidx.compose.runtime.mutableStateOf(
+                        xSessionState
+                            .getAuthenticatedUserId()
+                    )
+                }
+
+            val xAccountLauncher =
+                androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract =
+                        androidx.activity.result.contract.ActivityResultContracts
+                            .StartActivityForResult()
+                ) {
+                    val previousUserId =
+                        xUserId.value
+
+                    val currentUserId =
+                        xSessionState
+                            .getAuthenticatedUserId()
+
+                    xUserId.value =
+                        currentUserId
+
+                    if (
+                        previousUserId !=
+                        currentUserId
+                    ) {
+                        discoveryViewModel
+                            .notifyXAccountChanged()
+                    }
+                }
+
             SettingsScreen(
                 onBack = {
                     navController
@@ -307,6 +345,24 @@ fun AppNavigation(
                 onResolvedCapturesClick = {
                     navController.navigate(
                         "resolvedCaptures"
+                    )
+                },
+                xUserId =
+                    xUserId.value,
+                onXLoginClick = {
+                    xAccountLauncher.launch(
+                        io.github.nelurea.muninn.ui.browser.XLoginActivity
+                            .createLoginIntent(
+                                context
+                            )
+                    )
+                },
+                onXSwitchAccountClick = {
+                    xAccountLauncher.launch(
+                        io.github.nelurea.muninn.ui.browser.XLoginActivity
+                            .createSwitchAccountIntent(
+                                context
+                            )
                     )
                 }
             )

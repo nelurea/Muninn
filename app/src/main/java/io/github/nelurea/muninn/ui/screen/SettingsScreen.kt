@@ -26,7 +26,10 @@ import io.github.nelurea.muninn.capture.storage.StoragePreferences
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onResolvedCapturesClick: () -> Unit
+    onResolvedCapturesClick: () -> Unit,
+    xUserId: String?,
+    onXLoginClick: () -> Unit,
+    onXSwitchAccountClick: () -> Unit
 ) {
     val context =
         LocalContext.current
@@ -122,6 +125,41 @@ fun SettingsScreen(
         Text(
             "Settings"
         )
+
+        Text(
+            "X"
+        )
+
+        Text(
+            xUserId
+                ?.let {
+                    "User ID: $it"
+                }
+                ?: "Not signed in"
+        )
+
+        Button(
+            onClick =
+                if (
+                    xUserId == null
+                ) {
+                    onXLoginClick
+                } else {
+                    onXSwitchAccountClick
+                },
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+            Text(
+                if (
+                    xUserId == null
+                ) {
+                    "X login"
+                } else {
+                    "Switch account"
+                }
+            )
+        }
 
         Text(
             "Storage location"
