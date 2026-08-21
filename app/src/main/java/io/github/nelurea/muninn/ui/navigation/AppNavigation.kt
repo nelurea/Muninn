@@ -64,6 +64,12 @@ fun AppNavigation(
     val context =
         LocalContext.current
 
+    var pendingInitialPreview by remember {
+        mutableStateOf<Pair<Long, String?>?>(
+            null
+        )
+    }
+
     val saveCaptureUseCase =
         remember {
             SaveCaptureUseCase(
@@ -190,7 +196,11 @@ fun AppNavigation(
                 repository =
                     capturedWorkRepository,
                 onWorkClick = {
-                        workId ->
+                        workId,
+                        initialPreviewUri ->
+
+                    pendingInitialPreview =
+                        workId to initialPreviewUri
 
                     navController.navigate(
                         "capturedWorkDetail/$workId"
@@ -222,9 +232,36 @@ fun AppNavigation(
                     )
                     ?: return@composable
 
+            val initialPreviewUri =
+                remember(
+                    backStackEntry,
+                    workId
+                ) {
+                    pendingInitialPreview
+                        ?.takeIf {
+                            it.first == workId
+                        }
+                        ?.second
+                }
+
+            LaunchedEffect(
+                backStackEntry,
+                workId
+            ) {
+                if (
+                    pendingInitialPreview
+                        ?.first == workId
+                ) {
+                    pendingInitialPreview =
+                        null
+                }
+            }
+
             CapturedWorkDetailScreen(
                 workId =
                     workId,
+                initialPreviewUri =
+                    initialPreviewUri,
                 repository =
                     capturedWorkRepository
             )
