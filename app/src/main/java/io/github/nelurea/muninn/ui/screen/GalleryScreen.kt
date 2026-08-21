@@ -29,7 +29,7 @@ import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 @Composable
 fun GalleryScreen(
     repository: CapturedWorkRepository,
-    onWorkClick: (Long) -> Unit
+    onWorkClick: (Long, String?) -> Unit
 ) {
     val context =
         LocalContext.current
@@ -72,7 +72,8 @@ fun GalleryScreen(
                         .fillMaxWidth()
                         .clickable {
                             onWorkClick(
-                                item.work.id
+                                item.work.id,
+                                coverMedia?.localUri
                             )
                         }
                         .padding(

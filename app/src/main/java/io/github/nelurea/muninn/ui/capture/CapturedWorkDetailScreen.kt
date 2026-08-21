@@ -44,8 +44,27 @@ import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 @Composable
 fun CapturedWorkDetailScreen(
     workId: Long,
+    initialPreviewUri: String? = null,
     repository: CapturedWorkRepository
 ) {
+    var initialPreviewSucceeded by remember(
+        workId,
+        initialPreviewUri
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var initialPreviewFailed by remember(
+        workId,
+        initialPreviewUri
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
     var capturedWork by remember {
         mutableStateOf<CapturedWorkWithMedia?>(
             null
@@ -104,7 +123,60 @@ fun CapturedWorkDetailScreen(
         }
     ) { paddingValues ->
 
+        val canonicalInitialPreviewMatches =
+            initialPreviewUri != null &&
+                capturedWork
+                    ?.media
+                    ?.minByOrNull {
+                        it.mediaIndex
+                    }
+                    ?.localUri == initialPreviewUri
+
+        val showInitialPreview =
+            initialPreviewUri != null &&
+                !initialPreviewFailed &&
+                (
+                    loading ||
+                        (
+                            !initialPreviewSucceeded &&
+                                canonicalInitialPreviewMatches
+                        )
+                    )
+
         when {
+            showInitialPreview -> {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(
+                                paddingValues
+                            ),
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+                    AsyncImage(
+                        model =
+                            initialPreviewUri,
+                        contentDescription =
+                            null,
+                        onSuccess = {
+                            initialPreviewSucceeded =
+                                true
+                        },
+                        onError = {
+                            initialPreviewFailed =
+                                true
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxSize(),
+                        contentScale =
+                            ContentScale.Fit
+                    )
+                }
+            }
+
             loading -> {
                 Box(
                     modifier =
