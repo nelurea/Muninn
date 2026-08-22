@@ -25,8 +25,12 @@ import androidx.room.RoomDatabase
         CapturedWorkResponseEntity::class,
         MediaFocusEntity::class,
         MediaMoveJournalEntity::class,
+        SaveEventEntity::class,
+        SaveEventMediaEntity::class,
+        DuplicateNormalizationJournalEntity::class,
+        DuplicateCleanupJournalEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,4 +50,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun capturedWorkDao(): CapturedWorkDao
 
     abstract fun mediaMoveDao(): MediaMoveDao
+
+    abstract fun saveEventDao(): SaveEventDao
+
+    abstract fun duplicateNormalizationDao(): DuplicateNormalizationDao
 }

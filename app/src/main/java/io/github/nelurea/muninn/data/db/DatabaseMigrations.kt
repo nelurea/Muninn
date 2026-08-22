@@ -739,3 +739,136 @@ val MIGRATION_16_17 =
             )
         }
     }
+
+val MIGRATION_17_18 =
+    object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `save_events` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `sourceType` TEXT,
+                    `sourceId` TEXT,
+                    `canonicalUrl` TEXT,
+                    `savedAt` TEXT,
+                    `origin` TEXT NOT NULL,
+                    `legacyWorkId` INTEGER,
+                    `sessionId` INTEGER,
+                    `canonicalWorkId` INTEGER,
+                    `discoveryMode` TEXT,
+                    `discoveryQuery` TEXT,
+                    `saveKind` TEXT NOT NULL,
+                    FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL,
+                    FOREIGN KEY(`canonicalWorkId`) REFERENCES `captured_works`(`id`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_save_events_sourceType_sourceId` " +
+                    "ON `save_events` (`sourceType`, `sourceId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_save_events_legacyWorkId` " +
+                    "ON `save_events` (`legacyWorkId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_save_events_sessionId` " +
+                    "ON `save_events` (`sessionId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_save_events_canonicalWorkId` " +
+                    "ON `save_events` (`canonicalWorkId`)"
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `save_event_media` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `saveEventId` INTEGER NOT NULL,
+                    `capturedMediaId` INTEGER,
+                    `mediaIndex` INTEGER,
+                    `localUri` TEXT,
+                    `sourceUrl` TEXT,
+                    `mimeType` TEXT,
+                    `fileName` TEXT,
+                    `wasRequested` INTEGER,
+                    `wasHighlighted` INTEGER,
+                    `wasNewlyStored` INTEGER,
+                    `isLegacyBackfill` INTEGER NOT NULL,
+                    FOREIGN KEY(`saveEventId`) REFERENCES `save_events`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE,
+                    FOREIGN KEY(`capturedMediaId`) REFERENCES `captured_media`(`id`)
+                        ON UPDATE NO ACTION ON DELETE SET NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_save_event_media_saveEventId` " +
+                    "ON `save_event_media` (`saveEventId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_save_event_media_capturedMediaId` " +
+                    "ON `save_event_media` (`capturedMediaId`)"
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `duplicate_normalization_journal` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `sourceType` TEXT NOT NULL,
+                    `sourceId` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `verificationState` TEXT NOT NULL,
+                    `verificationDetails` TEXT,
+                    `canonicalWorkId` INTEGER,
+                    `planVersion` INTEGER,
+                    `planJson` TEXT,
+                    `lastError` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                    "`index_duplicate_normalization_journal_sourceType_sourceId` " +
+                    "ON `duplicate_normalization_journal` (`sourceType`, `sourceId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_duplicate_normalization_journal_state` " +
+                    "ON `duplicate_normalization_journal` (`state`)"
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `duplicate_cleanup_journal` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `normalizationId` INTEGER NOT NULL,
+                    `capturedMediaId` INTEGER,
+                    `targetUri` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `lastError` TEXT,
+                    `updatedAt` INTEGER NOT NULL,
+                    FOREIGN KEY(`normalizationId`)
+                        REFERENCES `duplicate_normalization_journal`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_duplicate_cleanup_journal_normalizationId` " +
+                    "ON `duplicate_cleanup_journal` (`normalizationId`)"
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS " +
+                    "`index_duplicate_cleanup_journal_normalizationId_targetUri` " +
+                    "ON `duplicate_cleanup_journal` (`normalizationId`, `targetUri`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_duplicate_cleanup_journal_state` " +
+                    "ON `duplicate_cleanup_journal` (`state`)"
+            )
+        }
+    }
