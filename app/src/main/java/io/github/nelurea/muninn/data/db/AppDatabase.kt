@@ -24,8 +24,9 @@ import androidx.room.RoomDatabase
         AestheticResponseVocabularyEntity::class,
         CapturedWorkResponseEntity::class,
         MediaFocusEntity::class,
+        MediaMoveJournalEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -43,4 +44,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun captureEventDao(): CaptureEventDao
 
     abstract fun capturedWorkDao(): CapturedWorkDao
+
+    abstract fun mediaMoveDao(): MediaMoveDao
 }

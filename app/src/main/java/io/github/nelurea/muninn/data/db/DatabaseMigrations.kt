@@ -710,3 +710,32 @@ val MIGRATION_15_16 =
             )
         }
     }
+
+val MIGRATION_16_17 =
+    object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `media_move_journal` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `mediaId` INTEGER NOT NULL,
+                    `sourceUri` TEXT NOT NULL,
+                    `destinationRootUri` TEXT,
+                    `destinationUri` TEXT,
+                    `state` TEXT NOT NULL,
+                    `byteCount` INTEGER,
+                    `lastError` TEXT,
+                    `updatedAt` INTEGER NOT NULL,
+                    FOREIGN KEY(`mediaId`) REFERENCES `captured_media`(`id`)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS `index_media_move_journal_mediaId`
+                ON `media_move_journal` (`mediaId`)
+                """.trimIndent()
+            )
+        }
+    }
