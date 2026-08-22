@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +63,17 @@ private data class AttractionDimensionUi(
     val label: String,
     val icon:
     androidx.compose.ui.graphics.vector.ImageVector
+)
+
+private data class WorkLoadedValue<T>(
+    val workId: Long,
+    val value: T
+)
+
+private data class MediaLoadedValue<T>(
+    val workId: Long,
+    val mediaId: Long?,
+    val value: T
 )
 
 private val attractionDimensions =
@@ -161,6 +173,133 @@ fun ContextEditorSheet(
 ) {
     var selectedTab by remember {
         mutableIntStateOf(1)
+    }
+
+    var purposeVocabulary by remember {
+        mutableStateOf<WorkLoadedValue<List<PurposeVocabularyEntity>>?>(null)
+    }
+    var selectedPurposes by remember {
+        mutableStateOf<WorkLoadedValue<List<PurposeVocabularyEntity>>?>(null)
+    }
+    var attractionVocabulary by remember {
+        mutableStateOf<WorkLoadedValue<List<AttractionVocabularyEntity>>?>(null)
+    }
+    var selectedWorkAttractions by remember {
+        mutableStateOf<WorkLoadedValue<List<AttractionVocabularyEntity>>?>(null)
+    }
+    var selectedPageAttractions by remember {
+        mutableStateOf<MediaLoadedValue<List<AttractionVocabularyEntity>>?>(null)
+    }
+    var responseVocabulary by remember {
+        mutableStateOf<WorkLoadedValue<List<AestheticResponseVocabularyEntity>>?>(null)
+    }
+    var selectedResponses by remember {
+        mutableStateOf<WorkLoadedValue<List<AestheticResponseVocabularyEntity>>?>(null)
+    }
+    var focuses by remember {
+        mutableStateOf<MediaLoadedValue<List<MediaFocusEntity>>?>(null)
+    }
+
+    val latestWorkId by rememberUpdatedState(workId)
+    val latestMediaId by rememberUpdatedState(currentMediaId)
+
+    suspend fun loadPurpose(requestedWorkId: Long) {
+        val vocabulary = repository.getPurposeVocabulary()
+        val selected = repository.getPurposesForWork(requestedWorkId)
+        if (latestWorkId == requestedWorkId) {
+            purposeVocabulary = WorkLoadedValue(requestedWorkId, vocabulary)
+            selectedPurposes = WorkLoadedValue(requestedWorkId, selected)
+        }
+    }
+
+    suspend fun loadAttractionVocabulary(requestedWorkId: Long) {
+        val vocabulary = repository.getAttractionVocabulary()
+        if (latestWorkId == requestedWorkId) {
+            attractionVocabulary = WorkLoadedValue(requestedWorkId, vocabulary)
+        }
+    }
+
+    suspend fun loadWorkAttractions(requestedWorkId: Long) {
+        val selected = repository.getAttractionsForWork(requestedWorkId)
+        if (latestWorkId == requestedWorkId) {
+            selectedWorkAttractions = WorkLoadedValue(requestedWorkId, selected)
+            val loadedVocabulary = attractionVocabulary
+            if (loadedVocabulary?.workId == requestedWorkId) {
+                attractionVocabulary = loadedVocabulary.copy(
+                    value = (loadedVocabulary.value + selected).distinctBy { it.id }
+                )
+            }
+        }
+    }
+
+    suspend fun loadPageAttractions(requestedWorkId: Long, requestedMediaId: Long?) {
+        val selected = if (requestedMediaId == null) {
+            emptyList()
+        } else {
+            repository.getAttractionsForMedia(requestedMediaId)
+        }
+        if (latestWorkId == requestedWorkId && latestMediaId == requestedMediaId) {
+            selectedPageAttractions = MediaLoadedValue(requestedWorkId, requestedMediaId, selected)
+            val loadedVocabulary = attractionVocabulary
+            if (loadedVocabulary?.workId == requestedWorkId) {
+                attractionVocabulary = loadedVocabulary.copy(
+                    value = (loadedVocabulary.value + selected).distinctBy { it.id }
+                )
+            }
+        }
+    }
+
+    suspend fun loadResponse(requestedWorkId: Long) {
+        val vocabulary = repository.getResponseVocabulary()
+        val selected = repository.getResponsesForWork(requestedWorkId)
+        if (latestWorkId == requestedWorkId) {
+            responseVocabulary = WorkLoadedValue(requestedWorkId, vocabulary)
+            selectedResponses = WorkLoadedValue(requestedWorkId, selected)
+        }
+    }
+
+    suspend fun loadFocus(requestedWorkId: Long, requestedMediaId: Long?) {
+        val loadedFocuses = if (requestedMediaId == null) {
+            emptyList()
+        } else {
+            repository.getFocusForMedia(requestedMediaId)
+        }
+        if (latestWorkId == requestedWorkId && latestMediaId == requestedMediaId) {
+            focuses = MediaLoadedValue(requestedWorkId, requestedMediaId, loadedFocuses)
+        }
+    }
+
+    LaunchedEffect(selectedTab, workId, currentMediaId) {
+        when (selectedTab) {
+            0 -> if (purposeVocabulary?.workId != workId || selectedPurposes?.workId != workId) {
+                loadPurpose(workId)
+            }
+            1 -> {
+                if (attractionVocabulary?.workId != workId) loadAttractionVocabulary(workId)
+                if (selectedWorkAttractions?.workId != workId) loadWorkAttractions(workId)
+                if (
+                    selectedPageAttractions?.workId != workId ||
+                    selectedPageAttractions?.mediaId != currentMediaId
+                ) {
+                    loadPageAttractions(workId, currentMediaId)
+                }
+            }
+            2 -> if (responseVocabulary?.workId != workId || selectedResponses?.workId != workId) {
+                loadResponse(workId)
+            }
+            3 -> {
+                if (attractionVocabulary?.workId != workId) loadAttractionVocabulary(workId)
+                if (
+                    selectedPageAttractions?.workId != workId ||
+                    selectedPageAttractions?.mediaId != currentMediaId
+                ) {
+                    loadPageAttractions(workId, currentMediaId)
+                }
+                if (focuses?.workId != workId || focuses?.mediaId != currentMediaId) {
+                    loadFocus(workId, currentMediaId)
+                }
+            }
+        }
     }
 
     ModalBottomSheet(
@@ -315,7 +454,14 @@ fun ContextEditorSheet(
                         workId =
                             workId,
                         repository =
-                            repository
+                            repository,
+                        vocabulary =
+                            purposeVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        selected =
+                            selectedPurposes.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        onReload = {
+                            loadPurpose(workId)
+                        }
                     )
                 }
 
@@ -326,7 +472,21 @@ fun ContextEditorSheet(
                         currentMediaId =
                             currentMediaId,
                         repository =
-                            repository
+                            repository,
+                        vocabulary =
+                            attractionVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        workSelected =
+                            selectedWorkAttractions.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        pageSelected =
+                            selectedPageAttractions.takeIf {
+                                it?.workId == workId && it.mediaId == currentMediaId
+                            }?.value.orEmpty(),
+                        onReloadWork = {
+                            loadWorkAttractions(workId)
+                        },
+                        onReloadPage = {
+                            loadPageAttractions(workId, currentMediaId)
+                        }
                     )
                 }
 
@@ -335,7 +495,14 @@ fun ContextEditorSheet(
                         workId =
                             workId,
                         repository =
-                            repository
+                            repository,
+                        vocabulary =
+                            responseVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        selected =
+                            selectedResponses.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        onReload = {
+                            loadResponse(workId)
+                        }
                     )
                 }
 
@@ -344,7 +511,20 @@ fun ContextEditorSheet(
                         currentMediaId =
                             currentMediaId,
                         repository =
-                            repository
+                            repository,
+                        attractionVocabulary =
+                            attractionVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
+                        pageAttractions =
+                            selectedPageAttractions.takeIf {
+                                it?.workId == workId && it.mediaId == currentMediaId
+                            }?.value.orEmpty(),
+                        focuses =
+                            focuses.takeIf {
+                                it?.workId == workId && it.mediaId == currentMediaId
+                            }?.value.orEmpty(),
+                        onReload = {
+                            loadFocus(workId, currentMediaId)
+                        }
                     )
                 }
 
@@ -362,48 +542,17 @@ fun ContextEditorSheet(
 @Composable
 private fun PurposeEditor(
     workId: Long,
-    repository: CapturedWorkRepository
+    repository: CapturedWorkRepository,
+    vocabulary: List<PurposeVocabularyEntity>,
+    selected: List<PurposeVocabularyEntity>,
+    onReload: suspend () -> Unit
 ) {
-    var vocabulary by remember {
-        mutableStateOf<
-                List<PurposeVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
-    var selected by remember {
-        mutableStateOf<
-                List<PurposeVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
     var newLabel by remember {
         mutableStateOf("")
     }
 
     val scope =
         rememberCoroutineScope()
-
-    suspend fun reload() {
-        vocabulary =
-            repository
-                .getPurposeVocabulary()
-
-        selected =
-            repository
-                .getPurposesForWork(
-                    workId
-                )
-    }
-
-    LaunchedEffect(
-        workId
-    ) {
-        reload()
-    }
 
     EditorSection(
         title =
@@ -457,7 +606,7 @@ private fun PurposeEditor(
                                             )
                                     }
 
-                                    reload()
+                                    onReload()
                                 }
                             },
                             label = {
@@ -504,7 +653,7 @@ private fun PurposeEditor(
                         newLabel =
                             ""
 
-                        reload()
+                        onReload()
                     }
                 }
             }
@@ -516,32 +665,13 @@ private fun PurposeEditor(
 private fun AttractionEditor(
     workId: Long,
     currentMediaId: Long?,
-    repository: CapturedWorkRepository
+    repository: CapturedWorkRepository,
+    vocabulary: List<AttractionVocabularyEntity>,
+    workSelected: List<AttractionVocabularyEntity>,
+    pageSelected: List<AttractionVocabularyEntity>,
+    onReloadWork: suspend () -> Unit,
+    onReloadPage: suspend () -> Unit
 ) {
-    var vocabulary by remember {
-        mutableStateOf<
-                List<AttractionVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
-    var workSelected by remember {
-        mutableStateOf<
-                List<AttractionVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
-    var pageSelected by remember {
-        mutableStateOf<
-                List<AttractionVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
     var selectedDimension by remember {
         mutableStateOf(
             "EXPRESSION_GESTURE"
@@ -558,47 +688,6 @@ private fun AttractionEditor(
 
     val scope =
         rememberCoroutineScope()
-
-    suspend fun reloadWork() {
-        vocabulary =
-            repository
-                .getAttractionVocabulary()
-
-        workSelected =
-            repository
-                .getAttractionsForWork(
-                    workId
-                )
-    }
-
-    suspend fun reloadPage() {
-        val mediaId =
-            currentMediaId
-
-        pageSelected =
-            if (
-                mediaId == null
-            ) {
-                emptyList()
-            } else {
-                repository
-                    .getAttractionsForMedia(
-                        mediaId
-                    )
-            }
-
-        vocabulary =
-            repository
-                .getAttractionVocabulary()
-    }
-
-    LaunchedEffect(
-        workId,
-        currentMediaId
-    ) {
-        reloadWork()
-        reloadPage()
-    }
 
     EditorSection(
         title =
@@ -809,7 +898,7 @@ private fun AttractionEditor(
                                             )
                                     }
 
-                                    reloadPage()
+                                    onReloadPage()
                                 } else {
                                     if (
                                         isSelected
@@ -833,7 +922,7 @@ private fun AttractionEditor(
                                             )
                                     }
 
-                                    reloadWork()
+                                    onReloadWork()
                                 }
                             }
                         },
@@ -891,7 +980,7 @@ private fun AttractionEditor(
                                     value
                             )
 
-                        reloadPage()
+                        onReloadPage()
                     } else {
                         repository
                             .addAttractionToWork(
@@ -903,7 +992,7 @@ private fun AttractionEditor(
                                     value
                             )
 
-                        reloadWork()
+                        onReloadWork()
                     }
 
                     newLabel =
@@ -917,48 +1006,17 @@ private fun AttractionEditor(
 @Composable
 private fun ResponseEditor(
     workId: Long,
-    repository: CapturedWorkRepository
+    repository: CapturedWorkRepository,
+    vocabulary: List<AestheticResponseVocabularyEntity>,
+    selected: List<AestheticResponseVocabularyEntity>,
+    onReload: suspend () -> Unit
 ) {
-    var vocabulary by remember {
-        mutableStateOf<
-                List<AestheticResponseVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
-    var selected by remember {
-        mutableStateOf<
-                List<AestheticResponseVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
     var newLabel by remember {
         mutableStateOf("")
     }
 
     val scope =
         rememberCoroutineScope()
-
-    suspend fun reload() {
-        vocabulary =
-            repository
-                .getResponseVocabulary()
-
-        selected =
-            repository
-                .getResponsesForWork(
-                    workId
-                )
-    }
-
-    LaunchedEffect(
-        workId
-    ) {
-        reload()
-    }
 
     EditorSection(
         title =
@@ -1012,7 +1070,7 @@ private fun ResponseEditor(
                                             )
                                     }
 
-                                    reload()
+                                    onReload()
                                 }
                             },
                             label = {
@@ -1060,7 +1118,7 @@ private fun ResponseEditor(
                         newLabel =
                             ""
 
-                        reload()
+                        onReload()
                     }
                 }
             }
@@ -1071,32 +1129,12 @@ private fun ResponseEditor(
 @Composable
 private fun FocusEditor(
     currentMediaId: Long?,
-    repository: CapturedWorkRepository
+    repository: CapturedWorkRepository,
+    attractionVocabulary: List<AttractionVocabularyEntity>,
+    pageAttractions: List<AttractionVocabularyEntity>,
+    focuses: List<MediaFocusEntity>,
+    onReload: suspend () -> Unit
 ) {
-    var attractionVocabulary by remember {
-        mutableStateOf<
-                List<AttractionVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
-    var pageAttractions by remember {
-        mutableStateOf<
-                List<AttractionVocabularyEntity>
-                >(
-            emptyList()
-        )
-    }
-
-    var focuses by remember {
-        mutableStateOf<
-                List<MediaFocusEntity>
-                >(
-            emptyList()
-        )
-    }
-
     var selectedAttractionId by remember {
         mutableStateOf<Long?>(
             null
@@ -1110,42 +1148,6 @@ private fun FocusEditor(
     val scope =
         rememberCoroutineScope()
 
-    suspend fun reload() {
-        val mediaId =
-            currentMediaId
-
-        if (
-            mediaId == null
-        ) {
-            attractionVocabulary =
-                emptyList()
-
-            pageAttractions =
-                emptyList()
-
-            focuses =
-                emptyList()
-
-            return
-        }
-
-        attractionVocabulary =
-            repository
-                .getAttractionVocabulary()
-
-        pageAttractions =
-            repository
-                .getAttractionsForMedia(
-                    mediaId
-                )
-
-        focuses =
-            repository
-                .getFocusForMedia(
-                    mediaId
-                )
-    }
-
     LaunchedEffect(
         currentMediaId
     ) {
@@ -1154,8 +1156,6 @@ private fun FocusEditor(
 
         note =
             ""
-
-        reload()
     }
 
     EditorSection(
@@ -1310,7 +1310,7 @@ private fun FocusEditor(
                         note =
                             ""
 
-                        reload()
+                        onReload()
                     }
                 }
             }
@@ -1373,7 +1373,7 @@ private fun FocusEditor(
                                         focus.id
                                     )
 
-                                reload()
+                                onReload()
                             }
                         }
                     )
