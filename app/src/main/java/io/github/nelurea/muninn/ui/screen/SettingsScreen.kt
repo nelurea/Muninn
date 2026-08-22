@@ -9,10 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,9 +27,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.nelurea.muninn.capture.storage.MediaStorageMode
 import io.github.nelurea.muninn.capture.storage.StoragePreferences
+import io.github.nelurea.muninn.media.move.MediaMoveBatchCoordinator
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 
 @Composable
 fun SettingsScreen(
+    mediaMoveBatchCoordinator: MediaMoveBatchCoordinator,
+    migrationScope: CoroutineScope,
     onBack: () -> Unit,
     onResolvedCapturesClick: () -> Unit,
     xUserId: String?,
@@ -33,6 +43,25 @@ fun SettingsScreen(
 ) {
     val context =
         LocalContext.current
+
+    val migrationState by
+        mediaMoveBatchCoordinator.state.collectAsState()
+
+    val storageControlsLocked =
+        migrationState.isRunning ||
+            migrationState.hasUnfinishedJournal ||
+            !migrationState.journalStatusLoaded
+
+    var showMoveConfirmation by remember {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(
+        mediaMoveBatchCoordinator
+    ) {
+        mediaMoveBatchCoordinator
+            .refreshUnfinishedJournal()
+    }
 
     val storagePreferences =
         remember {
@@ -114,9 +143,13 @@ fun SettingsScreen(
 
     Column(
         modifier =
-            Modifier.padding(
-                16.dp
-            ),
+            Modifier
+                .verticalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    16.dp
+                ),
         verticalArrangement =
             Arrangement.spacedBy(
                 12.dp
@@ -179,6 +212,8 @@ fun SettingsScreen(
             ) {
                 Button(
                     onClick = {},
+                    enabled =
+                        !storageControlsLocked,
                     modifier =
                         Modifier.weight(
                             1f
@@ -202,6 +237,8 @@ fun SettingsScreen(
                         storageError =
                             null
                     },
+                    enabled =
+                        !storageControlsLocked,
                     modifier =
                         Modifier.weight(
                             1f
@@ -219,6 +256,8 @@ fun SettingsScreen(
             ) {
                 Button(
                     onClick = {},
+                    enabled =
+                        !storageControlsLocked,
                     modifier =
                         Modifier.weight(
                             1f
@@ -250,6 +289,8 @@ fun SettingsScreen(
                             )
                         }
                     },
+                    enabled =
+                        !storageControlsLocked,
                     modifier =
                         Modifier.weight(
                             1f
@@ -296,6 +337,8 @@ fun SettingsScreen(
                         )
                 )
             },
+            enabled =
+                !storageControlsLocked,
             modifier =
                 Modifier.fillMaxWidth()
         ) {
@@ -321,6 +364,77 @@ fun SettingsScreen(
             }
 
         Button(
+            onClick = {
+                showMoveConfirmation =
+                    true
+            },
+            enabled =
+                !storageControlsLocked &&
+                    (
+                        storageMode == MediaStorageMode.INTERNAL ||
+                            selectedTreeUri != null
+                    ),
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "Move all captured media here"
+            )
+        }
+
+        if (
+            migrationState.isRunning ||
+            migrationState.total > 0
+        ) {
+            Text(
+                "processed: ${migrationState.processed} / total: ${migrationState.total}"
+            )
+            Text(
+                "completed: ${migrationState.completed} / skipped: ${migrationState.skipped} / failed: ${migrationState.failed}"
+            )
+        }
+
+        if (
+            migrationState.failed > 0 &&
+            !migrationState.isRunning
+        ) {
+            OutlinedButton(
+                onClick = {
+                    migrationScope.launch {
+                        mediaMoveBatchCoordinator
+                            .retryFailed()
+                    }
+                },
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Retry failed"
+                )
+            }
+        }
+
+        if (
+            migrationState.hasUnfinishedJournal &&
+            !migrationState.isRunning
+        ) {
+            OutlinedButton(
+                onClick = {
+                    migrationScope.launch {
+                        mediaMoveBatchCoordinator
+                            .resumeIncomplete()
+                    }
+                },
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Resume unfinished move"
+                )
+            }
+        }
+
+        Button(
             onClick =
                 onResolvedCapturesClick,
             modifier =
@@ -341,5 +455,68 @@ fun SettingsScreen(
                 "Back"
             )
         }
+    }
+
+    if (
+        showMoveConfirmation
+    ) {
+        AlertDialog(
+            onDismissRequest = {
+                showMoveConfirmation =
+                    false
+            },
+            title = {
+                Text(
+                    "Move captured media?"
+                )
+            },
+            text = {
+                Text(
+                    "All existing captured media will be moved to the currently selected storage location."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showMoveConfirmation =
+                            false
+
+                        val destinationSnapshot =
+                            when (
+                                storagePreferences.getMode()
+                            ) {
+                                MediaStorageMode.INTERNAL ->
+                                    null
+
+                                MediaStorageMode.EXTERNAL ->
+                                    storagePreferences.getTreeUri()
+                            }
+
+                        migrationScope.launch {
+                            mediaMoveBatchCoordinator
+                                .start(
+                                    destinationSnapshot
+                                )
+                        }
+                    }
+                ) {
+                    Text(
+                        "Move"
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showMoveConfirmation =
+                            false
+                    }
+                ) {
+                    Text(
+                        "Cancel"
+                    )
+                }
+            }
+        )
     }
 }

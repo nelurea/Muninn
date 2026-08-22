@@ -19,7 +19,7 @@ class MediaMoveService(
             }
             resolvedDestination = files.createDestination(
                 mediaId,
-                safeFileName(media.fileName),
+                media.fileName,
                 media.mimeType,
                 destinationRootUri
             )
@@ -55,7 +55,7 @@ class MediaMoveService(
                     ?: return fail(mediaId, "Captured media does not exist")
                 val destination = resolvedDestination ?: files.createDestination(
                     mediaId,
-                    safeFileName(media.fileName),
+                    media.fileName,
                     media.mimeType,
                     journal.destinationRootUri
                 )
@@ -79,7 +79,7 @@ class MediaMoveService(
             }
 
             if (journal.state == MediaMoveState.DB_SWITCHED) {
-                if (!files.delete(journal.sourceUri)) {
+                if (!files.delete(journal.sourceUri, mediaId)) {
                     return fail(mediaId, "Could not delete old media; retry is required")
                 }
                 check(persistence.markCompleted(mediaId, now())) { "Move state changed while completing" }
@@ -98,8 +98,6 @@ class MediaMoveService(
         return MediaMoveResult.Failure(message)
     }
 
-    private fun safeFileName(value: String): String =
-        value.substringAfterLast('/').substringAfterLast('\\').ifBlank { "media-$value" }
 }
 
 sealed interface MediaMoveResult {

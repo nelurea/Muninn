@@ -50,19 +50,24 @@ import io.github.nelurea.muninn.capture.discovery.XDiscoverySaveUseCase
 import androidx.compose.runtime.DisposableEffect
 import io.github.nelurea.muninn.capture.discovery.DiscoverySaveCoordinator
 import io.github.nelurea.muninn.capture.storage.UserSelectedMediaStorage
+import io.github.nelurea.muninn.media.move.MediaMoveBatchCoordinator
 
 @Composable
 fun AppNavigation(
     repository: ImageRepository,
     sessionRepository: SessionRepository,
     resolvedCaptureRepository: ResolvedCaptureRepository,
-    capturedWorkRepository: CapturedWorkRepository
+    capturedWorkRepository: CapturedWorkRepository,
+    mediaMoveBatchCoordinator: MediaMoveBatchCoordinator
 ) {
     val navController =
         rememberNavController()
 
     val context =
         LocalContext.current
+
+    val migrationScope =
+        rememberCoroutineScope()
 
     var pendingInitialPreview by remember {
         mutableStateOf<Pair<Long, String?>?>(
@@ -370,6 +375,10 @@ fun AppNavigation(
                 }
 
             SettingsScreen(
+                mediaMoveBatchCoordinator =
+                    mediaMoveBatchCoordinator,
+                migrationScope =
+                    migrationScope,
                 onBack = {
                     navController
                         .popBackStack()

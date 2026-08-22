@@ -21,7 +21,19 @@ class MediaMoveBatchCoordinatorTest {
 
         assertEquals(listOf(1L, 2L, 3L), operations.movedIds)
         assertEquals(listOf("content://tree/one", "content://tree/one", "content://tree/one"), operations.destinations)
-        assertEquals(MediaMoveBatchState(3, 3, 1, 1, 1, listOf(2L)), coordinator.state.value)
+        assertEquals(
+            MediaMoveBatchState(
+                3,
+                3,
+                1,
+                1,
+                1,
+                listOf(2L),
+                hasUnfinishedJournal = true,
+                journalStatusLoaded = true
+            ),
+            coordinator.state.value
+        )
     }
 
     @Test
@@ -42,7 +54,10 @@ class MediaMoveBatchCoordinatorTest {
 
         assertEquals(listOf(1L, 2L, 2L), operations.movedIds)
         assertEquals("content://tree/snapshot", operations.destinations.last())
-        assertEquals(MediaMoveBatchState(1, 1, 1, 0, 0), coordinator.state.value)
+        assertEquals(
+            MediaMoveBatchState(1, 1, 1, 0, 0, journalStatusLoaded = true),
+            coordinator.state.value
+        )
     }
 
     @Test
@@ -60,14 +75,49 @@ class MediaMoveBatchCoordinatorTest {
 
         assertEquals(listOf(8L, 9L), operations.resumedIds)
         assertEquals(emptyList<String?>(), operations.destinations)
-        assertEquals(MediaMoveBatchState(2, 2, 1, 0, 1, listOf(9L)), coordinator.state.value)
+        assertEquals(
+            MediaMoveBatchState(
+                2,
+                2,
+                1,
+                0,
+                1,
+                listOf(9L),
+                hasUnfinishedJournal = true,
+                journalStatusLoaded = true
+            ),
+            coordinator.state.value
+        )
 
         operations.results[9L] = MediaMoveResult.Completed(9L)
         coordinator.retryFailed()
 
         assertEquals(listOf(8L, 9L, 9L), operations.resumedIds)
         assertEquals(emptyList<Long>(), operations.movedIds)
-        assertEquals(MediaMoveBatchState(1, 1, 1, 0, 0), coordinator.state.value)
+        assertEquals(
+            MediaMoveBatchState(1, 1, 1, 0, 0, journalStatusLoaded = true),
+            coordinator.state.value
+        )
+    }
+
+    @Test
+    fun `refresh exposes unfinished journal before any user action`() = runBlocking {
+        val operations = FakeOperations(
+            incompleteIds = mutableListOf(4L)
+        )
+        val coordinator = MediaMoveBatchCoordinator(operations)
+
+        coordinator.refreshUnfinishedJournal()
+
+        assertEquals(
+            MediaMoveBatchState(
+                hasUnfinishedJournal = true,
+                journalStatusLoaded = true
+            ),
+            coordinator.state.value
+        )
+        assertEquals(emptyList<Long>(), operations.movedIds)
+        assertEquals(emptyList<Long>(), operations.resumedIds)
     }
 
     private class FakeOperations(
@@ -84,11 +134,19 @@ class MediaMoveBatchCoordinatorTest {
         override suspend fun move(mediaId: Long, destinationRootUri: String?): MediaMoveResult {
             movedIds += mediaId
             destinations += destinationRootUri
-            return requireNotNull(results[mediaId])
+            return requireNotNull(results[mediaId]).also { result ->
+                if (result is MediaMoveResult.Failure) {
+                    if (mediaId !in incompleteIds) incompleteIds += mediaId
+                } else {
+                    incompleteIds -= mediaId
+                }
+            }
         }
         override suspend fun resume(mediaId: Long): MediaMoveResult {
             resumedIds += mediaId
-            return requireNotNull(results[mediaId])
+            return requireNotNull(results[mediaId]).also { result ->
+                if (result !is MediaMoveResult.Failure) incompleteIds -= mediaId
+            }
         }
     }
 }

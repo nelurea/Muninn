@@ -28,6 +28,10 @@ import io.github.nelurea.muninn.ui.navigation.AppNavigation
 import io.github.nelurea.muninn.ui.theme.MuninnTheme
 import kotlinx.coroutines.launch
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.media.move.AndroidMediaMoveFileOperations
+import io.github.nelurea.muninn.media.move.MediaMoveBatchCoordinator
+import io.github.nelurea.muninn.media.move.MediaMoveRepository
+import io.github.nelurea.muninn.media.move.MediaMoveService
 
 class MainActivity : ComponentActivity() {
 
@@ -42,6 +46,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var captureEventRepository: CaptureEventRepository
 
     private lateinit var capturedWorkRepository: CapturedWorkRepository
+    private lateinit var mediaMoveBatchCoordinator: MediaMoveBatchCoordinator
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,6 +88,20 @@ class MainActivity : ComponentActivity() {
         capturedWorkRepository =
             CapturedWorkRepository(
                 database.capturedWorkDao()
+            )
+
+        mediaMoveBatchCoordinator =
+            MediaMoveBatchCoordinator(
+                MediaMoveService(
+                    persistence =
+                        MediaMoveRepository(
+                            database.mediaMoveDao()
+                        ),
+                    files =
+                        AndroidMediaMoveFileOperations(
+                            applicationContext
+                        )
+                )
             )
 
         val pendingCaptureResolver =
@@ -151,7 +170,9 @@ class MainActivity : ComponentActivity() {
                     resolvedCaptureRepository =
                         resolvedCaptureRepository,
                     capturedWorkRepository =
-                        capturedWorkRepository
+                        capturedWorkRepository,
+                    mediaMoveBatchCoordinator =
+                        mediaMoveBatchCoordinator
                 )
             }
         }

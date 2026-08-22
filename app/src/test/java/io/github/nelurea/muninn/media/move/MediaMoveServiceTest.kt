@@ -19,9 +19,9 @@ class MediaMoveServiceTest {
 
         assertTrue(result is MediaMoveResult.Completed)
         assertEquals(42L, persistence.media.id)
-        assertEquals("content://tree/root/.muninn-move-42/image.jpg", persistence.media.localUri)
+        assertEquals("content://tree/root/image.jpg", persistence.media.localUri)
         assertEquals(MediaMoveState.COMPLETED, persistence.journal?.state)
-        assertEquals(listOf("file:///old/image.jpg"), files.deleted)
+        assertEquals(listOf("file:///old/image.jpg" to 42L), files.deleted)
         assertEquals(1, files.copyCount)
     }
 
@@ -50,21 +50,21 @@ class MediaMoveServiceTest {
 
         assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Completed)
         val sdUri = persistence.media.localUri
-        assertEquals("content://tree/sd/.muninn-move-42/image.jpg", sdUri)
+        assertEquals("content://tree/sd/image.jpg", sdUri)
 
         assertTrue(service.move(42L, null) is MediaMoveResult.Completed)
 
         assertEquals(42L, persistence.media.id)
         assertEquals("file:///internal/42/image.jpg", persistence.media.localUri)
         assertEquals(MediaMoveState.COMPLETED, persistence.journal?.state)
-        assertEquals(listOf("file:///old/image.jpg", sdUri), files.deleted)
+        assertEquals(listOf("file:///old/image.jpg" to 42L, sdUri to 42L), files.deleted)
         assertEquals(2, files.copyCount)
     }
 
     @Test
-    fun `destination created before journal update is reused and copied on retry`() = runBlocking {
+    fun `destination creation is retried when journal update fails before URI is recorded`() = runBlocking {
         val persistence = FakePersistence(failNextMarkCopying = true)
-        val files = FakeFiles()
+        val files = FakeFiles(uniqueDestinationOnEachCreate = true)
         val service = MediaMoveService(persistence, files) { 10L }
 
         assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Failure)
@@ -74,10 +74,10 @@ class MediaMoveServiceTest {
 
         assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Completed)
 
-        assertEquals(1, files.destinations.size)
+        assertEquals(2, files.destinations.size)
         assertEquals(2, files.createDestinationCount)
         assertEquals(1, files.copyCount)
-        assertEquals("content://tree/sd/.muninn-move-42/image.jpg", persistence.media.localUri)
+        assertEquals("content://tree/sd/image.jpg?created=2", persistence.media.localUri)
     }
 
     @Test
@@ -137,7 +137,7 @@ class MediaMoveServiceTest {
         assertEquals(MediaMoveResult.AlreadyAtDestination(42L), service.move(42L, null))
         assertEquals(0, files.createDestinationCount)
         assertEquals(0, files.copyCount)
-        assertEquals(emptyList<String>(), files.deleted)
+        assertEquals(emptyList<Pair<String, Long>>(), files.deleted)
         assertEquals(0, persistence.beginCount)
         assertEquals(0, persistence.databaseSwitchCount)
     }
@@ -156,17 +156,68 @@ class MediaMoveServiceTest {
         val service = MediaMoveService(persistence, files) { 10L }
 
         assertEquals(MediaMoveResult.Completed(42L), service.resume(42L))
-        assertEquals("content://tree/recorded/.muninn-move-42/image.jpg", persistence.media.localUri)
+        assertEquals("content://tree/recorded/image.jpg", persistence.media.localUri)
     }
 
-    private class FakeFiles(var deleteSucceeds: Boolean = true) : MediaMoveFileOperations {
+    @Test
+    fun `resume copying uses recorded legacy destination without creating another document`() = runBlocking {
+        val legacyDestination = "content://tree/recorded/.muninn-move-42/image.jpg"
+        val persistence = FakePersistence().apply {
+            journal = MediaMoveJournalEntity(
+                mediaId = media.id,
+                sourceUri = media.localUri,
+                destinationRootUri = "content://tree/recorded",
+                destinationUri = legacyDestination,
+                state = MediaMoveState.COPYING,
+                updatedAt = 1L
+            )
+        }
+        val files = FakeFiles()
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertEquals(MediaMoveResult.Completed(42L), service.resume(42L))
+        assertEquals(legacyDestination, persistence.media.localUri)
+        assertEquals(0, files.createDestinationCount)
+        assertEquals(1, files.copyCount)
+    }
+
+    @Test
+    fun `db switched legacy source resumes delete only without create copy or switch`() = runBlocking {
+        val legacySource = "content://tree/old/.muninn-move-42/image.jpg"
+        val destination = "content://tree/new/image.jpg"
+        val persistence = FakePersistence().apply {
+            media = media.copy(localUri = destination)
+            journal = MediaMoveJournalEntity(
+                mediaId = media.id,
+                sourceUri = legacySource,
+                destinationRootUri = "content://tree/new",
+                destinationUri = destination,
+                byteCount = 123L,
+                state = MediaMoveState.DB_SWITCHED,
+                updatedAt = 1L
+            )
+        }
+        val files = FakeFiles()
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertEquals(MediaMoveResult.Completed(42L), service.resume(42L))
+        assertEquals(listOf(legacySource to 42L), files.deleted)
+        assertEquals(0, files.createDestinationCount)
+        assertEquals(0, files.copyCount)
+        assertEquals(0, persistence.databaseSwitchCount)
+    }
+
+    private class FakeFiles(
+        var deleteSucceeds: Boolean = true,
+        private val uniqueDestinationOnEachCreate: Boolean = false
+    ) : MediaMoveFileOperations {
         var copyCount = 0
         var createDestinationCount = 0
         val destinations = mutableSetOf<String>()
-        val deleted = mutableListOf<String>()
+        val deleted = mutableListOf<Pair<String, Long>>()
         val alreadyAtDestination = mutableSetOf<String>()
         override suspend fun isAtDestination(sourceUri: String, destinationRootUri: String?): Boolean {
-            val expected = destinationRootUri?.let { "$it/.muninn-move-42/image.jpg" }
+            val expected = destinationRootUri?.let { "$it/image.jpg" }
                 ?: "file:///internal/42/image.jpg"
             return sourceUri == expected || sourceUri in alreadyAtDestination
         }
@@ -177,7 +228,9 @@ class MediaMoveServiceTest {
             destinationRootUri: String?
         ): String {
             createDestinationCount++
-            val destination = destinationRootUri?.let { "$it/.muninn-move-$mediaId/$fileName" }
+            val destination = destinationRootUri?.let {
+                "$it/$fileName" + if (uniqueDestinationOnEachCreate) "?created=$createDestinationCount" else ""
+            }
                 ?: "file:///internal/$mediaId/$fileName"
             destinations += destination
             return destination
@@ -186,8 +239,8 @@ class MediaMoveServiceTest {
             copyCount++
             return 123L
         }
-        override suspend fun delete(uri: String): Boolean {
-            deleted += uri
+        override suspend fun delete(uri: String, mediaId: Long): Boolean {
+            deleted += uri to mediaId
             return deleteSucceeds
         }
     }

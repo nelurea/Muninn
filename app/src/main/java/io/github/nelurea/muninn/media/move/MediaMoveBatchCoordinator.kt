@@ -12,7 +12,10 @@ data class MediaMoveBatchState(
     val completed: Int = 0,
     val skipped: Int = 0,
     val failed: Int = 0,
-    val failedIds: List<Long> = emptyList()
+    val failedIds: List<Long> = emptyList(),
+    val isRunning: Boolean = false,
+    val hasUnfinishedJournal: Boolean = false,
+    val journalStatusLoaded: Boolean = false
 )
 
 interface MediaMoveBatchOperations {
@@ -31,6 +34,13 @@ class MediaMoveBatchCoordinator(
 
     private var destinationSnapshot: String? = null
     private var retryResumesJournal = false
+
+    suspend fun refreshUnfinishedJournal() = mutex.withLock {
+        mutableState.value = mutableState.value.copy(
+            hasUnfinishedJournal = service.incompleteMediaIds().isNotEmpty(),
+            journalStatusLoaded = true
+        )
+    }
 
     suspend fun start(destinationRootUri: String?) = mutex.withLock {
         val mediaIds = service.allMediaIds().toList()
@@ -58,7 +68,12 @@ class MediaMoveBatchCoordinator(
         mediaIds: List<Long>,
         operation: suspend (Long) -> MediaMoveResult
     ) {
-        mutableState.value = MediaMoveBatchState(total = mediaIds.size)
+        mutableState.value = MediaMoveBatchState(
+            total = mediaIds.size,
+            isRunning = true,
+            hasUnfinishedJournal = mutableState.value.hasUnfinishedJournal,
+            journalStatusLoaded = true
+        )
         mediaIds.forEach { mediaId ->
             val previous = mutableState.value
             val result = runCatching { operation(mediaId) }
@@ -79,5 +94,10 @@ class MediaMoveBatchCoordinator(
                 )
             }
         }
+        mutableState.value = mutableState.value.copy(
+            isRunning = false,
+            hasUnfinishedJournal = service.incompleteMediaIds().isNotEmpty(),
+            journalStatusLoaded = true
+        )
     }
 }

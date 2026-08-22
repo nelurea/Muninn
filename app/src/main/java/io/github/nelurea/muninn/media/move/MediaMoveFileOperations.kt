@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.provider.DocumentsContract
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.InputStream
 import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +15,7 @@ interface MediaMoveFileOperations {
     suspend fun isAtDestination(sourceUri: String, destinationRootUri: String?): Boolean
     suspend fun createDestination(mediaId: Long, fileName: String, mimeType: String, destinationRootUri: String?): String
     suspend fun copyAndVerify(sourceUri: String, destinationUri: String): Long
-    suspend fun delete(uri: String): Boolean
+    suspend fun delete(uri: String, mediaId: Long): Boolean
 }
 
 class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations {
@@ -62,18 +63,9 @@ class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations
             treeUri,
             DocumentsContract.getTreeDocumentId(treeUri)
         )
-        val mediaDirectoryName = ".muninn-move-$mediaId"
-        val mediaDirectory = findChild(root, treeUri, mediaDirectoryName)
-            ?: DocumentsContract.createDocument(
-                resolver,
-                root,
-                DocumentsContract.Document.MIME_TYPE_DIR,
-                mediaDirectoryName
-            )
-            ?: error("Could not create destination directory")
-        findChild(mediaDirectory, treeUri, fileName)?.toString() ?: DocumentsContract.createDocument(
+        DocumentsContract.createDocument(
             resolver,
-            mediaDirectory,
+            root,
             mimeType.ifBlank { "application/octet-stream" },
             fileName
         )?.toString() ?: error("Could not create destination document")
@@ -98,10 +90,36 @@ class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations
             copied
         }
 
-    override suspend fun delete(uri: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun delete(uri: String, mediaId: Long): Boolean = withContext(Dispatchers.IO) {
         val parsed = Uri.parse(uri)
         when (parsed.scheme) {
-            "content" -> resolver.delete(parsed, null, null) > 0
+            "content" -> {
+                val legacyDirectory = runCatching { findLegacyDirectory(parsed, mediaId) }.getOrNull()
+                val sourceWasInLegacyDirectory = legacyDirectory?.let { directory ->
+                    runCatching {
+                        val documentId = DocumentsContract.getDocumentId(parsed)
+                        hasChild(directory, parsed, documentId)
+                    }.getOrDefault(false)
+                } == true
+                try {
+                    val deleted = if (DocumentsContract.isDocumentUri(appContext, parsed)) {
+                        DocumentsContract.deleteDocument(resolver, parsed)
+                    } else {
+                        resolver.delete(parsed, null, null) > 0
+                    }
+                    if (deleted && sourceWasInLegacyDirectory) {
+                        legacyDirectory?.let(::deleteDirectoryIfEmpty)
+                    }
+                    deleted
+                } catch (_: FileNotFoundException) {
+                    // Deletion is idempotent: the old source may have been removed
+                    // before the journal could be marked completed.
+                    if (legacyDirectory != null) {
+                        deleteDirectoryIfEmpty(legacyDirectory)
+                    }
+                    true
+                }
+            }
             "file", null -> {
                 val file = File(parsed.path ?: uri)
                 !file.exists() || file.delete()
@@ -146,6 +164,44 @@ class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations
             }
         }
         return null
+    }
+
+    private fun findLegacyDirectory(documentUri: Uri, mediaId: Long): Uri? {
+        if (!DocumentsContract.isDocumentUri(appContext, documentUri)) return null
+        val treeId = runCatching { DocumentsContract.getTreeDocumentId(documentUri) }.getOrNull()
+            ?: return null
+        val root = DocumentsContract.buildDocumentUriUsingTree(documentUri, treeId)
+        return findChild(root, documentUri, ".muninn-move-$mediaId")
+    }
+
+    private fun hasChild(parent: Uri, treeUri: Uri, documentId: String): Boolean =
+        queryChildDocumentIds(parent, treeUri)?.any { it == documentId } == true
+
+    private fun deleteDirectoryIfEmpty(directory: Uri) {
+        runCatching {
+            if (queryChildDocumentIds(directory, directory)?.isEmpty() == true) {
+                DocumentsContract.deleteDocument(resolver, directory)
+            }
+        }
+    }
+
+    private fun queryChildDocumentIds(parent: Uri, treeUri: Uri): List<String>? {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri,
+            DocumentsContract.getDocumentId(parent)
+        )
+        return resolver.query(
+            children,
+            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+            buildList {
+                while (cursor.moveToNext()) add(cursor.getString(idColumn))
+            }
+        }
     }
 
     private fun openInput(rawUri: String): InputStream {
