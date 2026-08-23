@@ -94,6 +94,35 @@ class DuplicateNormalizationPlannerTest {
         assertFalse(shouldVerify(planned, retryRejected = true))
     }
 
+    @Test
+    fun `plan v2 parser and revalidation cover every snapshotted medium`() {
+        val snapshot = DuplicateIdentitySnapshot(
+            works = listOf(work(10, "2026-01-01"), work(20, "2026-01-02")),
+            media = listOf(media(101, 10, 0, "a"), media(202, 20, 0, "b")),
+            activeMoves = emptyList()
+        )
+        val bytes = byteArrayOf(1, 2, 3)
+        val verified = DuplicateMediaVerifier.verify(snapshot.media) { ByteArrayInputStream(bytes) }
+            as MediaVerificationResult.Verified
+        val encoded = DuplicateNormalizationPlanner.create("pixiv", "source", snapshot, verified.media).json
+        val plan = DuplicateNormalizationPlan.parse(encoded)
+        val opened = mutableListOf<String>()
+
+        assertEquals(null, DuplicatePlanVerifier.verify(plan) { uri ->
+            opened += uri
+            ByteArrayInputStream(bytes)
+        })
+        assertEquals(listOf("a", "b"), opened)
+        assertEquals(DuplicateVerificationDetails.HASH_MISMATCH, DuplicatePlanVerifier.verify(plan) { uri ->
+            ByteArrayInputStream(if (uri == "a") bytes else byteArrayOf(3, 2, 1))
+        })
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `parser rejects non v2 plan`() {
+        DuplicateNormalizationPlan.parse("""{"version":1}""")
+    }
+
     private fun work(id: Long, capturedAt: String) = CapturedWorkEntity(
         id, "pixiv", "source", "url", capturedAt, null, null, null, "author", "name", null, null, "", null
     )
