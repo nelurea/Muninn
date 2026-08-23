@@ -29,6 +29,9 @@ abstract class DuplicateNormalizationDao {
     )
     abstract suspend fun getByIdentity(sourceType: String, sourceId: String): DuplicateNormalizationJournalEntity?
 
+    @Query("SELECT * FROM duplicate_normalization_journal ORDER BY id")
+    abstract suspend fun getAllJournals(): List<DuplicateNormalizationJournalEntity>
+
     @Transaction
     open suspend fun ensureJournal(sourceType: String, sourceId: String, now: Long): DuplicateNormalizationJournalEntity {
         insert(DuplicateNormalizationJournalEntity(sourceType = sourceType, sourceId = sourceId, createdAt = now, updatedAt = now))
@@ -124,6 +127,9 @@ abstract class DuplicateNormalizationDao {
 
     @Query("SELECT * FROM duplicate_cleanup_journal WHERE normalizationId = :normalizationId ORDER BY id")
     abstract suspend fun getCleanup(normalizationId: Long): List<DuplicateCleanupJournalEntity>
+
+    @Query("SELECT * FROM duplicate_cleanup_journal ORDER BY id")
+    abstract suspend fun getAllCleanup(): List<DuplicateCleanupJournalEntity>
 
     @Query("SELECT * FROM duplicate_cleanup_journal WHERE state = 'PENDING' ORDER BY id")
     abstract suspend fun getPendingCleanup(): List<DuplicateCleanupJournalEntity>
