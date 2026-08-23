@@ -5,6 +5,7 @@ import io.github.nelurea.muninn.discovery.model.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryCreator
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import java.net.URI
 
 object XDiscoveryMapper {
 
@@ -31,7 +32,9 @@ object XDiscoveryMapper {
                 payload.canonicalUrl,
 
             previewImageUrl =
-                firstMedia.sourceUrl,
+                toMediumPreviewUrl(
+                    firstMedia.sourceUrl
+                ),
 
             title =
                 payload.caption
@@ -56,6 +59,115 @@ object XDiscoveryMapper {
 
             restriction =
                 ContentRestriction.UNKNOWN
+        )
+    }
+
+    private fun toMediumPreviewUrl(
+        sourceUrl: String
+    ): String {
+        val uri =
+            runCatching {
+                URI(
+                    sourceUrl
+                )
+            }
+                .getOrNull()
+                ?: return sourceUrl
+
+        if (uri.scheme != "https" ||
+            uri.rawAuthority != "pbs.twimg.com" ||
+            uri.rawPath?.matches(
+                Regex(
+                    "^/media/[^/]+$"
+                )
+            ) != true ||
+            uri.rawFragment != null
+        ) {
+            return sourceUrl
+        }
+
+        val query =
+            uri.rawQuery
+                ?: return sourceUrl
+
+        if (query.isEmpty() ||
+            query.startsWith("&") ||
+            query.endsWith("&") ||
+            query.contains("&&")
+        ) {
+            return sourceUrl
+        }
+
+        val parameters =
+            query.split(
+                "&"
+            )
+
+        val keys =
+            mutableSetOf<String>()
+
+        var nameValueStart = -1
+        var queryOffset = 0
+
+        for (parameter in parameters) {
+            val separatorIndex =
+                parameter.indexOf(
+                    '='
+                )
+
+            if (separatorIndex <= 0 ||
+                separatorIndex != parameter.lastIndexOf('=') ||
+                separatorIndex == parameter.lastIndex ||
+                !keys.add(
+                    parameter.substring(
+                        0,
+                        separatorIndex
+                    )
+                )
+            ) {
+                return sourceUrl
+            }
+
+            if (parameter.substring(
+                    0,
+                    separatorIndex
+                ) == "name"
+            ) {
+                nameValueStart =
+                    queryOffset +
+                            separatorIndex +
+                            1
+            }
+
+            queryOffset +=
+                parameter.length +
+                        1
+        }
+
+        if (!keys.contains("format") ||
+            nameValueStart < 0
+        ) {
+            return sourceUrl
+        }
+
+        val nameValueEnd =
+            query.indexOf(
+                '&',
+                nameValueStart
+            )
+                .takeIf {
+                    it >= 0
+                }
+                ?: query.length
+
+        val queryStart =
+            sourceUrl.indexOf('?') +
+                    1
+
+        return sourceUrl.replaceRange(
+            queryStart + nameValueStart,
+            queryStart + nameValueEnd,
+            "medium"
         )
     }
 
