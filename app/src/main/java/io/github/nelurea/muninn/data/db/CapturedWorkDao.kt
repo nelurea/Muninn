@@ -59,6 +59,7 @@ abstract class CapturedWorkDao {
     FROM captured_works
     WHERE sourceType = :sourceType
       AND sourceId = :sourceId
+    ORDER BY capturedAt ASC, id ASC
     LIMIT 1
     """
     )
@@ -66,6 +67,19 @@ abstract class CapturedWorkDao {
         sourceType: String,
         sourceId: String
     ): CapturedWorkWithMedia?
+
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM captured_works
+        WHERE sourceType = :sourceType AND sourceId = :sourceId
+        ORDER BY capturedAt ASC, id ASC
+        """
+    )
+    abstract suspend fun getAllBySourceIdentity(
+        sourceType: String,
+        sourceId: String
+    ): List<CapturedWorkWithMedia>
 
     @Transaction
     open suspend fun appendMediaToWork(
@@ -95,6 +109,9 @@ abstract class CapturedWorkDao {
         workId: Long,
         mediaIndices: List<Int>
     )
+
+    @Query("UPDATE captured_media SET isHighlighted = 1 WHERE id IN (:mediaIds)")
+    abstract suspend fun markMediaHighlightedById(mediaIds: List<Long>)
     @Transaction
     @Query(
         """

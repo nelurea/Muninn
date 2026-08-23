@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
 
         capturedWorkRepository =
             CapturedWorkRepository(
-                database.capturedWorkDao()
+                database
             )
 
         mediaMoveBatchCoordinator =

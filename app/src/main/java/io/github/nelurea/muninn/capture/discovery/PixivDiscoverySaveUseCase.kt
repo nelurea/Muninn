@@ -135,6 +135,23 @@ class PixivDiscoverySaveUseCase(
                     "prepare=${SystemClock.elapsedRealtime() - prepareStartedAt}ms"
             )
 
+            val baseDraft =
+                CaptureDraft(
+                    sourceType = "pixiv",
+                    sourceId = preview.sourceItemId,
+                    canonicalUrl = preview.canonicalUrl,
+                    capturedAt = currentTimestamp(),
+                    publishedAt = preview.publishedAt,
+                    discoveryMode = discoveryMode,
+                    discoveryQuery = discoveryQuery,
+                    authorId = preview.creator?.sourceCreatorId ?: "",
+                    authorName = preview.creator?.name ?: "",
+                    title = preview.title,
+                    caption = preview.caption ?: "",
+                    tags = preview.tags,
+                    media = emptyList()
+                )
+
             if (
                 preparation.missingMediaIndices.isEmpty()
             ) {
@@ -144,12 +161,10 @@ class PixivDiscoverySaveUseCase(
                         "alreadySaved=true " +
                         "total=${SystemClock.elapsedRealtime() - totalStartedAt}ms"
                 )
-                return@withContext SaveCaptureResult.Success(
-                    workId =
-                        preparation.workId
-                            ?: 0L,
-                    mediaCount =
-                        0
+                return@withContext saveCaptureUseCase.save(
+                    draft = baseDraft,
+                    requestedMediaIndices = requestedMediaIndices,
+                    highlightedMediaIndices = selectedMediaIndices
                 )
             }
 
@@ -251,59 +266,16 @@ class PixivDiscoverySaveUseCase(
                         "pages=${mediaDrafts.size}"
                 )
 
-                val draft =
-                    CaptureDraft(
-                        sourceType =
-                            "pixiv",
-
-                        sourceId =
-                            preview.sourceItemId,
-
-                        canonicalUrl =
-                            preview.canonicalUrl,
-
-                        capturedAt =
-                            currentTimestamp(),
-
-                        publishedAt =
-                            preview.publishedAt,
-
-                        discoveryMode =
-                            discoveryMode,
-
-                        discoveryQuery =
-                            discoveryQuery,
-
-                        authorId =
-                            preview.creator
-                                ?.sourceCreatorId
-                                ?: "",
-
-                        authorName =
-                            preview.creator
-                                ?.name
-                                ?: "",
-
-                        title =
-                            preview.title,
-
-                        caption =
-                            preview.caption
-                                ?: "",
-
-                        tags =
-                            preview.tags,
-
-                        media =
-                            mediaDrafts
-                    )
+                val draft = baseDraft.copy(media = mediaDrafts)
 
                 val persistStartedAt =
                     SystemClock.elapsedRealtime()
 
                 val result =
                     saveCaptureUseCase.save(
-                        draft
+                        draft = draft,
+                        requestedMediaIndices = requestedMediaIndices,
+                        highlightedMediaIndices = selectedMediaIndices
                     )
 
                 Log.d(

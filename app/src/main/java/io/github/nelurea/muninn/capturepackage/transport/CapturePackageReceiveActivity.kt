@@ -125,7 +125,7 @@ class CapturePackageReceiveActivity : ComponentActivity() {
 
                         val repository =
                             CapturedWorkRepository(
-                                dao = database.capturedWorkDao()
+                                database = database
                             )
 
                         val sessionRepository =

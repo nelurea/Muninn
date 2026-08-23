@@ -25,4 +25,7 @@ abstract class SaveEventDao {
 
     @Query("SELECT * FROM save_event_media WHERE saveEventId = :saveEventId ORDER BY id")
     abstract suspend fun getMedia(saveEventId: Long): List<SaveEventMediaEntity>
+
+    @Query("SELECT * FROM save_events WHERE sourceType = :sourceType AND sourceId = :sourceId ORDER BY id")
+    abstract suspend fun getBySourceIdentity(sourceType: String, sourceId: String): List<SaveEventEntity>
 }

@@ -1,6 +1,11 @@
 package io.github.nelurea.muninn.data.repository
 
 import io.github.nelurea.muninn.capture.usecase.CapturePersistence
+import io.github.nelurea.muninn.capture.usecase.CaptureIdentitySnapshot
+import androidx.room.withTransaction
+import io.github.nelurea.muninn.data.db.AppDatabase
+import io.github.nelurea.muninn.data.db.SaveEventEntity
+import io.github.nelurea.muninn.data.db.SaveEventMediaEntity
 
 import io.github.nelurea.muninn.data.db.CapturedMediaEntity
 import io.github.nelurea.muninn.data.db.CapturedTagEntity
@@ -17,8 +22,13 @@ import io.github.nelurea.muninn.data.db.CapturedMediaAttractionEntity
 import io.github.nelurea.muninn.data.db.MediaFocusEntity
 
 class CapturedWorkRepository(
-    private val dao: CapturedWorkDao
+    private val database: AppDatabase
 ) : CapturePersistence {
+
+    private val dao = database.capturedWorkDao()
+
+    override suspend fun <T> inTransaction(block: suspend () -> T): T =
+        database.withTransaction { block() }
 
     override suspend fun saveCapture(
         work: CapturedWorkEntity,
@@ -55,6 +65,21 @@ class CapturedWorkRepository(
         )
     }
 
+    override suspend fun getIdentitySnapshot(
+        sourceType: String,
+        sourceId: String
+    ): CaptureIdentitySnapshot? {
+        val rankedWorks = dao.getAllBySourceIdentity(sourceType, sourceId)
+        val canonical = rankedWorks.firstOrNull() ?: return null
+        val rankedMedia = linkedMapOf<Int, CapturedMediaEntity>()
+        rankedWorks.forEach { work ->
+            work.media.sortedBy { it.id }.forEach { media ->
+                rankedMedia.putIfAbsent(media.mediaIndex, media)
+            }
+        }
+        return CaptureIdentitySnapshot(canonical, rankedMedia)
+    }
+
     override suspend fun appendMediaToWork(
         workId: Long,
         media: List<CapturedMediaEntity>
@@ -78,6 +103,15 @@ class CapturedWorkRepository(
             mediaIndices = mediaIndices
         )
     }
+
+    override suspend fun markMediaHighlightedById(mediaIds: List<Long>) {
+        if (mediaIds.isNotEmpty()) dao.markMediaHighlightedById(mediaIds)
+    }
+
+    override suspend fun insertSaveEvent(
+        event: SaveEventEntity,
+        media: List<SaveEventMediaEntity>
+    ): Long = database.saveEventDao().insert(event, media)
     suspend fun getPurposeVocabulary():
             List<PurposeVocabularyEntity> {
         return dao.getPurposeVocabulary()

@@ -148,12 +148,16 @@ class XDiscoverySaveUseCase(
                         "alreadySaved=true " +
                         "total=${SystemClock.elapsedRealtime() - totalStartedAt}ms"
                 )
-                return@withContext SaveCaptureResult.Success(
-                    workId =
-                        preparation.workId
-                            ?: 0L,
-                    mediaCount =
-                        0
+                val draft = XCaptureMapper.toCaptureDraft(
+                    payload = selectedPayload.copy(media = emptyList()),
+                    downloadedFiles = emptyList(),
+                    discoveryMode = discoveryMode,
+                    discoveryQuery = discoveryQuery
+                )
+                return@withContext saveCaptureUseCase.save(
+                    draft = draft,
+                    requestedMediaIndices = requestedMediaIndices,
+                    highlightedMediaIndices = selectedMediaIndices
                 )
             }
 
@@ -220,7 +224,9 @@ class XDiscoverySaveUseCase(
 
                         val result =
                             saveCaptureUseCase.save(
-                                draft
+                                draft = draft,
+                                requestedMediaIndices = requestedMediaIndices,
+                                highlightedMediaIndices = selectedMediaIndices
                             )
 
                         Log.d(
