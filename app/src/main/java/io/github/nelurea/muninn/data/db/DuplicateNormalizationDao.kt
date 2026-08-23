@@ -125,6 +125,21 @@ abstract class DuplicateNormalizationDao {
     @Query("SELECT * FROM duplicate_cleanup_journal WHERE normalizationId = :normalizationId ORDER BY id")
     abstract suspend fun getCleanup(normalizationId: Long): List<DuplicateCleanupJournalEntity>
 
+    @Query("SELECT * FROM duplicate_cleanup_journal WHERE state = 'PENDING' ORDER BY id")
+    abstract suspend fun getPendingCleanup(): List<DuplicateCleanupJournalEntity>
+
+    @Query("SELECT * FROM duplicate_cleanup_journal WHERE id = :id")
+    abstract suspend fun getCleanupById(id: Long): DuplicateCleanupJournalEntity?
+
+    @Query("SELECT COUNT(*) FROM captured_media WHERE localUri = :uri")
+    abstract suspend fun countMediaUsingUri(uri: String): Int
+
+    @Query(
+        "UPDATE duplicate_cleanup_journal SET lastError = :error, updatedAt = :updatedAt " +
+            "WHERE id = :id AND state = 'PENDING'"
+    )
+    abstract suspend fun recordCleanupError(id: Long, error: String, updatedAt: Long): Int
+
     @Query(
         """
         UPDATE duplicate_cleanup_journal
