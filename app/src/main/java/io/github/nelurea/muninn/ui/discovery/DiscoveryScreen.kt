@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 fun DiscoveryScreen(
     viewModel: DiscoveryViewModel,
     onItemClick: (DiscoveryItem) -> Unit,
+    onPixivLogin: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -204,6 +205,8 @@ fun DiscoveryScreen(
                 xRefreshToken +=
                     1
             },
+            onPixivLogin =
+                onPixivLogin,
             onBack =
                 onBack
         )
@@ -312,6 +315,7 @@ private fun DiscoveryContent(
     xIsLoadingMore: Boolean,
     onLoadMoreX: () -> Unit,
     onRefreshX: () -> Unit,
+    onPixivLogin: () -> Unit,
     onBack: () -> Unit
 ) {
     val state =
@@ -770,7 +774,11 @@ private fun DiscoveryContent(
 
                         Button(
                             onClick = {
-                                viewModel.retry()
+                                if (state.authenticationRequired) {
+                                    onPixivLogin()
+                                } else {
+                                    viewModel.retry()
+                                }
 
                                 if (
                                     viewModel.sourceId ==
@@ -785,7 +793,11 @@ private fun DiscoveryContent(
                                 )
                         ) {
                             Text(
-                                "Retry"
+                                if (state.authenticationRequired) {
+                                    "Log in to Pixiv"
+                                } else {
+                                    "Retry"
+                                }
                             )
                         }
                     }
@@ -971,7 +983,11 @@ private fun DiscoveryContent(
 
                                     Button(
                                         onClick = {
-                                            viewModel.retry()
+                                            if (state.authenticationRequired) {
+                                                onPixivLogin()
+                                            } else {
+                                                viewModel.retry()
+                                            }
 
                                             if (
                                                 viewModel.sourceId ==
@@ -986,7 +1002,11 @@ private fun DiscoveryContent(
                                             )
                                     ) {
                                         Text(
-                                            "Retry"
+                                            if (state.authenticationRequired) {
+                                                "Log in to Pixiv"
+                                            } else {
+                                                "Retry"
+                                            }
                                         )
                                     }
                                 }

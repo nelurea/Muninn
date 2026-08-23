@@ -37,6 +37,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ui.browser.PixivLoginActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".debug.observation.ObservationActivity"
             android:exported="true">
         </activity>

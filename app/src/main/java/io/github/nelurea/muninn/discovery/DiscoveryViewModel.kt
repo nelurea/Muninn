@@ -14,6 +14,7 @@ import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoveryMode
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import io.github.nelurea.muninn.discovery.pixiv.PixivAuthenticationRequiredException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -1076,7 +1077,9 @@ class DiscoveryViewModel(
                     !replace &&
                             showLoading,
                 error =
-                    null
+                    null,
+                authenticationRequired =
+                    false
             )
 
         val requestedMode =
@@ -1144,7 +1147,9 @@ class DiscoveryViewModel(
                             hasNextPage =
                                 hasNextPage,
                             error =
-                                null
+                                null,
+                            authenticationRequired =
+                                false
                         )
 
                     isLoading =
@@ -1168,7 +1173,9 @@ class DiscoveryViewModel(
                                 false,
                             error =
                                 error.message
-                                    ?: "Failed to load discovery items."
+                                    ?: "Failed to load discovery items.",
+                            authenticationRequired =
+                                error is PixivAuthenticationRequiredException
                         )
 
                     isLoading =
@@ -1230,7 +1237,10 @@ data class DiscoveryUiState(
         true,
 
     val error: String? =
-        null
+        null,
+
+    val authenticationRequired: Boolean =
+        false
 )
 
 data class ArtworkPreviewUiState(

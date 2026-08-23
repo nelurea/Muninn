@@ -501,6 +501,16 @@ fun AppNavigation(
             val scope =
                 rememberCoroutineScope()
 
+            val pixivLoginLauncher =
+                androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts
+                        .StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == android.app.Activity.RESULT_OK) {
+                        discoveryViewModel.retry()
+                    }
+                }
+
             var showStatePicker by remember {
                 mutableStateOf(
                     false
@@ -560,6 +570,12 @@ fun AppNavigation(
             DiscoveryScreen(
                 viewModel =
                     discoveryViewModel,
+                onPixivLogin = {
+                    pixivLoginLauncher.launch(
+                        io.github.nelurea.muninn.ui.browser.PixivLoginActivity
+                            .createIntent(context)
+                    )
+                },
                 onItemClick = {
                         item ->
 

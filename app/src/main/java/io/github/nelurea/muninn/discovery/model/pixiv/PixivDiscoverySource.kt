@@ -133,6 +133,11 @@ class PixivDiscoverySource(
                             it.readText()
                         }
 
+                throwIfPixivLoginResponse(
+                    finalUrl = connection.url.toString(),
+                    responseBody = json
+                )
+
                 val response =
                     try {
                         PixivFollowingParser.parse(
@@ -198,15 +203,15 @@ class PixivDiscoverySource(
                 "page must be >= 1"
             }
 
+            val cookie =
+                requireCookie()
+
             val userId =
                 identityProvider
                     .getLoggedInUserId()
                     ?: throw PixivDiscoveryException(
                         "Could not determine the logged-in Pixiv user."
                     )
-
-            val cookie =
-                requireCookie()
 
             val requestUrl =
                 buildBookmarksUrl(
@@ -254,6 +259,11 @@ class PixivDiscoverySource(
                         .use {
                             it.readText()
                         }
+
+                throwIfPixivLoginResponse(
+                    finalUrl = connection.url.toString(),
+                    responseBody = json
+                )
 
                 val response =
                     try {
@@ -379,6 +389,11 @@ class PixivDiscoverySource(
                             it.readText()
                         }
 
+                throwIfPixivLoginResponse(
+                    finalUrl = connection.url.toString(),
+                    responseBody = json
+                )
+
                 val response =
                     try {
                         PixivSearchParser.parse(
@@ -436,15 +451,20 @@ class PixivDiscoverySource(
         }
 
     private fun requireCookie(): String {
-        return cookieManager.getCookie(
+        val cookie = cookieManager.getCookie(
             PIXIV_ORIGIN
         )
             ?.takeIf {
                 it.isNotBlank()
             }
-            ?: throw PixivDiscoveryException(
+
+        if (!hasPixivSessionCookie(cookie)) {
+            throw PixivAuthenticationRequiredException(
                 "No authenticated Pixiv session is available."
             )
+        }
+
+        return checkNotNull(cookie)
     }
 
     private fun configureConnection(
@@ -496,6 +516,17 @@ class PixivDiscoverySource(
                 ?.use {
                     it.readText()
                 }
+
+        if (isPixivAuthenticationStatus(status)) {
+            throw PixivAuthenticationRequiredException(
+                "Pixiv login is required: HTTP $status."
+            )
+        }
+
+        throwIfPixivLoginResponse(
+            finalUrl = connection.url.toString(),
+            responseBody = errorBody.orEmpty()
+        )
 
         throw PixivDiscoveryException(
             buildString {
@@ -720,10 +751,64 @@ class PixivDiscoverySource(
     }
 }
 
-class PixivDiscoveryException(
+open class PixivDiscoveryException(
     message: String,
     cause: Throwable? = null
 ) : Exception(
     message,
     cause
 )
+
+class PixivAuthenticationRequiredException(
+    message: String
+) : PixivDiscoveryException(message)
+
+internal fun isPixivAuthenticationStatus(status: Int): Boolean =
+    status == HttpURLConnection.HTTP_UNAUTHORIZED ||
+        status == HttpURLConnection.HTTP_FORBIDDEN
+
+internal fun hasPixivSessionCookie(cookie: String?): Boolean =
+    cookie
+        ?.split(';')
+        ?.any { part ->
+            val separator = part.indexOf('=')
+            separator > 0 &&
+                part.substring(0, separator).trim() == "PHPSESSID" &&
+                part.substring(separator + 1).trim().isNotEmpty()
+        } == true
+
+internal fun isPixivLoginResponse(
+    finalUrl: String,
+    responseBody: String
+): Boolean {
+    val normalizedUrl = finalUrl.lowercase()
+    if (
+        normalizedUrl.startsWith("https://accounts.pixiv.net/login") ||
+        normalizedUrl.contains("/login.php")
+    ) {
+        return true
+    }
+
+    val normalizedBody = responseBody.lowercase()
+    val isHtml =
+        normalizedBody.contains("<html") ||
+            normalizedBody.contains("<!doctype html")
+
+    return isHtml &&
+        (
+            normalizedBody.contains("accounts.pixiv.net/login") ||
+                normalizedBody.contains("pixiv login") &&
+                normalizedBody.contains("name=\"password\"")
+        )
+}
+
+private fun throwIfPixivLoginResponse(
+    finalUrl: String,
+    responseBody: String
+) {
+    if (isPixivLoginResponse(finalUrl, responseBody)) {
+        throw PixivAuthenticationRequiredException(
+            "Pixiv login is required."
+        )
+    }
+}
