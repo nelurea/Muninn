@@ -10,20 +10,10 @@ class MediaMoveService(
 ) : MediaMoveBatchOperations {
     override suspend fun move(mediaId: Long, destinationRootUri: String?): MediaMoveResult {
         val existingJournal = persistence.getJournal(mediaId)
-        var resolvedDestination: String? = null
         if (existingJournal == null || existingJournal.state == MediaMoveState.COMPLETED) {
             val media = persistence.getMedia(mediaId)
                 ?: return MediaMoveResult.Failure("Captured media does not exist")
             if (files.isAtDestination(media.localUri, destinationRootUri)) {
-                return MediaMoveResult.AlreadyAtDestination(mediaId)
-            }
-            resolvedDestination = files.createDestination(
-                mediaId,
-                media.fileName,
-                media.mimeType,
-                destinationRootUri
-            )
-            if (media.localUri == resolvedDestination) {
                 return MediaMoveResult.AlreadyAtDestination(mediaId)
             }
         }
@@ -32,7 +22,7 @@ class MediaMoveService(
         if (journal.destinationRootUri != destinationRootUri) {
             return MediaMoveResult.Failure("This media already has a move to another destination")
         }
-        return resume(mediaId, resolvedDestination)
+        return resume(mediaId)
     }
 
     suspend fun resumeIncomplete(): List<MediaMoveResult> =
@@ -42,9 +32,8 @@ class MediaMoveService(
 
     override suspend fun incompleteMediaIds(): List<Long> = persistence.getIncomplete().map { it.mediaId }
 
-    override suspend fun resume(mediaId: Long): MediaMoveResult = resume(mediaId, null)
-
-    private suspend fun resume(mediaId: Long, resolvedDestination: String?): MediaMoveResult {
+    override suspend fun resume(mediaId: Long): MediaMoveResult {
+        var unrecordedDestination: String? = null
         return try {
             var journal = persistence.getJournal(mediaId)
                 ?: return MediaMoveResult.Failure("Move journal does not exist")
@@ -53,16 +42,21 @@ class MediaMoveService(
             if (journal.state == MediaMoveState.PENDING) {
                 val media = persistence.getMedia(mediaId)
                     ?: return fail(mediaId, "Captured media does not exist")
-                val destination = resolvedDestination ?: files.createDestination(
+                val identity = persistence.getSourceIdentity(mediaId)
+                    ?: return fail(mediaId, "Captured work does not exist")
+                val requestedFileName = destinationFileName(media, identity)
+                val destination = files.createDestination(
                     mediaId,
-                    media.fileName,
+                    requestedFileName,
                     media.mimeType,
                     journal.destinationRootUri
                 )
                 if (journal.sourceUri == destination) {
                     return MediaMoveResult.AlreadyAtDestination(mediaId)
                 }
+                unrecordedDestination = destination
                 check(persistence.markCopying(mediaId, destination, now())) { "Move state changed while preparing copy" }
+                unrecordedDestination = null
                 journal = requireJournal(mediaId)
             }
 
@@ -74,7 +68,9 @@ class MediaMoveService(
             }
 
             if (journal.state == MediaMoveState.COPIED) {
-                check(persistence.switchDatabase(journal, now())) { "Source URI no longer matches captured media" }
+                val destination = requireNotNull(journal.destinationUri)
+                val fileName = files.getFileName(destination)
+                check(persistence.switchDatabase(journal, fileName, now())) { "Source URI no longer matches captured media" }
                 journal = requireJournal(mediaId)
             }
 
@@ -86,7 +82,12 @@ class MediaMoveService(
             }
             MediaMoveResult.Completed(mediaId)
         } catch (exception: Exception) {
-            fail(mediaId, exception.message ?: "Media move failed")
+            var message = exception.message ?: "Media move failed"
+            unrecordedDestination?.let { destination ->
+                val cleanedUp = runCatching { files.cleanupDestination(destination) }.getOrDefault(false)
+                if (!cleanedUp) message += "; Could not clean up unrecorded destination"
+            }
+            fail(mediaId, message)
         }
     }
 
@@ -96,6 +97,16 @@ class MediaMoveService(
     private suspend fun fail(mediaId: Long, message: String): MediaMoveResult.Failure {
         persistence.recordError(mediaId, message, now())
         return MediaMoveResult.Failure(message)
+    }
+
+    private fun destinationFileName(
+        media: io.github.nelurea.muninn.data.db.CapturedMediaEntity,
+        identity: MediaMoveSourceIdentity
+    ): String {
+        if (identity.sourceType != "x") return media.fileName
+        val extension = media.fileName.substringAfterLast('.', missingDelimiterValue = "")
+        check(extension.isNotBlank()) { "X media file extension is missing" }
+        return "x-${identity.sourceId}-p${media.mediaIndex}.$extension"
     }
 
 }

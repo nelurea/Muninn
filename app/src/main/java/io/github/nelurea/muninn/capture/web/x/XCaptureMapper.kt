@@ -40,7 +40,10 @@ object XCaptureMapper {
                                 ?: "application/octet-stream",
 
                         fileName =
-                            item.fileName,
+                            canonicalFileName(
+                                payload.sourceId,
+                                item
+                            ),
 
                         sourceFile =
                             downloadedFiles[
@@ -100,4 +103,28 @@ object XCaptureMapper {
                 media
         )
     }
+
+    private fun canonicalFileName(
+        sourceId: String,
+        media: XCaptureMediaPayload
+    ): String {
+        val extension =
+            media.fileName
+                .substringAfterLast('.', missingDelimiterValue = "")
+                .lowercase()
+                .takeIf { it.matches(Regex("[a-z0-9]+")) }
+                ?: extensionForMimeType(media.mimeType)
+
+        return "x-$sourceId-p${media.mediaIndex}.$extension"
+    }
+
+    private fun extensionForMimeType(mimeType: String?): String =
+        when (mimeType?.lowercase()) {
+            "image/jpeg" -> "jpg"
+            "image/png" -> "png"
+            "image/gif" -> "gif"
+            "image/webp" -> "webp"
+            "image/avif" -> "avif"
+            else -> "bin"
+        }
 }

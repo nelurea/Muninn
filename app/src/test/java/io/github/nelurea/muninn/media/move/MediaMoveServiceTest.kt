@@ -62,22 +62,104 @@ class MediaMoveServiceTest {
     }
 
     @Test
-    fun `destination creation is retried when journal update fails before URI is recorded`() = runBlocking {
+    fun `mark copying exception cleans up only the newly created destination`() = runBlocking {
         val persistence = FakePersistence(failNextMarkCopying = true)
         val files = FakeFiles(uniqueDestinationOnEachCreate = true)
         val service = MediaMoveService(persistence, files) { 10L }
 
         assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Failure)
         assertEquals(MediaMoveState.PENDING, persistence.journal?.state)
-        assertEquals(1, files.destinations.size)
+        assertEquals(0, files.destinations.size)
+        assertEquals(listOf("content://tree/sd/image.jpg?created=1"), files.cleanedUp)
+        assertEquals(emptyList<Pair<String, Long>>(), files.deleted)
         assertEquals(0, files.copyCount)
 
         assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Completed)
 
-        assertEquals(2, files.destinations.size)
+        assertEquals(1, files.destinations.size)
         assertEquals(2, files.createDestinationCount)
+        assertEquals(listOf("content://tree/sd/image.jpg?created=1"), files.cleanedUp)
         assertEquals(1, files.copyCount)
         assertEquals("content://tree/sd/image.jpg?created=2", persistence.media.localUri)
+    }
+
+    @Test
+    fun `mark copying false cleans up created destination without deleting source`() = runBlocking {
+        val persistence = FakePersistence(returnFalseNextMarkCopying = true)
+        val files = FakeFiles(uniqueDestinationOnEachCreate = true)
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Failure)
+
+        assertEquals(listOf("content://tree/sd/image.jpg?created=1"), files.cleanedUp)
+        assertEquals(emptyList<Pair<String, Long>>(), files.deleted)
+        assertEquals("file:///old/image.jpg", persistence.media.localUri)
+        assertEquals(MediaMoveState.PENDING, persistence.journal?.state)
+    }
+
+    @Test
+    fun `retries clean each unrecorded destination without accumulating orphans`() = runBlocking {
+        val persistence = FakePersistence(returnFalseMarkCopyingCount = 2)
+        val files = FakeFiles(uniqueDestinationOnEachCreate = true)
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Failure)
+        assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Failure)
+        assertEquals(MediaMoveResult.Completed(42L), service.move(42L, "content://tree/sd"))
+
+        assertEquals(
+            listOf(
+                "content://tree/sd/image.jpg?created=1",
+                "content://tree/sd/image.jpg?created=2"
+            ),
+            files.cleanedUp
+        )
+        assertEquals("content://tree/sd/image.jpg?created=3", persistence.media.localUri)
+    }
+
+    @Test
+    fun `copy failure after mark copying keeps destination for resume`() = runBlocking {
+        val persistence = FakePersistence()
+        val files = FakeFiles(failNextCopy = true, uniqueDestinationOnEachCreate = true)
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertTrue(service.move(42L, "content://tree/sd") is MediaMoveResult.Failure)
+        val destination = persistence.journal?.destinationUri
+        assertEquals(MediaMoveState.COPYING, persistence.journal?.state)
+        assertEquals(emptyList<String>(), files.cleanedUp)
+
+        assertEquals(MediaMoveResult.Completed(42L), service.resume(42L))
+        assertEquals(destination, persistence.media.localUri)
+        assertEquals(1, files.createDestinationCount)
+        assertEquals(emptyList<String>(), files.cleanedUp)
+    }
+
+    @Test
+    fun `new X move uses source identity and media index in requested file name`() = runBlocking {
+        val persistence = FakePersistence().apply {
+            identity = MediaMoveSourceIdentity("x", "1890123456789012345")
+            media = media.copy(mediaIndex = 2, fileName = "legacy-name.jpg")
+        }
+        val files = FakeFiles()
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertEquals(MediaMoveResult.Completed(42L), service.move(42L, "content://tree/sd"))
+
+        assertEquals(listOf("x-1890123456789012345-p2.jpg"), files.requestedFileNames)
+        assertEquals("x-1890123456789012345-p2.jpg", persistence.media.fileName)
+    }
+
+    @Test
+    fun `database stores provider assigned destination file name`() = runBlocking {
+        val persistence = FakePersistence().apply {
+            identity = MediaMoveSourceIdentity("x", "123")
+        }
+        val files = FakeFiles(providerFileName = "x-123-p0 (1).jpg")
+        val service = MediaMoveService(persistence, files) { 10L }
+
+        assertEquals(MediaMoveResult.Completed(42L), service.move(42L, "content://tree/sd"))
+
+        assertEquals("x-123-p0 (1).jpg", persistence.media.fileName)
     }
 
     @Test
@@ -209,13 +291,18 @@ class MediaMoveServiceTest {
 
     private class FakeFiles(
         var deleteSucceeds: Boolean = true,
-        private val uniqueDestinationOnEachCreate: Boolean = false
+        private val uniqueDestinationOnEachCreate: Boolean = false,
+        var failNextCopy: Boolean = false,
+        private val providerFileName: String? = null
     ) : MediaMoveFileOperations {
         var copyCount = 0
         var createDestinationCount = 0
         val destinations = mutableSetOf<String>()
+        val cleanedUp = mutableListOf<String>()
         val deleted = mutableListOf<Pair<String, Long>>()
         val alreadyAtDestination = mutableSetOf<String>()
+        val requestedFileNames = mutableListOf<String>()
+        private val fileNamesByUri = mutableMapOf<String, String>()
         override suspend fun isAtDestination(sourceUri: String, destinationRootUri: String?): Boolean {
             val expected = destinationRootUri?.let { "$it/image.jpg" }
                 ?: "file:///internal/42/image.jpg"
@@ -228,16 +315,30 @@ class MediaMoveServiceTest {
             destinationRootUri: String?
         ): String {
             createDestinationCount++
+            requestedFileNames += fileName
+            val actualFileName = providerFileName ?: fileName
             val destination = destinationRootUri?.let {
-                "$it/$fileName" + if (uniqueDestinationOnEachCreate) "?created=$createDestinationCount" else ""
+                "$it/$actualFileName" + if (uniqueDestinationOnEachCreate) "?created=$createDestinationCount" else ""
             }
-                ?: "file:///internal/$mediaId/$fileName"
+                ?: "file:///internal/$mediaId/$actualFileName"
             destinations += destination
+            fileNamesByUri[destination] = actualFileName
             return destination
         }
+        override suspend fun getFileName(uri: String) =
+            fileNamesByUri[uri] ?: uri.substringBefore('?').substringAfterLast('/')
         override suspend fun copyAndVerify(sourceUri: String, destinationUri: String): Long {
             copyCount++
+            if (failNextCopy) {
+                failNextCopy = false
+                error("Copy failed")
+            }
             return 123L
+        }
+        override suspend fun cleanupDestination(destinationUri: String): Boolean {
+            cleanedUp += destinationUri
+            destinations -= destinationUri
+            return true
         }
         override suspend fun delete(uri: String, mediaId: Long): Boolean {
             deleted += uri to mediaId
@@ -245,7 +346,11 @@ class MediaMoveServiceTest {
         }
     }
 
-    private class FakePersistence(var failNextMarkCopying: Boolean = false) : MediaMovePersistence {
+    private class FakePersistence(
+        var failNextMarkCopying: Boolean = false,
+        var returnFalseNextMarkCopying: Boolean = false,
+        var returnFalseMarkCopyingCount: Int = 0
+    ) : MediaMovePersistence {
         var beginCount = 0
         var databaseSwitchCount = 0
         var media = CapturedMediaEntity(
@@ -258,6 +363,7 @@ class MediaMoveServiceTest {
             fileName = "image.jpg",
             isHighlighted = false
         )
+        var identity = MediaMoveSourceIdentity("pixiv", "123")
         var journal: MediaMoveJournalEntity? = null
 
         override suspend fun getAllMediaIds() = listOf(media.id)
@@ -276,12 +382,21 @@ class MediaMoveServiceTest {
             return journal
         }
         override suspend fun getMedia(mediaId: Long) = media.takeIf { it.id == mediaId }
+        override suspend fun getSourceIdentity(mediaId: Long) = identity.takeIf { media.id == mediaId }
         override suspend fun getJournal(mediaId: Long) = journal?.takeIf { it.mediaId == mediaId }
         override suspend fun getIncomplete() = listOfNotNull(journal).filter { it.state != MediaMoveState.COMPLETED }
         override suspend fun markCopying(mediaId: Long, destinationUri: String, now: Long): Boolean {
             if (failNextMarkCopying) {
                 failNextMarkCopying = false
                 error("Process ended before journal update")
+            }
+            if (returnFalseNextMarkCopying) {
+                returnFalseNextMarkCopying = false
+                return false
+            }
+            if (returnFalseMarkCopyingCount > 0) {
+                returnFalseMarkCopyingCount--
+                return false
             }
             journal = journal?.copy(destinationUri = destinationUri, state = MediaMoveState.COPYING, updatedAt = now)
             return true
@@ -290,10 +405,10 @@ class MediaMoveServiceTest {
             journal = journal?.copy(state = MediaMoveState.COPIED, byteCount = byteCount, updatedAt = now)
             return true
         }
-        override suspend fun switchDatabase(journal: MediaMoveJournalEntity, now: Long): Boolean {
+        override suspend fun switchDatabase(journal: MediaMoveJournalEntity, fileName: String, now: Long): Boolean {
             databaseSwitchCount++
             if (media.localUri != journal.sourceUri) return false
-            media = media.copy(localUri = requireNotNull(journal.destinationUri))
+            media = media.copy(localUri = requireNotNull(journal.destinationUri), fileName = fileName)
             this.journal = journal.copy(state = MediaMoveState.DB_SWITCHED, updatedAt = now)
             return true
         }

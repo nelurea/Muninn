@@ -14,7 +14,9 @@ import kotlinx.coroutines.withContext
 interface MediaMoveFileOperations {
     suspend fun isAtDestination(sourceUri: String, destinationRootUri: String?): Boolean
     suspend fun createDestination(mediaId: Long, fileName: String, mimeType: String, destinationRootUri: String?): String
+    suspend fun getFileName(uri: String): String
     suspend fun copyAndVerify(sourceUri: String, destinationUri: String): Long
+    suspend fun cleanupDestination(destinationUri: String): Boolean
     suspend fun delete(uri: String, mediaId: Long): Boolean
 }
 
@@ -71,6 +73,16 @@ class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations
         )?.toString() ?: error("Could not create destination document")
     }
 
+    override suspend fun getFileName(uri: String): String = withContext(Dispatchers.IO) {
+        val parsed = Uri.parse(uri)
+        when (parsed.scheme) {
+            "content" -> queryFileName(parsed)
+            "file" -> parsed.path?.let(::File)?.name
+            null -> File(uri).name
+            else -> null
+        } ?: error("Could not determine destination file name")
+    }
+
     override suspend fun copyAndVerify(sourceUri: String, destinationUri: String): Long =
         withContext(Dispatchers.IO) {
             val copied = openInput(sourceUri).use { input ->
@@ -89,6 +101,26 @@ class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations
             check(copied == verified) { "Destination length differs after copy" }
             copied
         }
+
+    override suspend fun cleanupDestination(destinationUri: String): Boolean = withContext(Dispatchers.IO) {
+        val uri = Uri.parse(destinationUri)
+        try {
+            when (uri.scheme) {
+                "content" -> if (DocumentsContract.isDocumentUri(appContext, uri)) {
+                    DocumentsContract.deleteDocument(resolver, uri)
+                } else {
+                    resolver.delete(uri, null, null) > 0
+                }
+                "file", null -> {
+                    val file = File(uri.path ?: destinationUri)
+                    !file.exists() || file.delete()
+                }
+                else -> false
+            }
+        } catch (_: FileNotFoundException) {
+            true
+        }
+    }
 
     override suspend fun delete(uri: String, mediaId: Long): Boolean = withContext(Dispatchers.IO) {
         val parsed = Uri.parse(uri)
@@ -213,6 +245,12 @@ class AndroidMediaMoveFileOperations(context: Context) : MediaMoveFileOperations
             else -> null
         } ?: error("Could not open source $rawUri")
     }
+
+    private fun queryFileName(uri: Uri): String =
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val column = cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)
+            if (cursor.moveToFirst()) cursor.getString(column) else null
+        } ?: error("Could not determine destination file name")
 
     private fun openOutput(rawUri: String): OutputStream {
         val uri = Uri.parse(rawUri)
