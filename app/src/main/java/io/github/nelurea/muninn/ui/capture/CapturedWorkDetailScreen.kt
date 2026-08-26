@@ -2,6 +2,11 @@ package io.github.nelurea.muninn.ui.capture
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,13 +30,18 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
@@ -79,6 +89,22 @@ fun CapturedWorkDetailScreen(
         mutableStateOf(false)
     }
 
+    var controlsVisible by remember(
+        workId
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var currentPageZoomed by remember(
+        workId
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
     LaunchedEffect(
         workId
     ) {
@@ -92,17 +118,9 @@ fun CapturedWorkDetailScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Captured Work"
-                    )
-                }
-            )
-        },
         floatingActionButton = {
             if (
+                controlsVisible &&
                 !loading &&
                 capturedWork != null
             ) {
@@ -260,7 +278,9 @@ fun CapturedWorkDetailScreen(
                                         .fillMaxWidth()
                                         .weight(
                                             1f
-                                        )
+                                        ),
+                                userScrollEnabled =
+                                    !currentPageZoomed
                             ) { page ->
 
                                 val pageMedia =
@@ -271,20 +291,33 @@ fun CapturedWorkDetailScreen(
                                         Modifier
                                             .fillMaxSize()
                                 ) {
-                                    AsyncImage(
-                                        model =
-                                            pageMedia
-                                                .localUri,
-                                        contentDescription =
-                                            null,
-                                        modifier =
-                                            Modifier
-                                                .fillMaxSize(),
-                                        contentScale =
-                                            ContentScale.Fit
+                                    ZoomableCapturedMediaPage(
+                                        localUri =
+                                            pageMedia.localUri,
+                                        mediaId =
+                                            pageMedia.id,
+                                        active =
+                                            page ==
+                                                pagerState.currentPage,
+                                        onZoomedChange = {
+                                                zoomed ->
+
+                                            if (
+                                                page ==
+                                                pagerState.currentPage
+                                            ) {
+                                                currentPageZoomed =
+                                                    zoomed
+                                            }
+                                        },
+                                        onToggleControls = {
+                                            controlsVisible =
+                                                !controlsVisible
+                                        }
                                     )
 
                                     if (
+                                        controlsVisible &&
                                         pageMedia
                                             .isHighlighted
                                     ) {
@@ -326,28 +359,7 @@ fun CapturedWorkDetailScreen(
                                 }
                             }
 
-                            if (
-                                media.size > 1
-                            ) {
-                                Text(
-                                    text =
-                                        "${pagerState.currentPage + 1} / ${media.size}",
-                                    modifier =
-                                        Modifier
-                                            .align(
-                                                Alignment
-                                                    .CenterHorizontally
-                                            )
-                                            .padding(
-                                                vertical =
-                                                    12.dp
-                                            ),
-                                    style =
-                                        MaterialTheme
-                                            .typography
-                                            .bodyMedium
-                                )
-                            }
+
                         } else {
                             Box(
                                 modifier =
@@ -361,6 +373,61 @@ fun CapturedWorkDetailScreen(
                                 )
                             }
                         }
+                    }
+
+                    if (
+                        controlsVisible
+                    ) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    "Captured Work"
+                                )
+                            },
+                            modifier =
+                                Modifier
+                                    .align(
+                                        Alignment.TopCenter
+                                    )
+                                    .fillMaxWidth()
+                        )
+                    }
+
+                    if (
+                        controlsVisible &&
+                        media.size > 1
+                    ) {
+                        Text(
+                            text =
+                                "${pagerState.currentPage + 1} / ${media.size}",
+                            modifier =
+                                Modifier
+                                    .align(
+                                        Alignment.BottomCenter
+                                    )
+                                    .padding(
+                                        bottom = 12.dp
+                                    )
+                                    .background(
+                                        color =
+                                            MaterialTheme
+                                                .colorScheme
+                                                .surface
+                                                .copy(
+                                                    alpha = 0.8f
+                                                ),
+                                        shape =
+                                            CircleShape
+                                    )
+                                    .padding(
+                                        horizontal = 12.dp,
+                                        vertical = 6.dp
+                                    ),
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodyMedium
+                        )
                     }
 
                     if (
@@ -384,5 +451,293 @@ fun CapturedWorkDetailScreen(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun ZoomableCapturedMediaPage(
+    localUri: String,
+    mediaId: Long,
+    active: Boolean,
+    onZoomedChange: (Boolean) -> Unit,
+    onToggleControls: () -> Unit
+) {
+    var scale by remember(
+        mediaId
+    ) {
+        mutableFloatStateOf(
+            1f
+        )
+    }
+
+    var offsetX by remember(
+        mediaId
+    ) {
+        mutableFloatStateOf(
+            0f
+        )
+    }
+
+    var offsetY by remember(
+        mediaId
+    ) {
+        mutableFloatStateOf(
+            0f
+        )
+    }
+
+    var viewportSize by remember(
+        mediaId
+    ) {
+        mutableStateOf(
+            IntSize.Zero
+        )
+    }
+
+    val zoomed =
+        scale > 1.01f
+
+    val snapToOneThreshold =
+        1.08f
+
+    LaunchedEffect(
+        active
+    ) {
+        if (
+            !active
+        ) {
+            scale =
+                1f
+
+            offsetX =
+                0f
+
+            offsetY =
+                0f
+        }
+    }
+
+    LaunchedEffect(
+        active,
+        zoomed
+    ) {
+        if (
+            active
+        ) {
+            onZoomedChange(
+                zoomed
+            )
+        }
+    }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged {
+                        size ->
+
+                    viewportSize =
+                        size
+                }
+                .pointerInput(
+                    mediaId,
+                    active
+                ) {
+                    awaitEachGesture {
+                        awaitFirstDown(
+                            requireUnconsumed =
+                                false
+                        )
+
+                        var transformGesture =
+                            scale > 1.01f
+
+                        do {
+                            val event =
+                                awaitPointerEvent()
+
+                            val pressed =
+                                event.changes
+                                    .filter {
+                                        it.pressed
+                                    }
+
+                            val pointerCount =
+                                pressed.size
+
+                            if (
+                                !transformGesture &&
+                                pointerCount >= 2
+                            ) {
+                                transformGesture =
+                                    true
+                            }
+
+                            if (
+                                transformGesture
+                            ) {
+                                val zoomChange =
+                                    if (
+                                        pointerCount >= 2
+                                    ) {
+                                        event.calculateZoom()
+                                    } else {
+                                        1f
+                                    }
+
+                                val panChange =
+                                    event.calculatePan()
+
+                                val newScale =
+                                    (
+                                        scale *
+                                            zoomChange
+                                        ).coerceIn(
+                                        1f,
+                                        5f
+                                    )
+
+                                if (
+                                    newScale <=
+                                    1.01f
+                                ) {
+                                    scale =
+                                        1f
+
+                                    offsetX =
+                                        0f
+
+                                    offsetY =
+                                        0f
+
+                                    onZoomedChange(
+                                        false
+                                    )
+                                } else {
+                                    val maxOffsetX =
+                                        viewportSize.width *
+                                            (
+                                                newScale -
+                                                    1f
+                                                ) /
+                                            2f
+
+                                    val maxOffsetY =
+                                        viewportSize.height *
+                                            (
+                                                newScale -
+                                                    1f
+                                                ) /
+                                            2f
+
+                                    scale =
+                                        newScale
+
+                                    offsetX =
+                                        (
+                                            offsetX +
+                                                panChange.x
+                                            ).coerceIn(
+                                            -maxOffsetX,
+                                            maxOffsetX
+                                        )
+
+                                    offsetY =
+                                        (
+                                            offsetY +
+                                                panChange.y
+                                            ).coerceIn(
+                                            -maxOffsetY,
+                                            maxOffsetY
+                                        )
+
+                                    onZoomedChange(
+                                        true
+                                    )
+                                }
+
+                                event.changes
+                                    .forEach {
+                                            change ->
+
+                                        if (
+                                            change.pressed
+                                        ) {
+                                            change.consume()
+                                        }
+                                    }
+                            }
+                        } while (
+                            event.changes
+                                .any {
+                                    it.pressed
+                                }
+                        )
+
+                        if (
+                            transformGesture
+                        ) {
+                            if (
+                                scale <
+                                snapToOneThreshold
+                            ) {
+                                scale =
+                                    1f
+
+                                offsetX =
+                                    0f
+
+                                offsetY =
+                                    0f
+
+                                onZoomedChange(
+                                    false
+                                )
+                            } else {
+                                onZoomedChange(
+                                    true
+                                )
+                            }
+                        }
+                    }
+                }
+                .pointerInput(
+                    mediaId
+                ) {
+                    detectTapGestures(
+                        onTap = {
+                            onToggleControls()
+                        }
+                    )
+                },
+        contentAlignment =
+            Alignment.Center
+    ) {
+        AsyncImage(
+            model =
+                localUri,
+            contentDescription =
+                null,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX =
+                            scale
+
+                        scaleY =
+                            scale
+
+                        translationX =
+                            offsetX
+
+                        translationY =
+                            offsetY
+                    },
+            contentScale =
+                ContentScale.Fit
+        )
     }
 }
