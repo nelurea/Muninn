@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -294,6 +295,8 @@ fun CapturedWorkDetailScreen(
                                     ZoomableCapturedMediaPage(
                                         localUri =
                                             pageMedia.localUri,
+                                        mimeType =
+                                            pageMedia.mimeType,
                                         mediaId =
                                             pageMedia.id,
                                         active =
@@ -458,6 +461,7 @@ fun CapturedWorkDetailScreen(
 @Composable
 private fun ZoomableCapturedMediaPage(
     localUri: String,
+    mimeType: String,
     mediaId: Long,
     active: Boolean,
     onZoomedChange: (Boolean) -> Unit,
@@ -715,29 +719,47 @@ private fun ZoomableCapturedMediaPage(
         contentAlignment =
             Alignment.Center
     ) {
-        AsyncImage(
-            model =
-                localUri,
-            contentDescription =
-                null,
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX =
-                            scale
+        val mediaModifier =
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX =
+                        scale
 
-                        scaleY =
-                            scale
+                    scaleY =
+                        scale
 
-                        translationX =
-                            offsetX
+                    translationX =
+                        offsetX
 
-                        translationY =
-                            offsetY
-                    },
-            contentScale =
-                ContentScale.Fit
-        )
-    }
+                    translationY =
+                        offsetY
+                }
+
+        if (
+            mimeType.startsWith(
+                "video/",
+                ignoreCase = true
+            )
+        ) {
+            LoopingVideoPlayer(
+                uri =
+                    localUri,
+                active =
+                    active,
+                modifier =
+                    mediaModifier
+            )
+        } else {
+            AsyncImage(
+                model =
+                    localUri,
+                contentDescription =
+                    null,
+                modifier =
+                    mediaModifier,
+                contentScale =
+                    ContentScale.Fit
+            )
+        }    }
 }

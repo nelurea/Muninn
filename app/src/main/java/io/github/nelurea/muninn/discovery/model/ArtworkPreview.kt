@@ -21,5 +21,7 @@ data class ArtworkPreview(
 data class ArtworkPreviewMedia(
     val mediaIndex: Int,
     val previewUrl: String,
-    val originalUrl: String
+    val originalUrl: String,
+    val mimeType: String? = null,
+    val playbackUri: String? = null
 )

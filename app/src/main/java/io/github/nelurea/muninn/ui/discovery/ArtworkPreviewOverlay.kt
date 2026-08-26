@@ -64,6 +64,7 @@ import io.github.nelurea.muninn.discovery.ArtworkPreviewUiState
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.ArtworkPreviewMedia
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
 import kotlin.math.abs
 import androidx.compose.material3.Icon
 
@@ -1442,39 +1443,63 @@ private fun ArtworkPagerPage(
         contentAlignment =
             Alignment.Center
     ) {
-        AsyncImage(
-            model =
-                imageRequest,
-            contentDescription =
-                "Page ${media.mediaIndex + 1}",
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(
-                        vertical = 56.dp
-                    )
-                    .graphicsLayer {
-                        scaleX =
-                            scale
-
-                        scaleY =
-                            scale
-
-                        translationX =
-                            offsetX
-
-                        translationY =
-                            offsetY
-                    },
-            contentScale =
-                ContentScale.Fit,
-            onError = {
-                Log.e(
-                    "Muninn/ArtworkPreview",
-                    "Failed to load ${media.previewUrl}: " +
-                        it.result.throwable
+        val mediaModifier =
+            Modifier
+                .fillMaxSize()
+                .padding(
+                    vertical = 56.dp
                 )
-            }
-        )
-    }
+                .graphicsLayer {
+                    scaleX =
+                        scale
+
+                    scaleY =
+                        scale
+
+                    translationX =
+                        offsetX
+
+                    translationY =
+                        offsetY
+                }
+
+        val playbackUri =
+            media.playbackUri
+
+        if (
+            media.mimeType
+                ?.startsWith(
+                    "video/",
+                    ignoreCase = true
+                ) ==
+            true &&
+            !playbackUri.isNullOrBlank()
+        ) {
+            LoopingVideoPlayer(
+                uri =
+                    playbackUri,
+                active =
+                    active,
+                modifier =
+                    mediaModifier
+            )
+        } else {
+            AsyncImage(
+                model =
+                    imageRequest,
+                contentDescription =
+                    "Page ${media.mediaIndex + 1}",
+                modifier =
+                    mediaModifier,
+                contentScale =
+                    ContentScale.Fit,
+                onError = {
+                    Log.e(
+                        "Muninn/ArtworkPreview",
+                        "Failed to load ${media.previewUrl}: " +
+                            it.result.throwable
+                    )
+                }
+            )
+        }    }
 }

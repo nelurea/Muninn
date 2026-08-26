@@ -1,6 +1,7 @@
 package io.github.nelurea.muninn.capture.discovery
 
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import android.webkit.CookieManager
@@ -209,49 +210,13 @@ class PixivDiscoverySaveUseCase(
                                 async {
                                     downloadSemaphore.withPermit {
 
-                        val fileName =
-                            resolveFileName(
-                                sourceUrl =
-                                    planItem.originalUrl,
-                                mediaIndex =
-                                    planItem.mediaIndex
-                            )
-
-                        val destination =
-                            File(
-                                temporaryDirectory,
-                                fileName
-                            )
-
-                        downloadOne(
-                            sourceUrl =
-                                planItem.originalUrl,
-                            destination =
-                                destination
-                        )
-
-                        CaptureMediaDraft(
-                            mediaIndex =
-                                planItem.mediaIndex,
-
-                            sourceUrl =
-                                planItem.originalUrl,
-
-                            mimeType =
-                                URLConnection
-                                    .guessContentTypeFromName(
-                                        fileName
-                                    )
-                                    ?: "application/octet-stream",
-
-                            fileName =
-                                fileName,
-
-                            sourceFile =
-                                destination,
-
-                            isHighlighted =
-                                planItem.isHighlighted
+                        createMediaDraft(
+                            preview =
+                                preview,
+                            planItem =
+                                planItem,
+                            temporaryDirectory =
+                                temporaryDirectory
                         )
                                     }
                                 }
@@ -301,6 +266,149 @@ class PixivDiscoverySaveUseCase(
             }
         }
 
+    private suspend fun createMediaDraft(
+        preview: ArtworkPreview,
+        planItem: DiscoveryArtworkSavePlanItem,
+        temporaryDirectory: File
+    ): CaptureMediaDraft {
+        if (
+            planItem.mimeType ==
+            VIDEO_MP4_MIME_TYPE
+        ) {
+            val cachedUgoiraFile =
+                planItem.playbackUri
+                    ?.let(
+                        Uri::parse
+                    )
+                    ?.takeIf {
+                        it.scheme ==
+                            "file"
+                    }
+                    ?.path
+                    ?.let(
+                        ::File
+                    )
+                    ?.takeIf {
+                        it.exists() &&
+                        it.length() > 0L
+                    }
+
+            if (
+                cachedUgoiraFile != null
+            ) {
+                return CaptureMediaDraft(
+                    mediaIndex =
+                        planItem.mediaIndex,
+
+                    sourceUrl =
+                        planItem.originalUrl,
+
+                    mimeType =
+                        VIDEO_MP4_MIME_TYPE,
+
+                    fileName =
+                        "pixiv-${preview.sourceItemId}-p${planItem.mediaIndex}.mp4",
+
+                    sourceFile =
+                        cachedUgoiraFile,
+
+                    isHighlighted =
+                        planItem.isHighlighted
+                )
+            }
+            val ugoiraDirectory =
+                File(
+                    temporaryDirectory,
+                    "ugoira-${planItem.mediaIndex}"
+                )
+
+            if (
+                !ugoiraDirectory.mkdirs()
+            ) {
+                throw IllegalStateException(
+                    "Could not create temporary ugoira directory."
+                )
+            }
+
+            val conversion =
+                PixivUgoiraConverter(
+                    context =
+                        context
+                ).convert(
+                    artworkId =
+                        preview.sourceItemId,
+                    canonicalUrl =
+                        preview.canonicalUrl,
+                    workingDirectory =
+                        ugoiraDirectory
+                )
+
+            return CaptureMediaDraft(
+                mediaIndex =
+                    planItem.mediaIndex,
+
+                sourceUrl =
+                    conversion.sourceUrl,
+
+                mimeType =
+                    VIDEO_MP4_MIME_TYPE,
+
+                fileName =
+                    "pixiv-${preview.sourceItemId}-p${planItem.mediaIndex}.mp4",
+
+                sourceFile =
+                    conversion.outputFile,
+
+                isHighlighted =
+                    planItem.isHighlighted
+            )
+        }
+
+        val fileName =
+            resolveFileName(
+                sourceUrl =
+                    planItem.originalUrl,
+                mediaIndex =
+                    planItem.mediaIndex
+            )
+
+        val destination =
+            File(
+                temporaryDirectory,
+                fileName
+            )
+
+        downloadOne(
+            sourceUrl =
+                planItem.originalUrl,
+            destination =
+                destination
+        )
+
+        return CaptureMediaDraft(
+            mediaIndex =
+                planItem.mediaIndex,
+
+            sourceUrl =
+                planItem.originalUrl,
+
+            mimeType =
+                URLConnection
+                    .guessContentTypeFromName(
+                        fileName
+                    )
+                    ?: "application/octet-stream",
+
+            fileName =
+                fileName,
+
+            sourceFile =
+                destination,
+
+            isHighlighted =
+                planItem.isHighlighted
+        )
+    }
     private fun currentTimestamp(): String {
         return SimpleDateFormat(
             "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
@@ -430,6 +538,9 @@ class PixivDiscoverySaveUseCase(
 
     private companion object {
 
+        const val VIDEO_MP4_MIME_TYPE =
+            "video/mp4"
+
         const val PIXIV_ORIGIN =
             "https://www.pixiv.net/"
 
@@ -452,7 +563,9 @@ class PixivDiscoverySaveUseCase(
 data class DiscoveryArtworkSavePlanItem(
     val mediaIndex: Int,
     val originalUrl: String,
-    val isHighlighted: Boolean
+    val isHighlighted: Boolean,
+    val mimeType: String? = null,
+    val playbackUri: String? = null
 )
 
 sealed interface DiscoveryArtworkSavePlan {
@@ -507,7 +620,11 @@ internal fun buildDiscoveryArtworkSavePlan(
                         media.originalUrl,
                     isHighlighted =
                         media.mediaIndex in
-                                selectedMediaIndices
+                                selectedMediaIndices,
+                    mimeType =
+                        media.mimeType,
+                    playbackUri =
+                        media.playbackUri
                 )
             }
     )

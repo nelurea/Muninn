@@ -1,12 +1,17 @@
 package io.github.nelurea.muninn.discovery.pixiv
 
+import android.content.Context
+import android.net.Uri
+import android.util.Log
 import android.webkit.CookieManager
+import io.github.nelurea.muninn.capture.discovery.PixivUgoiraConverter
 import io.github.nelurea.muninn.discovery.ArtworkPreviewSource
 import io.github.nelurea.muninn.discovery.model.ArtworkPreview
 import io.github.nelurea.muninn.discovery.model.ArtworkPreviewMedia
 import io.github.nelurea.muninn.discovery.model.DiscoveryCreator
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +19,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 class PixivArtworkPreviewSource(
+    private val context: Context? = null,
     private val cookieManager: CookieManager =
         CookieManager.getInstance()
 ) : ArtworkPreviewSource {
@@ -101,8 +107,121 @@ class PixivArtworkPreviewSource(
                         1
                     )
 
+            val illustType =
+                body.optInt(
+                    "illustType",
+                    0
+                )
+
+            val ugoiraPlaybackUri =
+                if (
+                    illustType ==
+                    PIXIV_ILLUST_TYPE_UGOIRA
+                ) {
+                    context
+                        ?.let {
+                                appContext ->
+
+                            val cacheDirectory =
+                                File(
+                                    appContext.cacheDir,
+                                    "pixiv_ugoira_cache/$artworkId"
+                                )
+
+                            val cachedMp4 =
+                                File(
+                                    cacheDirectory,
+                                    "ugoira.mp4"
+                                )
+
+                            try {
+                                if (
+                                    cachedMp4.exists() &&
+                                    cachedMp4.length() > 0L
+                                ) {
+                                    File(
+                                        cacheDirectory,
+                                        "source.zip"
+                                    ).delete()
+
+                                    File(
+                                        cacheDirectory,
+                                        "frames"
+                                    ).deleteRecursively()
+
+                                    Uri.fromFile(
+                                        cachedMp4
+                                    ).toString()
+                                } else {
+                                    cacheDirectory
+                                        .deleteRecursively()
+
+                                    if (
+                                        !cacheDirectory.mkdirs()
+                                    ) {
+                                        throw IllegalStateException(
+                                            "Could not create Pixiv ugoira preview cache."
+                                        )
+                                    }
+
+                                    val conversion =
+                                        PixivUgoiraConverter(
+                                            context =
+                                                appContext,
+                                            cookieManager =
+                                                cookieManager
+                                        ).convert(
+                                            artworkId =
+                                                artworkId,
+                                            canonicalUrl =
+                                                item.canonicalUrl,
+                                            workingDirectory =
+                                                cacheDirectory
+                                        )
+
+                                    File(
+                                        cacheDirectory,
+                                        "source.zip"
+                                    ).delete()
+
+                                    File(
+                                        cacheDirectory,
+                                        "frames"
+                                    ).deleteRecursively()
+
+                                    Uri.fromFile(
+                                        conversion.outputFile
+                                    ).toString()
+                                }
+                            } catch (
+                                exception: Exception
+                            ) {
+                                Log.e(
+                                    "Muninn/Ugoira",
+                                    "Preview conversion failed for $artworkId",
+                                    exception
+                                )
+
+                                null
+                            }
+                        }
+                } else {
+                    null
+                }
             val media =
                 if (
+                    illustType ==
+                    PIXIV_ILLUST_TYPE_UGOIRA
+                ) {
+                    buildSingleMedia(
+                        body =
+                            body,
+                        mimeType =
+                            VIDEO_MP4_MIME_TYPE,
+                        playbackUri =
+                            ugoiraPlaybackUri
+                    )
+                } else if (
                     pageCount == 1
                 ) {
                     buildSingleMedia(
@@ -269,7 +388,9 @@ class PixivArtworkPreviewSource(
     }
 
     private fun buildSingleMedia(
-        body: JSONObject
+        body: JSONObject,
+        mimeType: String? = null,
+        playbackUri: String? = null
     ): List<ArtworkPreviewMedia> {
         val urls =
             body.optJSONObject(
@@ -303,7 +424,11 @@ class PixivArtworkPreviewSource(
                 previewUrl =
                     previewUrl,
                 originalUrl =
-                    originalUrl
+                    originalUrl,
+                mimeType =
+                    mimeType,
+                playbackUri =
+                    playbackUri
             )
         )
     }
@@ -530,6 +655,12 @@ class PixivArtworkPreviewSource(
     }
 
     private companion object {
+
+        const val PIXIV_ILLUST_TYPE_UGOIRA =
+            2
+
+        const val VIDEO_MP4_MIME_TYPE =
+            "video/mp4"
 
         const val PIXIV_ORIGIN =
             "https://www.pixiv.net"

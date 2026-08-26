@@ -146,7 +146,10 @@ fun AppNavigation(
                 previewSources =
                     mapOf(
                         DiscoverySourceId.PIXIV to
-                                PixivArtworkPreviewSource(),
+                                PixivArtworkPreviewSource(
+                        context =
+                            context.applicationContext
+                    ),
 
                         DiscoverySourceId.X to
                                 XArtworkPreviewSource()

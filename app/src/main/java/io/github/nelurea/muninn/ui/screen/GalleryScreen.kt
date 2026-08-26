@@ -25,6 +25,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
 
 @Composable
 fun GalleryScreen(
@@ -73,7 +74,15 @@ fun GalleryScreen(
                         .clickable {
                             onWorkClick(
                                 item.work.id,
-                                coverMedia?.localUri
+                                coverMedia
+                                    ?.takeUnless {
+                                        it.mimeType
+                                            .startsWith(
+                                                "video/",
+                                                ignoreCase = true
+                                            )
+                                    }
+                                    ?.localUri
                             )
                         }
                         .padding(
@@ -89,39 +98,59 @@ fun GalleryScreen(
                                 media.localUri
                             )
 
-                        AsyncImage(
-                            model =
-                                ImageRequest
-                                    .Builder(
-                                        context
-                                    )
-                                    .data(
-                                        localUri
-                                    )
-                                    .build(),
-                            contentDescription =
-                                null,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(
-                                        280.dp
-                                    ),
-                            contentScale =
-                                ContentScale.Fit,
-                            onError = {
-                                    state ->
-
-                                Log.e(
-                                    "Muninn/Gallery",
-                                    "Failed to load ${media.localUri}",
-                                    state
-                                        .result
-                                        .throwable
+                        if (
+                            media.mimeType
+                                .startsWith(
+                                    "video/",
+                                    ignoreCase = true
                                 )
-                            }
-                        )
-                    }
+                        ) {
+                            LoopingVideoPlayer(
+                                uri =
+                                    media.localUri,
+                                active =
+                                    true,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(
+                                            280.dp
+                                        )
+                            )
+                        } else {
+                            AsyncImage(
+                                model =
+                                    ImageRequest
+                                        .Builder(
+                                            context
+                                        )
+                                        .data(
+                                            localUri
+                                        )
+                                        .build(),
+                                contentDescription =
+                                    null,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(
+                                            280.dp
+                                        ),
+                                contentScale =
+                                    ContentScale.Fit,
+                                onError = {
+                                        state ->
+
+                                    Log.e(
+                                        "Muninn/Gallery",
+                                        "Failed to load ${media.localUri}",
+                                        state
+                                            .result
+                                            .throwable
+                                    )
+                                }
+                            )
+                        }                    }
 
                 Column(
                     modifier =
