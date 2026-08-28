@@ -788,18 +788,6 @@
       return;
     }
 
-    /*
-     * Discovery currently handles image works only.
-     *
-     * Ignore:
-     *
-     * - text-only posts
-     * - video-only posts
-     * - unsupported / incomplete tweet objects
-     *
-     * A malformed individual item must not make the entire
-     * timeline batch fail.
-     */
     const items =
       [];
 
@@ -825,12 +813,6 @@
           capturePackage
         );
       } catch {
-        /*
-         * Expected for text-only, video-only, ads, deleted
-         * posts, incomplete timeline entries, etc.
-         *
-         * Silently ignore them for Discovery.
-         */
       }
     }
 
@@ -1315,58 +1297,152 @@
         0
     ) {
       throw new Error(
-        "This X post does not contain image media."
+        "This X post does not contain media."
       );
     }
 
-    const photoMedia =
-      rawMedia.filter(
-        (item) =>
-          item?.type ===
-          "photo"
-      );
+    const media =
+      [];
 
-    if (
-      photoMedia.length ===
-        0
+    for (
+      let index = 0;
+      index < rawMedia.length;
+      index += 1
     ) {
-      throw new Error(
-        "This X post does not contain supported photo media."
-      );
-    }
+      const item =
+        rawMedia[index];
 
-    /*
-     * Photo-only capture remains the current supported
-     * media model.
-     *
-     * If a post mixes photos and unsupported media,
-     * preserve the supported photos.
-     */
-
-    return photoMedia.map(
-      (
-        item,
-        index
-      ) => {
+      if (
+        item?.type ===
+          "photo"
+      ) {
         const sourceUrl =
           buildOriginalImageUrl(
             item.media_url_https
           );
 
         if (!sourceUrl) {
-          throw new Error(
-            `X image URL was not found at index ${index}.`
-          );
+          continue;
         }
 
-        return createMediaEntry(
-          index,
-          sourceUrl
+        media.push(
+          createMediaEntry(
+            index,
+            sourceUrl
+          )
         );
+
+        continue;
       }
-    );
+
+      if (
+        item?.type ===
+          "video" ||
+        item?.type ===
+          "animated_gif"
+      ) {
+        const sourceUrl =
+          selectHighestBitrateMp4(
+            item.video_info
+          );
+
+        const previewUrl =
+          typeof item.media_url_https ===
+            "string" &&
+          item.media_url_https.length >
+            0
+            ? item.media_url_https
+            : null;
+
+        if (
+          !sourceUrl ||
+          !previewUrl
+        ) {
+          continue;
+        }
+
+        media.push({
+          index,
+
+          sourceUrl,
+
+          previewUrl,
+
+          mimeType:
+            "video/mp4",
+
+          fileName:
+            `video-${index}.mp4`
+        });
+      }
+    }
+
+    if (
+      media.length ===
+        0
+    ) {
+      throw new Error(
+        "This X post does not contain supported media."
+      );
+    }
+
+    return media;
   }
 
+
+  function selectHighestBitrateMp4(
+    videoInfo
+  ) {
+    const variants =
+      videoInfo?.variants;
+
+    if (
+      !Array.isArray(
+        variants
+      )
+    ) {
+      return null;
+    }
+
+    const mp4Variants =
+      variants
+        .filter(
+          (variant) =>
+            variant &&
+            variant.content_type ===
+              "video/mp4" &&
+            typeof variant.url ===
+              "string" &&
+            variant.url.length >
+              0
+        )
+        .sort(
+          (
+            left,
+            right
+          ) =>
+            (
+              Number.isFinite(
+                right.bitrate
+              )
+                ? right.bitrate
+                : 0
+            ) -
+            (
+              Number.isFinite(
+                left.bitrate
+              )
+                ? left.bitrate
+                : 0
+            )
+        );
+
+    return (
+      mp4Variants[0]
+        ?.url ??
+      null
+    );
+  }
 
   function buildOriginalImageUrl(
     mediaUrl

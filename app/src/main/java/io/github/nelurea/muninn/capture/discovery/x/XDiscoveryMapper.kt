@@ -33,7 +33,8 @@ object XDiscoveryMapper {
 
             previewImageUrl =
                 toMediumPreviewUrl(
-                    firstMedia.sourceUrl
+                    firstMedia.previewUrl
+                        ?: firstMedia.sourceUrl
                 ),
 
             title =

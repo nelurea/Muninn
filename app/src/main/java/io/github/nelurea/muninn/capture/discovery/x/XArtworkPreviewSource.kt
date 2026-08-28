@@ -85,10 +85,25 @@ class XArtworkPreviewSource(
                                 media.mediaIndex,
 
                             previewUrl =
-                                media.sourceUrl,
+                                media.previewUrl
+                                    ?: media.sourceUrl,
 
                             originalUrl =
+                                media.sourceUrl,
+
+                            mimeType =
+                                media.mimeType,
+
+                            playbackUri =
                                 media.sourceUrl
+                                    .takeIf {
+                                        media.mimeType
+                                            ?.startsWith(
+                                                "video/",
+                                                ignoreCase = true
+                                            ) ==
+                                            true
+                                    }
                         )
                     }
         )

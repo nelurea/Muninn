@@ -22,5 +22,6 @@ data class XCaptureMediaPayload(
     val mediaIndex: Int,
     val sourceUrl: String,
     val mimeType: String?,
-    val fileName: String
+    val fileName: String,
+    val previewUrl: String? = null
 )

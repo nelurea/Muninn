@@ -158,7 +158,12 @@ class XMediaDownloader(
             if (
                 contentType != null &&
                 !contentType.startsWith(
-                    "image/"
+                    "image/",
+                    ignoreCase = true
+                ) &&
+                !contentType.startsWith(
+                    "video/",
+                    ignoreCase = true
                 )
             ) {
                 throw IllegalStateException(

@@ -1,6 +1,7 @@
 package io.github.nelurea.muninn.capture.discovery
 
 import android.content.Context
+import android.media.MediaCodecInfo
 import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
@@ -9,11 +10,13 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.VideoEncoderSettings
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -76,37 +79,10 @@ class PixivUgoiraConverter(
                     "source.zip"
                 )
 
-            downloadZip(
-                sourceUrl =
-                    metadata.sourceUrl,
-                canonicalUrl =
-                    canonicalUrl,
-                destination =
-                    zipFile
-            )
-
             val framesDirectory =
                 File(
                     workingDirectory,
                     "frames"
-                )
-
-            if (
-                !framesDirectory.mkdirs()
-            ) {
-                throw IllegalStateException(
-                    "Could not create ugoira frame directory."
-                )
-            }
-
-            val frameFiles =
-                extractFrames(
-                    zipFile =
-                        zipFile,
-                    frames =
-                        metadata.frames,
-                    destinationDirectory =
-                        framesDirectory
                 )
 
             val outputFile =
@@ -115,51 +91,123 @@ class PixivUgoiraConverter(
                     "ugoira.mp4"
                 )
 
-            exportMp4(
-                frameFiles =
-                    frameFiles,
-                frames =
-                    metadata.frames,
-                outputFile =
-                    outputFile
-            )
-
-            if (
-                !outputFile.exists() ||
-                outputFile.length() <= 0L
-            ) {
-                throw IllegalStateException(
-                    "Converted ugoira MP4 is empty."
+            try {
+                downloadZip(
+                    sourceUrl =
+                        metadata.sourceUrl,
+                    canonicalUrl =
+                        canonicalUrl,
+                    destination =
+                        zipFile
                 )
+
+                if (
+                    framesDirectory.exists() &&
+                    !framesDirectory.deleteRecursively()
+                ) {
+                    throw IllegalStateException(
+                        "Could not reset ugoira frame directory."
+                    )
+                }
+
+                if (
+                    !framesDirectory.mkdirs()
+                ) {
+                    throw IllegalStateException(
+                        "Could not create ugoira frame directory."
+                    )
+                }
+
+                val frameFiles =
+                    extractFrames(
+                        zipFile =
+                            zipFile,
+                        frames =
+                            metadata.frames,
+                        destinationDirectory =
+                            framesDirectory
+                    )
+
+                exportMp4(
+                    frameFiles =
+                        frameFiles,
+                    frames =
+                        metadata.frames,
+                    outputFile =
+                        outputFile
+                )
+
+                if (
+                    !outputFile.exists() ||
+                    outputFile.length() <= 0L
+                ) {
+                    throw IllegalStateException(
+                        "Converted ugoira MP4 is empty."
+                    )
+                }
+
+                val durationMs =
+                    metadata.frames
+                        .sumOf {
+                            it.delayMs
+                        }
+
+                Log.i(
+                    LOG_TAG,
+                    "converted " +
+                        "source=pixiv " +
+                        "artworkId=$artworkId " +
+                        "frames=${metadata.frames.size} " +
+                        "durationMs=$durationMs " +
+                        "outputBytes=${outputFile.length()} " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                )
+
+                PixivUgoiraConversionResult(
+                    sourceUrl =
+                        metadata.sourceUrl,
+                    outputFile =
+                        outputFile,
+                    frameCount =
+                        metadata.frames.size,
+                    durationMs =
+                        durationMs
+                )
+            } catch (
+                error: Exception
+            ) {
+                if (
+                    outputFile.exists() &&
+                    !outputFile.delete()
+                ) {
+                    Log.w(
+                        LOG_TAG,
+                        "Could not delete incomplete ugoira MP4: ${outputFile.absolutePath}"
+                    )
+                }
+
+                throw error
+            } finally {
+                if (
+                    zipFile.exists() &&
+                    !zipFile.delete()
+                ) {
+                    Log.w(
+                        LOG_TAG,
+                        "Could not delete temporary ugoira ZIP: ${zipFile.absolutePath}"
+                    )
+                }
+
+                if (
+                    framesDirectory.exists() &&
+                    !framesDirectory.deleteRecursively()
+                ) {
+                    Log.w(
+                        LOG_TAG,
+                        "Could not delete temporary ugoira frames: ${framesDirectory.absolutePath}"
+                    )
+                }
             }
-
-            val durationMs =
-                metadata.frames
-                    .sumOf {
-                        it.delayMs
-                    }
-
-            Log.i(
-                LOG_TAG,
-                "converted " +
-                    "source=pixiv " +
-                    "artworkId=$artworkId " +
-                    "frames=${metadata.frames.size} " +
-                    "durationMs=$durationMs " +
-                    "outputBytes=${outputFile.length()} " +
-                    "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-            )
-
-            PixivUgoiraConversionResult(
-                sourceUrl =
-                    metadata.sourceUrl,
-                outputFile =
-                    outputFile,
-                frameCount =
-                    metadata.frames.size,
-                durationMs =
-                    durationMs
-            )
         }
 
     private fun loadMetadata(
@@ -690,6 +738,29 @@ class PixivUgoiraConverter(
                         .setVideoMimeType(
                             MimeTypes.VIDEO_H264
                         )
+                        .setEncoderFactory(
+                            DefaultEncoderFactory
+                                .Builder(
+                                    appContext
+                                )
+                                .setEnableFallback(
+                                    true
+                                )
+                                .setRequestedVideoEncoderSettings(
+                                    VideoEncoderSettings
+                                        .Builder()
+                                        .setBitrate(
+                                            TARGET_VIDEO_BITRATE
+                                        )
+                                        .setBitrateMode(
+                                            MediaCodecInfo
+                                                .EncoderCapabilities
+                                                .BITRATE_MODE_CBR
+                                        )
+                                        .build()
+                                )
+                                .build()
+                        )
                         .addListener(
                             object :
                                 Transformer.Listener {
@@ -790,6 +861,9 @@ class PixivUgoiraConverter(
 
         const val TARGET_FRAME_RATE =
             60
+
+        const val TARGET_VIDEO_BITRATE =
+            100_000_000
 
         const val LOG_TAG =
             "Muninn/Ugoira"

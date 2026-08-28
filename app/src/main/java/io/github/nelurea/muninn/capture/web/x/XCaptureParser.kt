@@ -160,6 +160,11 @@ object XCaptureParser {
                             fileName =
                                 item.getString(
                                     "fileName"
+                                ),
+
+                            previewUrl =
+                                item.optNullableString(
+                                    "previewUrl"
                                 )
                         )
                     )
@@ -169,7 +174,7 @@ object XCaptureParser {
         require(
             media.isNotEmpty()
         ) {
-            "X capture does not contain image media"
+            "X capture does not contain supported media"
         }
 
         return XCapturePayload(

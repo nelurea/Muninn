@@ -1480,6 +1480,8 @@ private fun ArtworkPagerPage(
                     playbackUri,
                 active =
                     active,
+                muted =
+                    false,
                 modifier =
                     mediaModifier
             )

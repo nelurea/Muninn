@@ -125,6 +125,7 @@ object XCaptureMapper {
             "image/gif" -> "gif"
             "image/webp" -> "webp"
             "image/avif" -> "avif"
+            "video/mp4" -> "mp4"
             else -> "bin"
         }
 }
