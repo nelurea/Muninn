@@ -33,3 +33,13 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Local database dumps
+/muninn*.db
+/muninn*.db-wal
+/muninn*.db-shm
+/muninn*.db-journal
+
+# Local inspection artifacts
+/project-tree*.txt
+/rcmainjava -Recurse
