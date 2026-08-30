@@ -123,7 +123,44 @@ abstract class CapturedWorkDao {
     abstract suspend fun getAllWithMedia():
             List<CapturedWorkWithMedia>
 
+
+    @Query(
+        """
+        SELECT workId
+        FROM captured_work_purposes
+
+        UNION
+
+        SELECT workId
+        FROM captured_work_attractions
+
+        UNION
+
+        SELECT workId
+        FROM captured_work_responses
+
+        UNION
+
+        SELECT captured_media.workId
+        FROM captured_media_attractions
+        INNER JOIN captured_media
+            ON captured_media.id =
+               captured_media_attractions.mediaId
+
+        UNION
+
+        SELECT captured_media.workId
+        FROM media_focus
+        INNER JOIN captured_media
+            ON captured_media.id =
+               media_focus.mediaId
+        """
+    )
+    abstract suspend fun getContextualizedWorkIds():
+            List<Long>
+
     @Transaction
+
     @Query(
         """
     SELECT *

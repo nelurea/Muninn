@@ -47,6 +47,13 @@ class CapturedWorkRepository(
         return dao.getAllWithMedia()
     }
 
+    suspend fun getContextualizedWorkIds():
+            Set<Long> {
+        return dao
+            .getContextualizedWorkIds()
+            .toSet()
+    }
+
     suspend fun getWithMediaById(
         workId: Long
     ): CapturedWorkWithMedia? {
