@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import androidx.room.OnConflictStrategy
 
 
@@ -432,4 +433,25 @@ abstract class CapturedWorkDao {
     abstract suspend fun getFocusForMedia(
         mediaId: Long
     ): List<MediaFocusEntity>
+
+    @Update
+    protected abstract suspend fun updateWorkMetadata(
+        work: CapturedWorkEntity
+    )
+
+    @Transaction
+    open suspend fun refreshMetadata(
+        work: CapturedWorkEntity,
+        newTags: List<CapturedTagEntity>
+    ) {
+        updateWorkMetadata(
+            work
+        )
+
+        if (newTags.isNotEmpty()) {
+            insertTags(
+                newTags
+            )
+        }
+    }
 }

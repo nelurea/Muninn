@@ -19,10 +19,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,9 +47,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataResult
+import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataUseCase
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
+import kotlinx.coroutines.launch
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -106,6 +112,34 @@ fun CapturedWorkDetailScreen(
         )
     }
 
+
+    var refreshingMetadata by remember(
+        workId
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var refreshMessage by remember(
+        workId
+    ) {
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    val coroutineScope =
+        rememberCoroutineScope()
+
+    val refreshMetadataUseCase =
+        remember(
+            repository
+        ) {
+            RefreshCapturedWorkMetadataUseCase(
+                repository
+            )
+        }
     LaunchedEffect(
         workId
     ) {
@@ -384,8 +418,51 @@ fun CapturedWorkDetailScreen(
                         TopAppBar(
                             title = {
                                 Text(
-                                    "Captured Work"
+                                    if (
+                                        refreshingMetadata
+                                    ) {
+                                        "Refreshing metadata..."
+                                    } else {
+                                        refreshMessage
+                                            ?: "Captured Work"
+                                    }
                                 )
+                            },
+                            actions = {
+                                if (
+                                    item.work.sourceType ==
+                                    "x"
+                                ) {
+                                    if (
+                                        refreshingMetadata
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier =
+                                                Modifier.size(
+                                                    24.dp
+                                                ),
+                                            strokeWidth =
+                                                2.dp
+                                        )
+                                    } else {
+                                        IconButton(
+                                            onClick = {
+                                                refreshMessage =
+                                                    null
+
+                                                refreshingMetadata =
+                                                    true
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector =
+                                                    Icons.Default.Refresh,
+                                                contentDescription =
+                                                    "Refresh metadata"
+                                            )
+                                        }
+                                    }
+                                }
                             },
                             modifier =
                                 Modifier
@@ -430,6 +507,72 @@ fun CapturedWorkDetailScreen(
                                 MaterialTheme
                                     .typography
                                     .bodyMedium
+                        )
+                    }
+
+                    if (
+                        refreshingMetadata &&
+                        item.work.sourceType ==
+                        "x"
+                    ) {
+                        XMetadataRefreshSession(
+                            canonicalUrl =
+                                item.work.canonicalUrl,
+                            sourceId =
+                                item.work.sourceId,
+                            onPayload = {
+                                    payload ->
+
+                                coroutineScope.launch {
+                                    when (
+                                        val result =
+                                            refreshMetadataUseCase
+                                                .refreshX(
+                                                    workId =
+                                                        workId,
+                                                    payload =
+                                                        payload
+                                                )
+                                    ) {
+                                        is RefreshCapturedWorkMetadataResult.Success -> {
+                                            capturedWork =
+                                                repository.getWithMediaById(
+                                                    workId
+                                                )
+
+                                            refreshMessage =
+                                                if (
+                                                    result.addedTagCount >
+                                                    0
+                                                ) {
+                                                    "Metadata updated · +${result.addedTagCount} tags"
+                                                } else {
+                                                    "Metadata is up to date"
+                                                }
+
+                                            refreshingMetadata =
+                                                false
+                                        }
+
+                                        is RefreshCapturedWorkMetadataResult.Failure -> {
+                                            refreshMessage =
+                                                result.error
+
+                                            refreshingMetadata =
+                                                false
+                                        }
+                                    }
+                                }
+                            },
+                            onFailure = {
+                                    error ->
+
+                                refreshMessage =
+                                    error
+
+                                refreshingMetadata =
+                                    false
+                            }
                         )
                     }
 

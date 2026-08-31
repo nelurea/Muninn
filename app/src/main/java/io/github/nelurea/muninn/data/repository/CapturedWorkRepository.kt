@@ -435,4 +435,14 @@ class CapturedWorkRepository(
             mediaId
         )
     }
+
+    suspend fun refreshMetadata(
+        work: CapturedWorkEntity,
+        newTags: List<CapturedTagEntity>
+    ) {
+        dao.refreshMetadata(
+            work = work,
+            newTags = newTags
+        )
+    }
 }
