@@ -1127,6 +1127,11 @@
         tags:
           extractHashtags(
             legacy
+          ),
+
+        isSensitive:
+          extractIsSensitive(
+            result
           )
       },
 
@@ -1282,6 +1287,77 @@
    * ---------------------------------------------------------
    */
 
+  function extractIsSensitive(
+    result
+  ) {
+    const legacy =
+      result?.legacy;
+
+    if (
+      !legacy ||
+      typeof legacy !==
+        "object"
+    ) {
+      return false;
+    }
+
+    /*
+     * X Web reliably exposes a generic post-level flag,
+     * but does not reliably expose adult / violence detail.
+     *
+     * Do not inspect user_results.possibly_sensitive here:
+     * that belongs to the author, not necessarily this post.
+     */
+    if (
+      legacy.possibly_sensitive ===
+        true
+    ) {
+      return true;
+    }
+
+    const mediaCollections = [
+      legacy.entities?.media,
+      legacy.extended_entities?.media
+    ];
+
+    for (
+      const collection
+      of mediaCollections
+    ) {
+      if (
+        !Array.isArray(
+          collection
+        )
+      ) {
+        continue;
+      }
+
+      for (
+        const item
+        of collection
+      ) {
+        const warning =
+          item?.sensitive_media_warning ??
+          item?.ext_sensitive_media_warning;
+
+        if (
+          warning &&
+          typeof warning ===
+            "object" &&
+          Object.values(
+            warning
+          ).some(
+            (value) =>
+              value === true
+          )
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
   function buildMediaList(
     legacy
   ) {

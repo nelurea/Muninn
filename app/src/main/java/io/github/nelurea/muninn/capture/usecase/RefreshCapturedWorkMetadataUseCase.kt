@@ -1,6 +1,7 @@
 package io.github.nelurea.muninn.capture.usecase
 
 import io.github.nelurea.muninn.capture.web.x.XCapturePayload
+import io.github.nelurea.muninn.capture.web.x.classifiedXTags
 import io.github.nelurea.muninn.data.db.CapturedTagEntity
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 
@@ -58,14 +59,9 @@ class RefreshCapturedWorkMetadataUseCase(
                 .toSet()
 
         val incomingTags =
-            payload.tags
-                .map {
-                    it.trim()
-                }
-                .filter {
-                    it.isNotBlank()
-                }
-                .distinct()
+            classifiedXTags(
+                payload
+            )
 
         val missingTags =
             incomingTags

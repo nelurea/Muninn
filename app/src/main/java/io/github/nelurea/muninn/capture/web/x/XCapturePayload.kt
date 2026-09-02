@@ -15,6 +15,9 @@ data class XCapturePayload(
     val caption: String?,
 
     val tags: List<String>,
+
+    val isSensitive: Boolean = false,
+
     val media: List<XCaptureMediaPayload>
 )
 

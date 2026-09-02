@@ -87,6 +87,62 @@ class SaveCaptureUseCase(
                     )
                 } else preWrite.canonical.work.id
 
+                if (!wasNew) {
+                    val existing =
+                        requireNotNull(
+                            preWrite
+                        )
+
+                    val existingTagNames =
+                        existing
+                            .canonical
+                            .tags
+                            .mapTo(
+                                hashSetOf()
+                            ) {
+                                it.tag
+                            }
+
+                    val missingTags =
+                        draft
+                            .tags
+                            .distinct()
+                            .filterNot {
+                                it in existingTagNames
+                            }
+
+                    val nextTagPosition =
+                        (
+                            existing
+                                .canonical
+                                .tags
+                                .maxOfOrNull {
+                                    it.position
+                                }
+                                ?: -1
+                        ) + 1
+
+                    repository.appendTagsToWork(
+                        workId =
+                            workId,
+                        tags =
+                            missingTags
+                                .mapIndexed {
+                                        index,
+                                        tag ->
+
+                                    CapturedTagEntity(
+                                        workId =
+                                            workId,
+                                        position =
+                                            nextTagPosition + index,
+                                        tag =
+                                            tag
+                                    )
+                                }
+                    )
+                }
+
                 val inserted = stillMissing.map { index ->
                     val item = draftsByIndex.getValue(index)
                     CapturedMediaEntity(

@@ -97,7 +97,9 @@ object XCaptureMapper {
                     ?: "",
 
             tags =
-                payload.tags,
+                classifiedXTags(
+                    payload
+                ),
 
             media =
                 media

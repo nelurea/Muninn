@@ -176,8 +176,7 @@ object XCaptureParser {
         ) {
             "X capture does not contain supported media"
         }
-
-        return XCapturePayload(
+return XCapturePayload(
             sourceType =
                 source.getString(
                     "type"
@@ -230,6 +229,11 @@ object XCaptureParser {
 
             tags =
                 tags,
+            isSensitive =
+                content.optBoolean(
+                    "isSensitive",
+                    false
+                ),
 
             media =
                 media

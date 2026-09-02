@@ -226,8 +226,7 @@ fun XMetadataRefreshSession(
                         val rawMessage =
                             message.data
                                 ?: return@addWebMessageListener
-
-                        if (
+if (
                             !rawMessage.contains(
                                 "\"type\":\"X_CAPTURE_RESULT\""
                             )
@@ -254,8 +253,7 @@ fun XMetadataRefreshSession(
 
                                 completed.value =
                                     true
-
-                                currentOnPayload.value(
+currentOnPayload.value(
                                     result.payload
                                 )
                             }

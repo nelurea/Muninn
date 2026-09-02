@@ -102,6 +102,107 @@ class SaveCaptureUseCaseTest {
     }
 
     @Test
+    fun resaveAppendsOnlyMissingTags() =
+        runBlocking {
+            val existing =
+                CapturedWorkWithMedia(
+                    work =
+                        syntheticWork(
+                            id =
+                                42L
+                        ),
+                    media =
+                        listOf(
+                            CapturedMediaEntity(
+                                id =
+                                    100L,
+                                workId =
+                                    42L,
+                                mediaIndex =
+                                    0,
+                                localUri =
+                                    "existing://0",
+                                sourceUrl =
+                                    "https://synthetic.invalid/0.jpg",
+                                mimeType =
+                                    "image/jpeg",
+                                fileName =
+                                    "0.jpg",
+                                isHighlighted =
+                                    false
+                            )
+                        ),
+                    tags =
+                        listOf(
+                            CapturedTagEntity(
+                                workId =
+                                    42L,
+                                position =
+                                    0,
+                                tag =
+                                    "existing"
+                            )
+                        )
+                )
+
+            val repository =
+                FakeCapturePersistence(
+                    existing =
+                        existing
+                )
+
+            val useCase =
+                SaveCaptureUseCase(
+                    mediaStorage =
+                        FakeMediaStorage(),
+                    repository =
+                        repository,
+                    sessionRepository =
+                        FakeSessionStore()
+                )
+
+            val draft =
+                syntheticDraft(
+                    0
+                ).copy(
+                    tags =
+                        listOf(
+                            "existing",
+                            "Sensitive",
+                            "Sensitive"
+                        )
+                )
+
+            val firstResult =
+                useCase.save(
+                    draft
+                )
+
+            val secondResult =
+                useCase.save(
+                    draft
+                )
+
+            assertTrue(
+                firstResult is
+                    SaveCaptureResult.Success
+            )
+
+            assertTrue(
+                secondResult is
+                    SaveCaptureResult.Success
+            )
+
+            assertEquals(
+                listOf(
+                    "existing",
+                    "Sensitive"
+                ),
+                repository.currentTags
+            )
+        }
+
+    @Test
     fun persistenceFailureDeletesFilesForNewCapture() =
         runBlocking {
             val storage =
@@ -419,6 +520,18 @@ class SaveCaptureUseCaseTest {
         val currentWork: CapturedWorkEntity?
             get() = current?.work
 
+        val currentTags: List<String>
+            get() =
+                current
+                    ?.tags
+                    ?.sortedBy {
+                        it.position
+                    }
+                    ?.map {
+                        it.tag
+                    }
+                    .orEmpty()
+
         override suspend fun <T> inTransaction(block: suspend () -> T): T = block()
 
         override suspend fun getIdentitySnapshot(
@@ -472,6 +585,27 @@ class SaveCaptureUseCaseTest {
                     }
                 )
             }
+        }
+
+        override suspend fun appendTagsToWork(
+            workId: Long,
+            tags: List<CapturedTagEntity>
+        ) {
+            current =
+                current?.let {
+                        capture ->
+
+                    capture.copy(
+                        tags =
+                            capture.tags +
+                                tags.map {
+                                    it.copy(
+                                        workId =
+                                            workId
+                                    )
+                                }
+                    )
+                }
         }
 
         override suspend fun markMediaHighlighted(
@@ -586,6 +720,29 @@ class SaveCaptureUseCaseTest {
             captures[entry.key] = entry.value.copy(
                 media = entry.value.media + media.map { it.copy(id = nextMediaId++, workId = workId) }
             )
+        }
+
+        override suspend fun appendTagsToWork(
+            workId: Long,
+            tags: List<CapturedTagEntity>
+        ) {
+            val entry =
+                captures.entries.single {
+                    it.value.work.id ==
+                        workId
+                }
+
+            captures[entry.key] =
+                entry.value.copy(
+                    tags =
+                        entry.value.tags +
+                            tags.map {
+                                it.copy(
+                                    workId =
+                                        workId
+                                )
+                            }
+                )
         }
 
         override suspend fun markMediaHighlighted(

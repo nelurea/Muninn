@@ -37,6 +37,11 @@ interface CapturePersistence {
         media: List<CapturedMediaEntity>
     )
 
+    suspend fun appendTagsToWork(
+        workId: Long,
+        tags: List<CapturedTagEntity>
+    )
+
     suspend fun markMediaHighlighted(
         workId: Long,
         mediaIndices: List<Int>

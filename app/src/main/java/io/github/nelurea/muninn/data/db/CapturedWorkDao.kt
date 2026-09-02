@@ -98,6 +98,22 @@ abstract class CapturedWorkDao {
         }
     }
 
+    @Transaction
+    open suspend fun appendTagsToWork(
+        workId: Long,
+        tags: List<CapturedTagEntity>
+    ) {
+        if (tags.isNotEmpty()) {
+            insertTags(
+                tags.map {
+                    it.copy(
+                        workId = workId
+                    )
+                }
+            )
+        }
+    }
+
     @Query(
         """
     UPDATE captured_media

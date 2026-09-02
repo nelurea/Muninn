@@ -97,6 +97,16 @@ class CapturedWorkRepository(
         )
     }
 
+    override suspend fun appendTagsToWork(
+        workId: Long,
+        tags: List<CapturedTagEntity>
+    ) {
+        dao.appendTagsToWork(
+            workId = workId,
+            tags = tags
+        )
+    }
+
     override suspend fun markMediaHighlighted(
         workId: Long,
         mediaIndices: List<Int>
