@@ -1481,7 +1481,7 @@ private fun ArtworkPagerPage(
                 active =
                     active,
                 muted =
-                    false,
+                    true,
                 modifier =
                     mediaModifier
             )
