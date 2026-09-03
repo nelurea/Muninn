@@ -2,16 +2,23 @@ package io.github.nelurea.muninn.ui.media
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +65,14 @@ fun LoopingVideoPlayer(
     }
 
     var hasAudioTrack by remember(
+        uri
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var showUnsafeAudioDialog by remember(
         uri
     ) {
         mutableStateOf(
@@ -249,8 +264,20 @@ fun LoopingVideoPlayer(
             ) {
                 IconButton(
                     onClick = {
-                        isMuted =
+                        if (
                             !isMuted
+                        ) {
+                            isMuted =
+                                true
+                        } else if (
+                            context.hasPrivateMediaAudioRoute()
+                        ) {
+                            isMuted =
+                                false
+                        } else {
+                            showUnsafeAudioDialog =
+                                true
+                        }
                     }
                 ) {
                     Icon(
@@ -275,6 +302,54 @@ fun LoopingVideoPlayer(
             }
         }
     }
+
+    if (
+        showUnsafeAudioDialog
+    ) {
+        AlertDialog(
+            onDismissRequest = {
+                showUnsafeAudioDialog =
+                    false
+            },
+            title = {
+                Text(
+                    "Audio output warning"
+                )
+            },
+            text = {
+                Text(
+                    "Audio may play through a speaker."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showUnsafeAudioDialog =
+                            false
+
+                        isMuted =
+                            false
+                    }
+                ) {
+                    Text(
+                        "Play sound"
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showUnsafeAudioDialog =
+                            false
+                    }
+                ) {
+                    Text(
+                        "Keep muted"
+                    )
+                }
+            }
+        )
+    }
 }
 
 private tailrec fun Context
@@ -291,4 +366,72 @@ private tailrec fun Context
 
         else ->
             null
+    }
+
+private fun Context.hasPrivateMediaAudioRoute(): Boolean {
+    val audioManager =
+        getSystemService(
+            Context.AUDIO_SERVICE
+        ) as? AudioManager
+            ?: return false
+
+    if (
+        Build.VERSION.SDK_INT <
+        Build.VERSION_CODES.TIRAMISU
+    ) {
+        return false
+    }
+
+    val mediaAttributes =
+        AudioAttributes
+            .Builder()
+            .setUsage(
+                AudioAttributes.USAGE_MEDIA
+            )
+            .setContentType(
+                AudioAttributes.CONTENT_TYPE_MOVIE
+            )
+            .build()
+
+    val routedDevices =
+        audioManager
+            .getAudioDevicesForAttributes(
+                mediaAttributes
+            )
+
+    if (
+        routedDevices.isEmpty()
+    ) {
+        return false
+    }
+
+    return routedDevices.all {
+            device ->
+
+        device.isPrivateAudioDevice()
+    }
+}
+
+private fun AudioDeviceInfo.isPrivateAudioDevice(): Boolean =
+    when (
+        type
+    ) {
+        AudioDeviceInfo.TYPE_WIRED_HEADSET,
+        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+        AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        AudioDeviceInfo.TYPE_USB_HEADSET,
+        AudioDeviceInfo.TYPE_HEARING_AID ->
+            true
+
+        else ->
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.S
+            ) {
+                type ==
+                    AudioDeviceInfo.TYPE_BLE_HEADSET
+            } else {
+                false
+            }
     }
