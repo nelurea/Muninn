@@ -3,6 +3,7 @@ package io.github.nelurea.muninn.ui.media
 import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioAttributes
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
@@ -80,6 +81,14 @@ fun LoopingVideoPlayer(
         )
     }
 
+    var pausedForUnsafeAudioRoute by remember(
+        uri
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
+
     val player =
         remember(
             uri
@@ -115,7 +124,8 @@ fun LoopingVideoPlayer(
     LaunchedEffect(
         player,
         active,
-        isMuted
+        isMuted,
+        pausedForUnsafeAudioRoute
     ) {
         player.volume =
             if (
@@ -137,7 +147,8 @@ fun LoopingVideoPlayer(
 
         player.playWhenReady =
             active &&
-                    lifecycleStarted
+                    lifecycleStarted &&
+                    !pausedForUnsafeAudioRoute
     }
 
     DisposableEffect(
@@ -177,9 +188,64 @@ fun LoopingVideoPlayer(
     }
 
     DisposableEffect(
+        context,
+        player,
+        isMuted
+    ) {
+        val audioManager =
+            context.getSystemService(
+                Context.AUDIO_SERVICE
+            ) as? AudioManager
+
+        if (
+            audioManager ==
+            null
+        ) {
+            onDispose {}
+        } else {
+            val audioDeviceCallback =
+                object : AudioDeviceCallback() {
+                    override fun onAudioDevicesRemoved(
+                        removedDevices: Array<out AudioDeviceInfo>
+                    ) {
+                        if (
+                            removedDevices.isNotEmpty() &&
+                            !isMuted &&
+                            !context.hasPrivateMediaAudioRoute()
+                        ) {
+                            player.volume =
+                                0f
+
+                            player.playWhenReady =
+                                false
+
+                            isMuted =
+                                true
+
+                            pausedForUnsafeAudioRoute =
+                                true
+                        }
+                    }
+                }
+
+            audioManager.registerAudioDeviceCallback(
+                audioDeviceCallback,
+                null
+            )
+
+            onDispose {
+                audioManager.unregisterAudioDeviceCallback(
+                    audioDeviceCallback
+                )
+            }
+        }
+    }
+
+    DisposableEffect(
         lifecycleOwner,
         player,
-        active
+        active,
+        pausedForUnsafeAudioRoute
     ) {
         val observer =
             LifecycleEventObserver {
@@ -190,7 +256,8 @@ fun LoopingVideoPlayer(
                 ) {
                     Lifecycle.Event.ON_START -> {
                         player.playWhenReady =
-                            active
+                            active &&
+                                !pausedForUnsafeAudioRoute
                     }
 
                     Lifecycle.Event.ON_STOP -> {
@@ -272,6 +339,8 @@ fun LoopingVideoPlayer(
                         } else if (
                             context.hasPrivateMediaAudioRoute()
                         ) {
+                            pausedForUnsafeAudioRoute =
+                                false
                             isMuted =
                                 false
                         } else {
@@ -327,6 +396,8 @@ fun LoopingVideoPlayer(
                         showUnsafeAudioDialog =
                             false
 
+                        pausedForUnsafeAudioRoute =
+                            false
                         isMuted =
                             false
                     }
