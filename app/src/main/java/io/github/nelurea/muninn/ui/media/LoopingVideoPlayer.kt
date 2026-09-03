@@ -2,18 +2,35 @@ package io.github.nelurea.muninn.ui.media
 
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.ContentFrame
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
@@ -30,6 +47,23 @@ fun LoopingVideoPlayer(
 
     val lifecycleOwner =
         context.findLifecycleOwner()
+
+    var isMuted by remember(
+        uri,
+        muted
+    ) {
+        mutableStateOf(
+            muted
+        )
+    }
+
+    var hasAudioTrack by remember(
+        uri
+    ) {
+        mutableStateOf(
+            false
+        )
+    }
 
     val player =
         remember(
@@ -66,11 +100,11 @@ fun LoopingVideoPlayer(
     LaunchedEffect(
         player,
         active,
-        muted
+        isMuted
     ) {
         player.volume =
             if (
-                muted
+                isMuted
             ) {
                 0f
             } else {
@@ -88,7 +122,43 @@ fun LoopingVideoPlayer(
 
         player.playWhenReady =
             active &&
-                lifecycleStarted
+                    lifecycleStarted
+    }
+
+    DisposableEffect(
+        player
+    ) {
+        val listener =
+            object : Player.Listener {
+                override fun onTracksChanged(
+                    tracks: Tracks
+                ) {
+                    hasAudioTrack =
+                        tracks.groups.any {
+                                group ->
+                            group.type ==
+                                    C.TRACK_TYPE_AUDIO
+                        }
+                }
+            }
+
+        player.addListener(
+            listener
+        )
+
+        hasAudioTrack =
+            player.currentTracks.groups.any {
+                    group ->
+                group.type ==
+                        C.TRACK_TYPE_AUDIO
+            }
+
+        onDispose {
+            player.removeListener(
+                listener
+            )
+            player.release()
+        }
     }
 
     DisposableEffect(
@@ -100,7 +170,6 @@ fun LoopingVideoPlayer(
             LifecycleEventObserver {
                     _,
                     event ->
-
                 when (
                     event
                 ) {
@@ -133,32 +202,79 @@ fun LoopingVideoPlayer(
         }
     }
 
-    DisposableEffect(
-        player
+    Box(
+        modifier =
+            modifier
     ) {
-        onDispose {
-            player.release()
+        ContentFrame(
+            player =
+                player,
+
+            modifier =
+                Modifier.fillMaxSize(),
+
+            surfaceType =
+                SURFACE_TYPE_TEXTURE_VIEW,
+
+            contentScale =
+                ContentScale.Fit,
+
+            keepContentOnReset =
+                true,
+
+            shutter = {}
+        )
+
+        if (
+            hasAudioTrack
+        ) {
+            Surface(
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.TopEnd
+                        )
+                        .padding(
+                            12.dp
+                        ),
+                shape =
+                    MaterialTheme.shapes.extraLarge,
+                color =
+                    MaterialTheme
+                        .colorScheme
+                        .surface
+                        .copy(
+                            alpha = 0.72f
+                        )
+            ) {
+                IconButton(
+                    onClick = {
+                        isMuted =
+                            !isMuted
+                    }
+                ) {
+                    Icon(
+                        imageVector =
+                            if (
+                                isMuted
+                            ) {
+                                Icons.AutoMirrored.Filled.VolumeOff
+                            } else {
+                                Icons.AutoMirrored.Filled.VolumeUp
+                            },
+                        contentDescription =
+                            if (
+                                isMuted
+                            ) {
+                                "Unmute video"
+                            } else {
+                                "Mute video"
+                            }
+                    )
+                }
+            }
         }
     }
-
-    ContentFrame(
-        player =
-            player,
-
-        modifier =
-            modifier,
-
-        surfaceType =
-            SURFACE_TYPE_TEXTURE_VIEW,
-
-        contentScale =
-            ContentScale.Fit,
-
-        keepContentOnReset =
-            true,
-
-        shutter = {}
-    )
 }
 
 private tailrec fun Context

@@ -891,7 +891,7 @@ private fun ZoomableCapturedMediaPage(
                 active =
                     active,
                 muted =
-                    false,
+                    true,
                 modifier =
                     mediaModifier
             )
