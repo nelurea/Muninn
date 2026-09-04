@@ -4,6 +4,8 @@ import android.net.Uri
 import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.StickyNote2
@@ -128,6 +132,15 @@ fun GalleryScreen(
             false
         )
     }
+
+    var selectedWorkIds by remember {
+        mutableStateOf(
+            emptySet<Long>()
+        )
+    }
+
+    val selectionMode =
+        selectedWorkIds.isNotEmpty()
 
     LaunchedEffect(
         Unit
@@ -304,6 +317,10 @@ fun GalleryScreen(
             Text(
                 text =
                     if (
+                        selectionMode
+                    ) {
+                        "${selectedWorkIds.size} selected"
+                    } else if (
                         activeFilterCount == 0
                     ) {
                         "${visibleWorks.size} works"
@@ -318,17 +335,37 @@ fun GalleryScreen(
 
             IconButton(
                 onClick = {
-                    showFilters =
-                        true
+                    if (
+                        selectionMode
+                    ) {
+                        selectedWorkIds =
+                            emptySet()
+                    } else {
+                        showFilters =
+                            true
+                    }
                 }
             ) {
                 Icon(
                     imageVector =
-                        Icons.Default.FilterList,
+                        if (
+                            selectionMode
+                        ) {
+                            Icons.Default.Close
+                        } else {
+                            Icons.Default.FilterList
+                        },
                     contentDescription =
-                        "Filter gallery",
+                        if (
+                            selectionMode
+                        ) {
+                            "Clear selection"
+                        } else {
+                            "Filter gallery"
+                        },
                     tint =
                         if (
+                            !selectionMode &&
                             hasActiveFilters
                         ) {
                             MaterialTheme
@@ -363,24 +400,64 @@ fun GalleryScreen(
                             it.mediaIndex
                         }
 
+                val selected =
+                    item.work.id in
+                        selectedWorkIds
+
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                onWorkClick(
-                                    item.work.id,
-                                    coverMedia
-                                        ?.takeUnless {
-                                            it.mimeType
-                                                .startsWith(
-                                                    "video/",
-                                                    ignoreCase = true
-                                                )
-                                        }
-                                        ?.localUri
-                                )
-                            }
+                            .background(
+                                if (
+                                    selected
+                                ) {
+                                    MaterialTheme
+                                        .colorScheme
+                                        .primaryContainer
+                                        .copy(
+                                            alpha = 0.35f
+                                        )
+                                } else {
+                                    Color.Transparent
+                                }
+                            )
+                            .combinedClickable(
+                                onClick = {
+                                    if (
+                                        selectionMode
+                                    ) {
+                                        selectedWorkIds =
+                                            if (
+                                                selected
+                                            ) {
+                                                selectedWorkIds -
+                                                    item.work.id
+                                            } else {
+                                                selectedWorkIds +
+                                                    item.work.id
+                                            }
+                                    } else {
+                                        onWorkClick(
+                                            item.work.id,
+                                            coverMedia
+                                                ?.takeUnless {
+                                                    it.mimeType
+                                                        .startsWith(
+                                                            "video/",
+                                                            ignoreCase = true
+                                                        )
+                                                }
+                                                ?.localUri
+                                        )
+                                    }
+                                },
+                                onLongClick = {
+                                    selectedWorkIds =
+                                        selectedWorkIds +
+                                            item.work.id
+                                }
+                            )
                             .padding(
                                 bottom = 20.dp
                             )
