@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -494,11 +495,40 @@ fun GalleryScreen(
                 selectionMode
             ) {
                 IconButton(
+                    onClick = {
+                        val allWorkIds =
+                            works.map {
+                                it.work.id
+                            }.toSet()
+
+                        selectedWorkIds =
+                            if (
+                                selectedWorkIds ==
+                                allWorkIds
+                            ) {
+                                emptySet()
+                            } else {
+                                allWorkIds
+                            }
+                    }
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.Default.SelectAll,
+                        contentDescription =
+                            "Select all Gallery works"
+                    )
+                }
+
+                IconButton(
                     enabled =
                         !refreshingSelection,
                     onClick = {
                         val selectedWorks =
-                            works
+                            works.filter {
+                                it.work.id in
+                                    selectedWorkIds
+                            }
 
                         val refreshableWorks =
                             selectedWorks.filter {
