@@ -547,6 +547,9 @@ fun GalleryScreen(
                             refreshSessionRetryCount =
                                 0
 
+                            selectedWorkIds =
+                                emptySet()
+
                             refreshingSelection =
                                 true
                         }
