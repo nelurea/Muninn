@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -33,6 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -40,8 +42,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,7 +59,11 @@ import coil.request.ImageRequest
 import io.github.nelurea.muninn.R
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataResult
+import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataUseCase
+import io.github.nelurea.muninn.ui.capture.XMetadataRefreshSession
 import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
+import kotlinx.coroutines.launch
 
 private enum class GallerySourceFilter {
     ALL,
@@ -141,6 +149,155 @@ fun GalleryScreen(
 
     val selectionMode =
         selectedWorkIds.isNotEmpty()
+
+    var refreshQueueIds by remember {
+        mutableStateOf(
+            emptyList<Long>()
+        )
+    }
+
+    var refreshQueueIndex by remember {
+        mutableStateOf(
+            0
+        )
+    }
+
+    var refreshingSelection by remember {
+        mutableStateOf(
+            false
+        )
+    }
+
+    var refreshSuccessCount by remember {
+        mutableStateOf(
+            0
+        )
+    }
+
+    var refreshFailureCount by remember {
+        mutableStateOf(
+            0
+        )
+    }
+
+    var refreshSessionRetryCount by remember {
+        mutableStateOf(
+            0
+        )
+    }
+
+    var refreshSkippedCount by remember {
+        mutableStateOf(
+            0
+        )
+    }
+
+    var refreshMessage by remember {
+        mutableStateOf<String?>(
+            null
+        )
+    }
+
+    val coroutineScope =
+        rememberCoroutineScope()
+
+    val refreshMetadataUseCase =
+        remember(
+            repository
+        ) {
+            RefreshCapturedWorkMetadataUseCase(
+                repository
+            )
+        }
+
+    val currentRefreshWork =
+        refreshQueueIds
+            .getOrNull(
+                refreshQueueIndex
+            )
+            ?.let { workId ->
+                works.firstOrNull {
+                    it.work.id ==
+                        workId
+                }
+            }
+
+    val finishRefreshItem:
+        (Boolean) -> Unit = {
+            success ->
+
+            val nextSuccessCount =
+                refreshSuccessCount +
+                    if (
+                        success
+                    ) {
+                        1
+                    } else {
+                        0
+                    }
+
+            val nextFailureCount =
+                refreshFailureCount +
+                    if (
+                        success
+                    ) {
+                        0
+                    } else {
+                        1
+                    }
+
+            refreshSuccessCount =
+                nextSuccessCount
+
+            refreshFailureCount =
+                nextFailureCount
+
+            val nextIndex =
+                refreshQueueIndex + 1
+
+            if (
+                nextIndex <
+                refreshQueueIds.size
+            ) {
+                refreshSessionRetryCount =
+                    0
+
+                refreshQueueIndex =
+                    nextIndex
+            } else {
+                refreshingSelection =
+                    false
+
+                refreshMessage =
+                    buildString {
+                        append(
+                            "$nextSuccessCount refreshed"
+                        )
+
+                        if (
+                            nextFailureCount > 0
+                        ) {
+                            append(
+                                " · $nextFailureCount failed"
+                            )
+                        }
+
+                        if (
+                            refreshSkippedCount > 0
+                        ) {
+                            append(
+                                " · $refreshSkippedCount skipped"
+                            )
+                        }
+                    }
+
+                refreshQueueIds =
+                    emptyList()
+
+                refreshQueueIndex =
+                    0
+            }
+        }
 
     LaunchedEffect(
         Unit
@@ -319,7 +476,7 @@ fun GalleryScreen(
                     if (
                         selectionMode
                     ) {
-                        "${selectedWorkIds.size} selected"
+                        "${selectedWorkIds.size} selected" + (refreshMessage?.let { " · $it" } ?: "")
                     } else if (
                         activeFilterCount == 0
                     ) {
@@ -332,6 +489,93 @@ fun GalleryScreen(
                         .typography
                         .bodySmall
             )
+
+            if (
+                selectionMode
+            ) {
+                IconButton(
+                    enabled =
+                        !refreshingSelection,
+                    onClick = {
+                        val selectedWorks =
+                            works.filter {
+                                it.work.id in
+                                    selectedWorkIds
+                            }
+
+                        val refreshableWorks =
+                            selectedWorks.filter {
+                                it.work.sourceType
+                                    .equals(
+                                        "x",
+                                        ignoreCase = true
+                                    ) &&
+                                    it.work.canonicalUrl
+                                        .isNotBlank()
+                            }
+
+                        refreshSuccessCount =
+                            0
+
+                        refreshFailureCount =
+                            0
+
+                        refreshSkippedCount =
+                            selectedWorks.size -
+                                refreshableWorks.size
+
+                        refreshMessage =
+                            null
+
+                        if (
+                            refreshableWorks.isEmpty()
+                        ) {
+                            refreshMessage =
+                                if (
+                                    selectedWorks.isEmpty()
+                                ) {
+                                    "Nothing selected"
+                                } else {
+                                    "No refreshable X works"
+                                }
+                        } else {
+                            refreshQueueIds =
+                                refreshableWorks.map {
+                                    it.work.id
+                                }
+
+                            refreshQueueIndex =
+                                0
+
+                            refreshSessionRetryCount =
+                                0
+
+                            refreshingSelection =
+                                true
+                        }
+                    }
+                ) {
+                    if (
+                        refreshingSelection
+                    ) {
+                        CircularProgressIndicator(
+                            modifier =
+                                Modifier.size(
+                                    22.dp
+                                ),
+                            strokeWidth =
+                                2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector =
+                                Icons.Default.Refresh,
+                            contentDescription =
+                                "Refresh selected metadata"
+                        )
+                    }
+                }
+            }
 
             IconButton(
                 onClick = {
@@ -556,6 +800,96 @@ fun GalleryScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (
+        refreshingSelection &&
+        currentRefreshWork != null
+    ) {
+        key(
+            currentRefreshWork.work.id,
+            refreshSessionRetryCount
+        ) {
+            XMetadataRefreshSession(
+                canonicalUrl =
+                currentRefreshWork
+                    .work
+                    .canonicalUrl,
+            sourceId =
+                currentRefreshWork
+                    .work
+                    .sourceId,
+            onPayload = {
+                payload ->
+
+                coroutineScope.launch {
+                    val result =
+                        refreshMetadataUseCase
+                            .refreshX(
+                                workId =
+                                    currentRefreshWork
+                                        .work
+                                        .id,
+                                payload =
+                                    payload
+                            )
+
+                    when (
+                        result
+                    ) {
+                        is RefreshCapturedWorkMetadataResult.Success -> {
+                            Log.d(
+                                "Muninn/GalleryRefresh",
+                                "success workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId}"
+                            )
+
+                            works =
+                                repository
+                                    .getAllWithMedia()
+
+                            finishRefreshItem(
+                                true
+                            )
+                        }
+
+                        is RefreshCapturedWorkMetadataResult.Failure -> {
+                            Log.e(
+                                "Muninn/GalleryRefresh",
+                                "refreshX failed workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId} url=${currentRefreshWork.work.canonicalUrl} result=$result"
+                            )
+
+                            finishRefreshItem(
+                                false
+                            )
+                        }
+                    }
+                }
+            },
+                onFailure = {
+                    if (
+                        refreshSessionRetryCount <
+                        MAX_REFRESH_SESSION_RETRIES
+                    ) {
+                        Log.w(
+                            "Muninn/GalleryRefresh",
+                            "session retry workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId} retry=${refreshSessionRetryCount + 1}"
+                        )
+
+                        refreshSessionRetryCount =
+                            refreshSessionRetryCount + 1
+                    } else {
+                        Log.e(
+                            "Muninn/GalleryRefresh",
+                            "session failed after retry workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId} url=${currentRefreshWork.work.canonicalUrl}"
+                        )
+
+                        finishRefreshItem(
+                            false
+                        )
+                    }
+                }
+            )
         }
     }
 
@@ -1066,3 +1400,6 @@ private fun GalleryFilterTileContainer(
         )
     }
 }
+
+private const val MAX_REFRESH_SESSION_RETRIES =
+    1
