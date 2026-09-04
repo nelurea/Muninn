@@ -34,7 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -555,25 +555,12 @@ fun GalleryScreen(
                         }
                     }
                 ) {
-                    if (
-                        refreshingSelection
-                    ) {
-                        CircularProgressIndicator(
-                            modifier =
-                                Modifier.size(
-                                    22.dp
-                                ),
-                            strokeWidth =
-                                2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector =
-                                Icons.Default.Refresh,
-                            contentDescription =
-                                "Refresh selected metadata"
-                        )
-                    }
+                    Icon(
+                        imageVector =
+                            Icons.Default.Refresh,
+                        contentDescription =
+                            "Refresh Gallery metadata"
+                    )
                 }
             }
 
@@ -624,12 +611,98 @@ fun GalleryScreen(
             }
         }
 
-        LazyColumn(
-            state =
-                listState,
+        Column(
             modifier =
                 Modifier.fillMaxSize()
         ) {
+            if (
+                refreshingSelection &&
+                refreshQueueIds.isNotEmpty()
+            ) {
+                val completedCount =
+                    refreshQueueIndex
+                        .coerceAtMost(
+                            refreshQueueIds.size
+                        )
+
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = 16.dp,
+                                vertical = 4.dp
+                            ),
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween,
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    Text(
+                        text =
+                            "Refreshing metadata",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelSmall
+                    )
+
+                    Text(
+                        text =
+                            "$completedCount / ${refreshQueueIds.size}",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelSmall
+                    )
+                }
+
+                LinearProgressIndicator(
+                    progress = {
+                        if (
+                            refreshQueueIds.isEmpty()
+                        ) {
+                            0f
+                        } else {
+                            completedCount.toFloat() /
+                                refreshQueueIds.size.toFloat()
+                        }
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(
+                                2.dp
+                            )
+                )
+            } else if (
+                !refreshMessage.isNullOrBlank()
+            ) {
+                Text(
+                    text =
+                        refreshMessage.orEmpty(),
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 16.dp,
+                            vertical = 4.dp
+                        ),
+                    style =
+                        MaterialTheme
+                            .typography
+                            .labelSmall
+                )
+            }
+
+            LazyColumn(
+                state =
+                    listState,
+                modifier =
+                    Modifier
+                        .weight(
+                            1f
+                        )
+                        .fillMaxWidth()
+            ) {
             items(
                 items =
                     visibleWorks,
@@ -799,6 +872,7 @@ fun GalleryScreen(
                         )
                     }
                 }
+            }
             }
         }
     }
