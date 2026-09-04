@@ -498,10 +498,7 @@ fun GalleryScreen(
                         !refreshingSelection,
                     onClick = {
                         val selectedWorks =
-                            works.filter {
-                                it.work.id in
-                                    selectedWorkIds
-                            }
+                            works
 
                         val refreshableWorks =
                             selectedWorks.filter {
