@@ -47,6 +47,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,31 +107,31 @@ fun GalleryScreen(
         )
     }
 
-    var sourceFilter by remember {
+    var sourceFilter by rememberSaveable {
         mutableStateOf(
             GallerySourceFilter.ALL
         )
     }
 
-    var mediaFilter by remember {
+    var mediaFilter by rememberSaveable {
         mutableStateOf(
             GalleryMediaFilter.ALL
         )
     }
 
-    var highlightedOnly by remember {
+    var highlightedOnly by rememberSaveable {
         mutableStateOf(
             false
         )
     }
 
-    var contextualizedOnly by remember {
+    var contextualizedOnly by rememberSaveable {
         mutableStateOf(
             false
         )
     }
 
-    var sortOrder by remember {
+    var sortOrder by rememberSaveable {
         mutableStateOf(
             GallerySortOrder.NEWEST
         )
