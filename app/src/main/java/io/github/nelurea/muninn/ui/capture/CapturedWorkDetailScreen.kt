@@ -2,13 +2,19 @@ package io.github.nelurea.muninn.ui.capture
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +25,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +50,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -53,6 +61,7 @@ import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -62,7 +71,12 @@ import kotlinx.coroutines.launch
 fun CapturedWorkDetailScreen(
     workId: Long,
     initialPreviewUri: String? = null,
-    repository: CapturedWorkRepository
+    repository: CapturedWorkRepository,
+    onDismiss: () -> Unit,
+    onSearchTag: (
+        sourceType: String,
+        tag: String
+    ) -> Unit
 ) {
     var initialPreviewSucceeded by remember(
         workId,
@@ -131,6 +145,9 @@ fun CapturedWorkDetailScreen(
 
     val coroutineScope =
         rememberCoroutineScope()
+
+    val uriHandler =
+        LocalUriHandler.current
 
     val refreshMetadataUseCase =
         remember(
@@ -350,7 +367,9 @@ fun CapturedWorkDetailScreen(
                                         onToggleControls = {
                                             controlsVisible =
                                                 !controlsVisible
-                                        }
+                                        },
+                                        onDismiss =
+                                            onDismiss
                                     )
 
                                     if (
@@ -430,6 +449,26 @@ fun CapturedWorkDetailScreen(
                             },
                             actions = {
                                 if (
+                                    item.work.canonicalUrl
+                                        .isNotBlank()
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            uriHandler.openUri(
+                                                item.work.canonicalUrl
+                                            )
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector =
+                                                Icons.AutoMirrored.Filled.OpenInNew,
+                                            contentDescription =
+                                                "Open original artwork"
+                                        )
+                                    }
+                                }
+
+                                if (
                                     item.work.sourceType ==
                                     "x"
                                 ) {
@@ -471,6 +510,72 @@ fun CapturedWorkDetailScreen(
                                     )
                                     .fillMaxWidth()
                         )
+                    }
+
+                    if (
+                        controlsVisible &&
+                        item.tags.isNotEmpty()
+                    ) {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .align(
+                                        Alignment.TopCenter
+                                    )
+                                    .fillMaxWidth()
+                                    .padding(
+                                        top = 68.dp,
+                                        start = 12.dp,
+                                        end = 12.dp
+                                    )
+                                    .horizontalScroll(
+                                        rememberScrollState()
+                                    ),
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    8.dp
+                                )
+                        ) {
+                            item.tags
+                                .sortedBy {
+                                    it.position
+                                }
+                                .forEach {
+                                        capturedTag ->
+
+                                    Text(
+                                        text =
+                                            "#${capturedTag.tag}",
+                                        modifier =
+                                            Modifier
+                                                .background(
+                                                    color =
+                                                        MaterialTheme
+                                                            .colorScheme
+                                                            .surface
+                                                            .copy(
+                                                                alpha = 0.88f
+                                                            ),
+                                                    shape =
+                                                        CircleShape
+                                                )
+                                                .clickable {
+                                                    onSearchTag(
+                                                        item.work.sourceType,
+                                                        capturedTag.tag
+                                                    )
+                                                }
+                                                .padding(
+                                                    horizontal = 12.dp,
+                                                    vertical = 7.dp
+                                                ),
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodyMedium
+                                    )
+                                }
+                        }
                     }
 
                     if (
@@ -608,7 +713,8 @@ private fun ZoomableCapturedMediaPage(
     mediaId: Long,
     active: Boolean,
     onZoomedChange: (Boolean) -> Unit,
-    onToggleControls: () -> Unit
+    onToggleControls: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     var scale by remember(
         mediaId
@@ -849,6 +955,54 @@ private fun ZoomableCapturedMediaPage(
                             }
                         }
                     }
+                }
+                .pointerInput(
+                    mediaId,
+                    active,
+                    zoomed
+                ) {
+                    if (
+                        !active ||
+                        zoomed
+                    ) {
+                        return@pointerInput
+                    }
+
+                    var verticalDrag =
+                        0f
+
+                    detectVerticalDragGestures(
+                        onDragStart = {
+                            verticalDrag =
+                                0f
+                        },
+                        onVerticalDrag = {
+                                change,
+                                dragAmount ->
+
+                            verticalDrag +=
+                                dragAmount
+
+                            change.consume()
+                        },
+                        onDragEnd = {
+                            if (
+                                abs(
+                                    verticalDrag
+                                ) >=
+                                96.dp.toPx()
+                            ) {
+                                onDismiss()
+                            }
+
+                            verticalDrag =
+                                0f
+                        },
+                        onDragCancel = {
+                            verticalDrag =
+                                0f
+                        }
+                    )
                 }
                 .pointerInput(
                     mediaId

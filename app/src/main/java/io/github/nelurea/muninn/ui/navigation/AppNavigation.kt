@@ -159,6 +159,48 @@ fun AppNavigation(
             )
         }
 
+    val openCapturedWorkTagInDiscovery:
+        (
+            sourceType: String,
+            tag: String
+        ) -> Unit =
+        {
+                sourceType,
+                tag ->
+
+            val source =
+                when (
+                    sourceType.lowercase()
+                ) {
+                    "pixiv" ->
+                        DiscoverySourceId.PIXIV
+
+                    "x" ->
+                        DiscoverySourceId.X
+
+                    else ->
+                        null
+                }
+
+            if (
+                source != null
+            ) {
+                discoveryViewModel
+                    .selectSource(
+                        source
+                    )
+
+                discoveryViewModel
+                    .searchByTag(
+                        tag
+                    )
+
+                navController.navigate(
+                    "discovery"
+                )
+            }
+        }
+
     NavHost(
         navController =
             navController,
@@ -271,7 +313,13 @@ fun AppNavigation(
                 initialPreviewUri =
                     initialPreviewUri,
                 repository =
-                    capturedWorkRepository
+                    capturedWorkRepository,
+                onDismiss = {
+                    navController
+                        .popBackStack()
+                },
+                onSearchTag =
+                    openCapturedWorkTagInDiscovery
             )
         }
 
