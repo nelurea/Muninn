@@ -143,6 +143,102 @@ abstract class CapturedWorkDao {
 
     @Query(
         """
+        SELECT id
+        FROM captured_works
+        WHERE title LIKE '%' || :query || '%' COLLATE NOCASE
+           OR authorName LIKE '%' || :query || '%' COLLATE NOCASE
+           OR authorHandle LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT workId
+        FROM captured_tags
+        WHERE tag LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT captured_work_purposes.workId
+        FROM captured_work_purposes
+        INNER JOIN purpose_vocabulary
+            ON purpose_vocabulary.id =
+               captured_work_purposes.purposeVocabularyId
+        WHERE purpose_vocabulary.label
+            LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT captured_work_attractions.workId
+        FROM captured_work_attractions
+        INNER JOIN attraction_vocabulary
+            ON attraction_vocabulary.id =
+               captured_work_attractions.attractionVocabularyId
+        WHERE attraction_vocabulary.label
+            LIKE '%' || :query || '%' COLLATE NOCASE
+           OR attraction_vocabulary.dimension
+            LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT captured_work_responses.workId
+        FROM captured_work_responses
+        INNER JOIN aesthetic_response_vocabulary
+            ON aesthetic_response_vocabulary.id =
+               captured_work_responses.responseVocabularyId
+        WHERE aesthetic_response_vocabulary.label
+            LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT captured_media.workId
+        FROM captured_media_attractions
+        INNER JOIN captured_media
+            ON captured_media.id =
+               captured_media_attractions.mediaId
+        INNER JOIN attraction_vocabulary
+            ON attraction_vocabulary.id =
+               captured_media_attractions.attractionVocabularyId
+        WHERE attraction_vocabulary.label
+            LIKE '%' || :query || '%' COLLATE NOCASE
+           OR attraction_vocabulary.dimension
+            LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT captured_media.workId
+        FROM media_focus
+        INNER JOIN captured_media
+            ON captured_media.id =
+               media_focus.mediaId
+        LEFT JOIN attraction_vocabulary
+            ON attraction_vocabulary.id =
+               media_focus.attractionVocabularyId
+        WHERE media_focus.note
+            LIKE '%' || :query || '%' COLLATE NOCASE
+           OR attraction_vocabulary.label
+            LIKE '%' || :query || '%' COLLATE NOCASE
+           OR attraction_vocabulary.dimension
+            LIKE '%' || :query || '%' COLLATE NOCASE
+
+        UNION
+
+        SELECT captured_works.id
+        FROM captured_works
+        INNER JOIN session_states
+            ON session_states.sessionId =
+               captured_works.sessionId
+        INNER JOIN state_vocabulary
+            ON state_vocabulary.id =
+               session_states.stateVocabularyId
+        WHERE state_vocabulary.label
+            LIKE '%' || :query || '%' COLLATE NOCASE
+        """
+    )
+    abstract suspend fun searchWorkIds(
+        query: String
+    ): List<Long>
+
+    @Query(
+        """
         SELECT workId
         FROM captured_work_purposes
 

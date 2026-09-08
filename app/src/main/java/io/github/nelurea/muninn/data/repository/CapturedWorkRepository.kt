@@ -47,6 +47,23 @@ class CapturedWorkRepository(
         return dao.getAllWithMedia()
     }
 
+    suspend fun searchWorkIds(
+        query: String
+    ): Set<Long> {
+        val normalized =
+            query.trim()
+
+        if (normalized.isBlank()) {
+            return emptySet()
+        }
+
+        return dao
+            .searchWorkIds(
+                normalized
+            )
+            .toSet()
+    }
+
     suspend fun getContextualizedWorkIds():
             Set<Long> {
         return dao
