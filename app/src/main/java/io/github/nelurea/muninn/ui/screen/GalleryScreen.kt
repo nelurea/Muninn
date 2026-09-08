@@ -38,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +66,7 @@ import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataResul
 import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataUseCase
 import io.github.nelurea.muninn.ui.capture.XMetadataRefreshSession
 import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class GallerySourceFilter {
@@ -107,6 +109,17 @@ fun GalleryScreen(
         )
     }
 
+    var searchQuery by rememberSaveable {
+        mutableStateOf(
+            ""
+        )
+    }
+
+    var searchResultIds by remember {
+        mutableStateOf(
+            emptySet<Long>()
+        )
+    }
     var sourceFilter by rememberSaveable {
         mutableStateOf(
             GallerySourceFilter.ALL
@@ -313,10 +326,34 @@ fun GalleryScreen(
                 .getContextualizedWorkIds()
     }
 
+    LaunchedEffect(
+        searchQuery
+    ) {
+        val normalized =
+            searchQuery.trim()
+
+        if (normalized.isBlank()) {
+            searchResultIds =
+                emptySet()
+
+            return@LaunchedEffect
+        }
+
+        delay(
+            200
+        )
+
+        searchResultIds =
+            repository.searchWorkIds(
+                normalized
+            )
+    }
     val visibleWorks =
         remember(
             works,
             contextualizedWorkIds,
+            searchQuery,
+            searchResultIds,
             sourceFilter,
             mediaFilter,
             highlightedOnly,
@@ -326,6 +363,11 @@ fun GalleryScreen(
             val filtered =
                 works
                     .asSequence()
+                    .filter { item ->
+                        searchQuery.isBlank() ||
+                            item.work.id in
+                                searchResultIds
+                    }
                     .filter { item ->
                         when (
                             sourceFilter
@@ -415,6 +457,7 @@ fun GalleryScreen(
         }
 
     LaunchedEffect(
+        searchQuery,
         sourceFilter,
         mediaFilter,
         highlightedOnly,
@@ -642,6 +685,32 @@ fun GalleryScreen(
             }
         }
 
+        if (
+            !selectionMode
+        ) {
+            OutlinedTextField(
+                value =
+                    searchQuery,
+                onValueChange = {
+                    searchQuery =
+                        it
+                },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 16.dp,
+                            vertical = 4.dp
+                        ),
+                placeholder = {
+                    Text(
+                        "Search title, author, tags, or context"
+                    )
+                },
+                singleLine =
+                    true
+            )
+        }
         Column(
             modifier =
                 Modifier.fillMaxSize()
