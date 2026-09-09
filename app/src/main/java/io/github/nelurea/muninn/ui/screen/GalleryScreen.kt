@@ -876,7 +876,7 @@ fun GalleryScreen(
                                 }
                             )
                             .padding(
-                                bottom = 20.dp
+                                bottom = 8.dp
                             )
                 ) {
                     coverMedia
@@ -903,7 +903,7 @@ fun GalleryScreen(
                                         Modifier
                                             .fillMaxWidth()
                                             .height(
-                                                280.dp
+                                                360.dp
                                             )
                                 )
                             } else {
@@ -923,7 +923,7 @@ fun GalleryScreen(
                                         Modifier
                                             .fillMaxWidth()
                                             .height(
-                                                280.dp
+                                                360.dp
                                             ),
                                     contentScale =
                                         ContentScale.Fit,
