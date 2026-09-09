@@ -939,38 +939,6 @@ fun GalleryScreen(
                                 )
                             }
                         }
-
-                    Column(
-                        modifier =
-                            Modifier.padding(
-                                horizontal = 16.dp,
-                                vertical = 8.dp
-                            )
-                    ) {
-                        item.work.title
-                            ?.takeIf {
-                                it.isNotBlank()
-                            }
-                            ?.let { title ->
-                                Text(
-                                    text =
-                                        title,
-                                    style =
-                                        MaterialTheme
-                                            .typography
-                                            .titleMedium
-                                )
-                            }
-
-                        Text(
-                            text =
-                                item.work.authorName,
-                            style =
-                                MaterialTheme
-                                    .typography
-                                    .bodyMedium
-                        )
-                    }
                 }
             }
             }
