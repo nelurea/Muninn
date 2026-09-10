@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,9 +18,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
@@ -94,8 +96,8 @@ fun GalleryScreen(
     val context =
         LocalContext.current
 
-    val listState =
-        rememberLazyListState()
+    val gridState =
+        rememberLazyGridState()
 
     var works by remember {
         mutableStateOf(
@@ -467,7 +469,7 @@ fun GalleryScreen(
         if (
             visibleWorks.isNotEmpty()
         ) {
-            listState.scrollToItem(
+            gridState.scrollToItem(
                 0
             )
         }
@@ -793,15 +795,27 @@ fun GalleryScreen(
                 )
             }
 
-            LazyColumn(
+            LazyVerticalGrid(
+                columns =
+                    GridCells.Adaptive(
+                        minSize = 160.dp
+                    ),
                 state =
-                    listState,
+                    gridState,
                 modifier =
                     Modifier
                         .weight(
                             1f
                         )
-                        .fillMaxWidth()
+                        .fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
             ) {
             items(
                 items =
@@ -875,9 +889,6 @@ fun GalleryScreen(
                                             item.work.id
                                 }
                             )
-                            .padding(
-                                bottom = 8.dp
-                            )
                 ) {
                     coverMedia
                         ?.let { media ->
@@ -902,8 +913,8 @@ fun GalleryScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .height(
-                                                360.dp
+                                            .aspectRatio(
+                                                0.8f
                                             )
                                 )
                             } else {
@@ -922,8 +933,8 @@ fun GalleryScreen(
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .height(
-                                                360.dp
+                                            .aspectRatio(
+                                                0.8f
                                             ),
                                     contentScale =
                                         ContentScale.Fit,
