@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -476,6 +478,7 @@ fun GalleryScreen(
     }
 
     val hasActiveFilters =
+        searchQuery.isNotBlank() ||
         sourceFilter !=
             GallerySourceFilter.ALL ||
         mediaFilter !=
@@ -487,6 +490,7 @@ fun GalleryScreen(
 
     val activeFilterCount =
         listOf(
+            searchQuery.isNotBlank(),
             sourceFilter !=
                 GallerySourceFilter.ALL,
             mediaFilter !=
@@ -687,32 +691,6 @@ fun GalleryScreen(
             }
         }
 
-        if (
-            !selectionMode
-        ) {
-            OutlinedTextField(
-                value =
-                    searchQuery,
-                onValueChange = {
-                    searchQuery =
-                        it
-                },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = 16.dp,
-                            vertical = 4.dp
-                        ),
-                placeholder = {
-                    Text(
-                        "Search title, author, tags, or context"
-                    )
-                },
-                singleLine =
-                    true
-            )
-        }
         Column(
             modifier =
                 Modifier.fillMaxSize()
@@ -1060,8 +1038,14 @@ fun GalleryScreen(
                 contextualizedOnly,
             sortOrder =
                 sortOrder,
+            searchQuery =
+                searchQuery,
             hasActiveFilters =
                 hasActiveFilters,
+            onSearchQueryChange = {
+                searchQuery =
+                    it
+            },
             onSourceFilterChange = {
                 sourceFilter =
                     it
@@ -1083,6 +1067,9 @@ fun GalleryScreen(
                     it
             },
             onClear = {
+                searchQuery =
+                    ""
+
                 sourceFilter =
                     GallerySourceFilter.ALL
 
@@ -1109,12 +1096,14 @@ fun GalleryScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GalleryFilterSheet(
+    searchQuery: String,
     sourceFilter: GallerySourceFilter,
     mediaFilter: GalleryMediaFilter,
     highlightedOnly: Boolean,
     contextualizedOnly: Boolean,
     sortOrder: GallerySortOrder,
     hasActiveFilters: Boolean,
+    onSearchQueryChange: (String) -> Unit,
     onSourceFilterChange: (GallerySourceFilter) -> Unit,
     onMediaFilterChange: (GalleryMediaFilter) -> Unit,
     onHighlightedChange: (Boolean) -> Unit,
@@ -1136,16 +1125,70 @@ private fun GalleryFilterSheet(
                         end = 20.dp,
                         bottom = 28.dp
                     )
+                    .verticalScroll(
+                        rememberScrollState()
+                    )
         ) {
             Text(
                 text =
-                    "Filter & sort",
+                    "Search & filter",
                 style =
                     MaterialTheme
                         .typography
                         .titleLarge,
                 fontWeight =
                     FontWeight.SemiBold
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        20.dp
+                    )
+            )
+
+            OutlinedTextField(
+                value =
+                    searchQuery,
+                onValueChange =
+                    onSearchQueryChange,
+                modifier =
+                    Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        "Search title, author, tags, or context"
+                    )
+                },
+                trailingIcon = {
+                    if (
+                        searchQuery.isNotBlank()
+                    ) {
+                        IconButton(
+                            onClick = {
+                                onSearchQueryChange(
+                                    ""
+                                )
+                            },
+                            modifier =
+                                Modifier.size(
+                                    40.dp
+                                )
+                        ) {
+                            Icon(
+                                imageVector =
+                                    Icons.Default.Close,
+                                contentDescription =
+                                    "Clear search",
+                                modifier =
+                                    Modifier.size(
+                                        18.dp
+                                    )
+                            )
+                        }
+                    }
+                },
+                singleLine =
+                    true
             )
 
             Spacer(
@@ -1360,26 +1403,24 @@ private fun GalleryFilterSheet(
                 )
             }
 
-            if (
-                hasActiveFilters
-            ) {
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            24.dp
-                        )
-                )
-
-                Button(
-                    onClick =
-                        onClear,
-                    modifier =
-                        Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "Clear filters"
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        24.dp
                     )
-                }
+            )
+
+            Button(
+                enabled =
+                    hasActiveFilters,
+                onClick =
+                    onClear,
+                modifier =
+                    Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "Clear all"
+                )
             }
         }
     }
