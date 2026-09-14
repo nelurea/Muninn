@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -30,10 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import io.github.nelurea.muninn.discovery.DiscoverySaveQueueUiState
 import io.github.nelurea.muninn.content.ContentRestriction
+import io.github.nelurea.muninn.discovery.DiscoverySaveQueueUiState
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
+import io.github.nelurea.muninn.settings.ContentVisibility
 
 @Composable
 fun DiscoverySaveStatusBar(
@@ -41,73 +42,35 @@ fun DiscoverySaveStatusBar(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val message =
-        state.message
-            ?: return
+    val message = state.message ?: return
 
     Surface(
-        modifier =
-            modifier,
-        shape =
-            RoundedCornerShape(
-                12.dp
-            ),
-        tonalElevation =
-            6.dp,
-        shadowElevation =
-            6.dp
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp
     ) {
         Row(
-            modifier =
-                Modifier.padding(
-                    horizontal = 14.dp,
-                    vertical = 10.dp
-                ),
-            verticalAlignment =
-                Alignment.CenterVertically,
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    12.dp
-                )
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (
-                state.activeCount > 0
-            ) {
+            if (state.activeCount > 0) {
                 CircularProgressIndicator(
-                    modifier =
-                        Modifier.size(
-                            20.dp
-                        ),
-                    strokeWidth =
-                        2.dp
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
                 )
             }
 
             Text(
-                text =
-                    message,
-                modifier =
-                    Modifier.weight(
-                        1f,
-                        fill =
-                            false
-                    ),
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodyMedium
+                text = message,
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.bodyMedium
             )
 
-            if (
-                state.failedRequestKey != null
-            ) {
-                OutlinedButton(
-                    onClick =
-                        onRetry
-                ) {
-                    Text(
-                        "Retry"
-                    )
+            if (state.failedRequestKey != null) {
+                OutlinedButton(onClick = onRetry) {
+                    Text("Retry")
                 }
             }
         }
@@ -122,19 +85,13 @@ fun DiscoverySourceButton(
     onClick: () -> Unit
 ) {
     FilterChip(
-        selected =
-            selected,
-        onClick =
-            onClick,
-        enabled =
-            enabled,
-        label = {
-            Text(
-                label
-            )
-        }
+        selected = selected,
+        onClick = onClick,
+        enabled = enabled,
+        label = { Text(label) }
     )
 }
+
 @Composable
 fun DiscoveryModeButton(
     label: String,
@@ -142,17 +99,12 @@ fun DiscoveryModeButton(
     onClick: () -> Unit
 ) {
     FilterChip(
-        selected =
-            selected,
-        onClick =
-            onClick,
-        label = {
-            Text(
-                label
-            )
-        }
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) }
     )
 }
+
 @Composable
 private fun DiscoveryBadge(
     text: String,
@@ -160,31 +112,16 @@ private fun DiscoveryBadge(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier =
-            modifier,
-        shape =
-            RoundedCornerShape(
-                6.dp
-            ),
-        color =
-            backgroundColor
+        modifier = modifier,
+        shape = RoundedCornerShape(6.dp),
+        color = backgroundColor
     ) {
         Text(
-            text =
-                text,
-            modifier =
-                Modifier.padding(
-                    horizontal = 7.dp,
-                    vertical = 3.dp
-                ),
-            color =
-                Color.White,
-            style =
-                MaterialTheme
-                    .typography
-                    .labelMedium,
-            fontWeight =
-                FontWeight.SemiBold
+            text = text,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }
@@ -192,170 +129,95 @@ private fun DiscoveryBadge(
 @Composable
 fun DiscoveryGridItem(
     item: DiscoveryItem,
+    visibility: ContentVisibility,
     onClick: () -> Unit
 ) {
-    val context =
-        LocalContext.current
+    val context = LocalContext.current
 
     val imageRequest =
-        ImageRequest
-            .Builder(
-                context
-            )
-            .data(
-                item.previewImageUrl
-            )
-            .addHeader(
-                "Referer",
-                sourceReferer(
-                    item.source
-                )
-            )
+        ImageRequest.Builder(context)
+            .data(item.previewImageUrl)
+            .addHeader("Referer", sourceReferer(item.source))
             .build()
 
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(
-                    onClick =
-                        onClick
-                )
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(
-                        1f
-                    )
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f)
         ) {
             AsyncImage(
-                model =
-                    imageRequest,
-                contentDescription =
-                    item.title,
-                modifier =
-                    Modifier.fillMaxSize(),
-                contentScale =
-                    ContentScale.Crop,
+                model = imageRequest,
+                contentDescription = item.title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (visibility == ContentVisibility.BLURRED) {
+                            Modifier.blur(24.dp)
+                        } else {
+                            Modifier
+                        }
+                    ),
+                contentScale = ContentScale.Crop,
                 onError = {
                     Log.e(
                         "Muninn/DiscoveryImage",
-                        "Failed to load ${item.previewImageUrl}: " +
-                                it.result.throwable
+                        "Failed to load ${item.previewImageUrl}: ${it.result.throwable}"
                     )
                 }
             )
 
-            when (
-                item.restriction
-            ) {
+            when (item.restriction) {
                 ContentRestriction.R18 -> {
                     DiscoveryBadge(
-                        text =
-                            "R-18",
-                        backgroundColor =
-                            Color(
-                                0xFFE91E63
-                            ),
-                        modifier =
-                            Modifier
-                                .align(
-                                    Alignment.TopStart
-                                )
-                                .padding(
-                                    6.dp
-                                )
+                        text = "R-18",
+                        backgroundColor = Color(0xFFE91E63),
+                        modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
                     )
                 }
 
                 ContentRestriction.R18G -> {
                     DiscoveryBadge(
-                        text =
-                            "R-18G",
-                        backgroundColor =
-                            Color(
-                                0xFFD32F2F
-                            ),
-                        modifier =
-                            Modifier
-                                .align(
-                                    Alignment.TopStart
-                                )
-                                .padding(
-                                    6.dp
-                                )
+                        text = "R-18G",
+                        backgroundColor = Color(0xFFD32F2F),
+                        modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
                     )
                 }
 
-                else -> {
-                }
+                else -> Unit
             }
 
-            if (
-                item.mediaCount > 1
-            ) {
+            if (item.mediaCount > 1) {
                 DiscoveryBadge(
-                    text =
-                        "▧ ${item.mediaCount}",
-                    backgroundColor =
-                        Color.Black.copy(
-                            alpha = 0.72f
-                        ),
-                    modifier =
-                        Modifier
-                            .align(
-                                Alignment.TopEnd
-                            )
-                            .padding(
-                                6.dp
-                            )
+                    text = "▧ ${item.mediaCount}",
+                    backgroundColor = Color.Black.copy(alpha = 0.72f),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
                 )
             }
         }
 
-        item.title
-            ?.let {
-                    title ->
+        item.title?.let { title ->
+            Text(
+                text = title,
+                modifier = Modifier.padding(top = 6.dp),
+                maxLines = 2
+            )
+        }
 
-                Text(
-                    text =
-                        title,
-                    modifier =
-                        Modifier.padding(
-                            top = 6.dp
-                        ),
-                    maxLines =
-                        2
-                )
-            }
-
-        item.creator
-            ?.name
-            ?.let {
-                    creatorName ->
-
-                Text(
-                    text =
-                        creatorName,
-                    modifier =
-                        Modifier.padding(
-                            top = 2.dp
-                        ),
-                    maxLines =
-                        1
-                )
-            }
+        item.creator?.name?.let { creatorName ->
+            Text(
+                text = creatorName,
+                modifier = Modifier.padding(top = 2.dp),
+                maxLines = 1
+            )
+        }
     }
 }
 
 fun sourceLabel(
     source: DiscoverySourceId
 ): String {
-    return when (
-        source
-    ) {
+    return when (source) {
         DiscoverySourceId.PIXIV ->
             "Pixiv"
 
@@ -367,9 +229,7 @@ fun sourceLabel(
 fun sourceReferer(
     source: DiscoverySourceId
 ): String {
-    return when (
-        source
-    ) {
+    return when (source) {
         DiscoverySourceId.PIXIV ->
             "https://www.pixiv.net/"
 
@@ -382,21 +242,13 @@ fun shouldLoadMore(
     gridState: LazyGridState,
     itemCount: Int
 ): Boolean {
-    if (
-        itemCount == 0
-    ) {
+    if (itemCount == 0) {
         return false
     }
 
     val lastVisibleIndex =
-        gridState
-            .layoutInfo
-            .visibleItemsInfo
-            .lastOrNull()
-            ?.index
+        gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
             ?: return false
 
-    return lastVisibleIndex >=
-            itemCount - 4
+    return lastVisibleIndex >= itemCount - 4
 }
-

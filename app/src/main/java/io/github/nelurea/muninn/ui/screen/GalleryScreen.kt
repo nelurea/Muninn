@@ -3,15 +3,14 @@ package io.github.nelurea.muninn.ui.screen
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,15 +25,13 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,6 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -56,6 +54,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -64,12 +65,17 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.nelurea.muninn.R
-import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
-import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
 import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataResult
 import io.github.nelurea.muninn.capture.usecase.RefreshCapturedWorkMetadataUseCase
+import io.github.nelurea.muninn.content.ContentRestriction
+import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
+import io.github.nelurea.muninn.data.repository.CapturedWorkRepository
+import io.github.nelurea.muninn.settings.ContentVisibility
+import io.github.nelurea.muninn.settings.SensitiveContentVisibilityController
+import io.github.nelurea.muninn.settings.visibilityFor
 import io.github.nelurea.muninn.ui.capture.XMetadataRefreshSession
 import io.github.nelurea.muninn.ui.media.LoopingVideoPlayer
+import io.github.nelurea.muninn.ui.settings.SensitiveContentVisibilityControl
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -90,16 +96,34 @@ private enum class GallerySortOrder {
     OLDEST
 }
 
+private fun CapturedWorkWithMedia.visibilityFor(
+    policy: io.github.nelurea.muninn.settings.SensitiveContentVisibilityPolicy
+): ContentVisibility {
+    val restriction =
+        runCatching {
+            ContentRestriction.valueOf(
+                work.contentRestriction
+            )
+        }.getOrDefault(
+            ContentRestriction.UNKNOWN
+        )
+
+    return restriction.visibilityFor(policy)
+}
+
 @Composable
 fun GalleryScreen(
     repository: CapturedWorkRepository,
+    sensitiveContentVisibilityController: SensitiveContentVisibilityController,
     onWorkClick: (Long, String?) -> Unit
 ) {
-    val context =
-        LocalContext.current
+    val context = LocalContext.current
+    val gridState = rememberLazyGridState()
 
-    val gridState =
-        rememberLazyGridState()
+    val sensitivePolicy by
+        sensitiveContentVisibilityController
+            .policy
+            .collectAsState()
 
     var works by remember {
         mutableStateOf(
@@ -108,986 +132,469 @@ fun GalleryScreen(
     }
 
     var contextualizedWorkIds by remember {
-        mutableStateOf(
-            emptySet<Long>()
-        )
+        mutableStateOf(emptySet<Long>())
     }
 
     var searchQuery by rememberSaveable {
-        mutableStateOf(
-            ""
-        )
+        mutableStateOf("")
     }
 
     var searchResultIds by remember {
-        mutableStateOf(
-            emptySet<Long>()
-        )
+        mutableStateOf(emptySet<Long>())
     }
+
     var sourceFilter by rememberSaveable {
-        mutableStateOf(
-            GallerySourceFilter.ALL
-        )
+        mutableStateOf(GallerySourceFilter.ALL)
     }
 
     var mediaFilter by rememberSaveable {
-        mutableStateOf(
-            GalleryMediaFilter.ALL
-        )
+        mutableStateOf(GalleryMediaFilter.ALL)
     }
 
     var highlightedOnly by rememberSaveable {
-        mutableStateOf(
-            false
-        )
+        mutableStateOf(false)
     }
 
     var contextualizedOnly by rememberSaveable {
-        mutableStateOf(
-            false
-        )
+        mutableStateOf(false)
     }
 
     var sortOrder by rememberSaveable {
-        mutableStateOf(
-            GallerySortOrder.NEWEST
-        )
+        mutableStateOf(GallerySortOrder.NEWEST)
     }
 
     var showFilters by remember {
-        mutableStateOf(
-            false
-        )
+        mutableStateOf(false)
     }
 
     var selectedWorkIds by remember {
-        mutableStateOf(
-            emptySet<Long>()
-        )
+        mutableStateOf(emptySet<Long>())
     }
 
-    val selectionMode =
-        selectedWorkIds.isNotEmpty()
+    val selectionMode = selectedWorkIds.isNotEmpty()
 
     var refreshQueueIds by remember {
-        mutableStateOf(
-            emptyList<Long>()
-        )
+        mutableStateOf(emptyList<Long>())
     }
 
     var refreshQueueIndex by remember {
-        mutableStateOf(
-            0
-        )
+        mutableStateOf(0)
     }
 
     var refreshingSelection by remember {
-        mutableStateOf(
-            false
-        )
+        mutableStateOf(false)
     }
 
     var refreshSuccessCount by remember {
-        mutableStateOf(
-            0
-        )
+        mutableStateOf(0)
     }
 
     var refreshFailureCount by remember {
-        mutableStateOf(
-            0
-        )
+        mutableStateOf(0)
     }
 
     var refreshSessionRetryCount by remember {
-        mutableStateOf(
-            0
-        )
+        mutableStateOf(0)
     }
 
     var refreshSkippedCount by remember {
-        mutableStateOf(
-            0
-        )
+        mutableStateOf(0)
     }
 
     var refreshMessage by remember {
-        mutableStateOf<String?>(
-            null
-        )
+        mutableStateOf<String?>(null)
     }
 
-    val coroutineScope =
-        rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
 
-    val refreshMetadataUseCase =
-        remember(
+    val refreshMetadataUseCase = remember(
+        repository
+    ) {
+        RefreshCapturedWorkMetadataUseCase(
             repository
-        ) {
-            RefreshCapturedWorkMetadataUseCase(
-                repository
-            )
-        }
+        )
+    }
 
     val currentRefreshWork =
         refreshQueueIds
-            .getOrNull(
-                refreshQueueIndex
-            )
+            .getOrNull(refreshQueueIndex)
             ?.let { workId ->
                 works.firstOrNull {
-                    it.work.id ==
-                        workId
+                    it.work.id == workId
                 }
             }
 
-    val finishRefreshItem:
-        (Boolean) -> Unit = {
-            success ->
+    fun finishRefreshItem(success: Boolean) {
+        refreshSuccessCount += if (success) 1 else 0
+        refreshFailureCount += if (success) 0 else 1
+        val nextIndex = refreshQueueIndex + 1
+        if (nextIndex < refreshQueueIds.size) {
+            refreshSessionRetryCount = 0
+            refreshQueueIndex = nextIndex
+        } else {
+            refreshingSelection = false
+            refreshMessage = buildString {
+                append(
+                    "$refreshSuccessCount refreshed"
+                )
 
-            val nextSuccessCount =
-                refreshSuccessCount +
-                    if (
-                        success
-                    ) {
-                        1
-                    } else {
-                        0
-                    }
+                if (refreshFailureCount > 0) {
+                    append(
+                        " · $refreshFailureCount failed"
+                    )
+                }
 
-            val nextFailureCount =
-                refreshFailureCount +
-                    if (
-                        success
-                    ) {
-                        0
-                    } else {
-                        1
-                    }
-
-            refreshSuccessCount =
-                nextSuccessCount
-
-            refreshFailureCount =
-                nextFailureCount
-
-            val nextIndex =
-                refreshQueueIndex + 1
-
-            if (
-                nextIndex <
-                refreshQueueIds.size
-            ) {
-                refreshSessionRetryCount =
-                    0
-
-                refreshQueueIndex =
-                    nextIndex
-            } else {
-                refreshingSelection =
-                    false
-
-                refreshMessage =
-                    buildString {
-                        append(
-                            "$nextSuccessCount refreshed"
-                        )
-
-                        if (
-                            nextFailureCount > 0
-                        ) {
-                            append(
-                                " · $nextFailureCount failed"
-                            )
-                        }
-
-                        if (
-                            refreshSkippedCount > 0
-                        ) {
-                            append(
-                                " · $refreshSkippedCount skipped"
-                            )
-                        }
-                    }
-
-                refreshQueueIds =
-                    emptyList()
-
-                refreshQueueIndex =
-                    0
+                if (refreshSkippedCount > 0) {
+                    append(
+                        " · $refreshSkippedCount skipped"
+                    )
+                }
             }
+            refreshQueueIds = emptyList()
+            refreshQueueIndex = 0
         }
-
-    LaunchedEffect(
-        Unit
-    ) {
-        works =
-            repository
-                .getAllWithMedia()
-
-        contextualizedWorkIds =
-            repository
-                .getContextualizedWorkIds()
     }
 
-    LaunchedEffect(
-        searchQuery
-    ) {
-        val normalized =
-            searchQuery.trim()
+    LaunchedEffect(Unit) {
+        works = repository.getAllWithMedia()
+        contextualizedWorkIds =
+            repository.getContextualizedWorkIds()
+    }
+
+    LaunchedEffect(searchQuery) {
+        val normalized = searchQuery.trim()
 
         if (normalized.isBlank()) {
-            searchResultIds =
-                emptySet()
-
+            searchResultIds = emptySet()
             return@LaunchedEffect
         }
 
-        delay(
-            200
-        )
+        delay(200)
 
         searchResultIds =
-            repository.searchWorkIds(
-                normalized
-            )
+            repository.searchWorkIds(normalized)
     }
-    val visibleWorks =
-        remember(
-            works,
-            contextualizedWorkIds,
-            searchQuery,
-            searchResultIds,
-            sourceFilter,
-            mediaFilter,
-            highlightedOnly,
-            contextualizedOnly,
-            sortOrder
-        ) {
-            val filtered =
-                works
-                    .asSequence()
-                    .filter { item ->
-                        searchQuery.isBlank() ||
-                            item.work.id in
-                                searchResultIds
-                    }
-                    .filter { item ->
-                        when (
-                            sourceFilter
-                        ) {
-                            GallerySourceFilter.ALL ->
-                                true
 
-                            GallerySourceFilter.PIXIV ->
-                                item.work.sourceType
-                                    .equals(
-                                        "pixiv",
-                                        ignoreCase = true
-                                    )
-
-                            GallerySourceFilter.X ->
-                                item.work.sourceType
-                                    .equals(
-                                        "x",
-                                        ignoreCase = true
-                                    )
-                        }
-                    }
-                    .filter { item ->
-                        when (
-                            mediaFilter
-                        ) {
-                            GalleryMediaFilter.ALL ->
-                                true
-
-                            GalleryMediaFilter.IMAGE ->
-                                item.media.any { media ->
-                                    media.mimeType
-                                        .startsWith(
-                                            "image/",
-                                            ignoreCase = true
-                                        )
-                                }
-
-                            GalleryMediaFilter.VIDEO ->
-                                item.media.any { media ->
-                                    media.mimeType
-                                        .startsWith(
-                                            "video/",
-                                            ignoreCase = true
-                                        )
-                                }
-                        }
-                    }
-                    .filter { item ->
-                        !highlightedOnly ||
-                            item.media.any {
-                                it.isHighlighted
-                            }
-                    }
-                    .filter { item ->
-                        !contextualizedOnly ||
-                            item.work.id in
-                                contextualizedWorkIds
-                    }
-                    .toList()
-
-            when (
-                sortOrder
-            ) {
-                GallerySortOrder.NEWEST ->
-                    filtered.sortedWith(
-                        compareByDescending<
-                            CapturedWorkWithMedia
-                        > {
-                            it.work.capturedAt
-                        }.thenByDescending {
-                            it.work.id
-                        }
-                    )
-
-                GallerySortOrder.OLDEST ->
-                    filtered.sortedWith(
-                        compareBy<
-                            CapturedWorkWithMedia
-                        > {
-                            it.work.capturedAt
-                        }.thenBy {
-                            it.work.id
-                        }
-                    )
-            }
-        }
-
-    LaunchedEffect(
-        searchQuery,
-        sourceFilter,
-        mediaFilter,
-        highlightedOnly,
-        contextualizedOnly,
-        sortOrder
+    val visibleWorks = remember(
+        works, contextualizedWorkIds, searchQuery, searchResultIds,
+        sourceFilter, mediaFilter, highlightedOnly, contextualizedOnly,
+        sortOrder, sensitivePolicy
     ) {
-        if (
-            visibleWorks.isNotEmpty()
-        ) {
-            gridState.scrollToItem(
-                0
-            )
+        val filtered =
+            works
+                .asSequence()
+                .filter {
+                    it.visibilityFor(sensitivePolicy) !=
+                        ContentVisibility.HIDDEN
+                }
+                .filter {
+                    searchQuery.isBlank() ||
+                        it.work.id in searchResultIds
+                }
+            .filter {
+                when (sourceFilter) {
+                    GallerySourceFilter.ALL -> true
+                    GallerySourceFilter.PIXIV -> it.work.sourceType.equals("pixiv", true)
+                    GallerySourceFilter.X -> it.work.sourceType.equals("x", true)
+                }
+            }
+            .filter {
+                when (mediaFilter) {
+                    GalleryMediaFilter.ALL -> true
+                    GalleryMediaFilter.IMAGE -> it.media.any { m -> m.mimeType.startsWith("image/", true) }
+                    GalleryMediaFilter.VIDEO -> it.media.any { m -> m.mimeType.startsWith("video/", true) }
+                }
+            }
+                .filter {
+                    !highlightedOnly ||
+                        it.media.any { media ->
+                            media.isHighlighted
+                        }
+                }
+                .filter {
+                    !contextualizedOnly ||
+                        it.work.id in contextualizedWorkIds
+                }
+                .toList()
+
+        when (sortOrder) {
+            GallerySortOrder.NEWEST ->
+                filtered.sortedWith(
+                    compareByDescending<CapturedWorkWithMedia> {
+                        it.work.capturedAt
+                    }.thenByDescending {
+                        it.work.id
+                    }
+                )
+
+            GallerySortOrder.OLDEST ->
+                filtered.sortedWith(
+                    compareBy<CapturedWorkWithMedia> {
+                        it.work.capturedAt
+                    }.thenBy {
+                        it.work.id
+                    }
+                )
         }
+    }
+
+    LaunchedEffect(searchQuery, sourceFilter, mediaFilter, highlightedOnly, contextualizedOnly, sortOrder, sensitivePolicy) {
+        if (visibleWorks.isNotEmpty()) gridState.scrollToItem(0)
+        selectedWorkIds = selectedWorkIds.intersect(visibleWorks.map { it.work.id }.toSet())
     }
 
     val hasActiveFilters =
         searchQuery.isNotBlank() ||
-        sourceFilter !=
-            GallerySourceFilter.ALL ||
-        mediaFilter !=
-            GalleryMediaFilter.ALL ||
-        highlightedOnly ||
-        contextualizedOnly ||
-        sortOrder !=
-            GallerySortOrder.NEWEST
-
+            sourceFilter != GallerySourceFilter.ALL ||
+            mediaFilter != GalleryMediaFilter.ALL ||
+            highlightedOnly ||
+            contextualizedOnly ||
+            sortOrder != GallerySortOrder.NEWEST
     val activeFilterCount =
         listOf(
             searchQuery.isNotBlank(),
-            sourceFilter !=
-                GallerySourceFilter.ALL,
-            mediaFilter !=
-                GalleryMediaFilter.ALL,
+            sourceFilter != GallerySourceFilter.ALL,
+            mediaFilter != GalleryMediaFilter.ALL,
             highlightedOnly,
             contextualizedOnly,
-            sortOrder !=
-                GallerySortOrder.NEWEST
-        ).count {
-            it
-        }
+            sortOrder != GallerySortOrder.NEWEST
+        ).count { it }
 
-    Column(
-        modifier =
-            Modifier.fillMaxSize()
-    ) {
+    Column(Modifier.fillMaxSize()) {
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 16.dp,
-                        end = 8.dp,
-                        top = 2.dp,
-                        bottom = 2.dp
-                    ),
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-            verticalAlignment =
-                Alignment.CenterVertically
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text =
-                    if (
-                        selectionMode
-                    ) {
-                        "${selectedWorkIds.size} selected" + (refreshMessage?.let { " · $it" } ?: "")
-                    } else if (
-                        activeFilterCount == 0
-                    ) {
-                        "${visibleWorks.size} works"
-                    } else {
-                        "${visibleWorks.size} works · $activeFilterCount active"
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when {
+                        selectionMode -> "${selectedWorkIds.size} selected${refreshMessage?.let { " · $it" } ?: ""}"
+                        activeFilterCount == 0 -> "${visibleWorks.size} works"
+                        else -> "${visibleWorks.size} works · $activeFilterCount active"
                     },
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodySmall
-            )
-
-            if (
-                selectionMode
-            ) {
-                IconButton(
-                    onClick = {
-                        val allWorkIds =
-                            works.map {
-                                it.work.id
-                            }.toSet()
-
-                        selectedWorkIds =
-                            if (
-                                selectedWorkIds ==
-                                allWorkIds
-                            ) {
-                                emptySet()
-                            } else {
-                                allWorkIds
-                            }
-                    }
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Default.SelectAll,
-                        contentDescription =
-                            "Select all Gallery works"
-                    )
-                }
-
-                IconButton(
-                    enabled =
-                        !refreshingSelection,
-                    onClick = {
-                        val selectedWorks =
-                            works.filter {
-                                it.work.id in
-                                    selectedWorkIds
-                            }
-
-                        val refreshableWorks =
-                            selectedWorks.filter {
-                                it.work.sourceType
-                                    .equals(
-                                        "x",
-                                        ignoreCase = true
-                                    ) &&
-                                    it.work.canonicalUrl
-                                        .isNotBlank()
-                            }
-
-                        refreshSuccessCount =
-                            0
-
-                        refreshFailureCount =
-                            0
-
-                        refreshSkippedCount =
-                            selectedWorks.size -
-                                refreshableWorks.size
-
-                        refreshMessage =
-                            null
-
-                        if (
-                            refreshableWorks.isEmpty()
-                        ) {
-                            refreshMessage =
-                                if (
-                                    selectedWorks.isEmpty()
-                                ) {
-                                    "Nothing selected"
-                                } else {
-                                    "No refreshable X works"
-                                }
-                        } else {
-                            refreshQueueIds =
-                                refreshableWorks.map {
-                                    it.work.id
-                                }
-
-                            refreshQueueIndex =
-                                0
-
-                            refreshSessionRetryCount =
-                                0
-
-                            selectedWorkIds =
-                                emptySet()
-
-                            refreshingSelection =
-                                true
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Default.Refresh,
-                        contentDescription =
-                            "Refresh Gallery metadata"
-                    )
-                }
-            }
-
-            IconButton(
-                onClick = {
-                    if (
-                        selectionMode
-                    ) {
-                        selectedWorkIds =
-                            emptySet()
-                    } else {
-                        showFilters =
-                            true
-                    }
-                }
-            ) {
-                Icon(
-                    imageVector =
-                        if (
-                            selectionMode
-                        ) {
-                            Icons.Default.Close
-                        } else {
-                            Icons.Default.FilterList
-                        },
-                    contentDescription =
-                        if (
-                            selectionMode
-                        ) {
-                            "Clear selection"
-                        } else {
-                            "Filter gallery"
-                        },
-                    tint =
-                        if (
-                            !selectionMode &&
-                            hasActiveFilters
-                        ) {
-                            MaterialTheme
-                                .colorScheme
-                                .primary
-                        } else {
-                            MaterialTheme
-                                .colorScheme
-                                .onSurface
-                        }
+                    style = MaterialTheme.typography.bodySmall
+                )
+                SensitiveContentVisibilityControl(
+                    policy = sensitivePolicy,
+                    onPolicyChange = sensitiveContentVisibilityController::setPolicy
                 )
             }
-        }
-
-        Column(
-            modifier =
-                Modifier.fillMaxSize()
-        ) {
-            if (
-                refreshingSelection &&
-                refreshQueueIds.isNotEmpty()
-            ) {
-                val completedCount =
-                    refreshQueueIndex
-                        .coerceAtMost(
-                            refreshQueueIds.size
-                        )
-
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = 16.dp,
-                                vertical = 4.dp
-                            ),
-                    horizontalArrangement =
-                        Arrangement.SpaceBetween,
-                    verticalAlignment =
-                        Alignment.CenterVertically
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (selectionMode) {
+                    IconButton(onClick = {
+                        val allVisibleIds = visibleWorks.map { it.work.id }.toSet()
+                        selectedWorkIds = if (selectedWorkIds == allVisibleIds) emptySet() else allVisibleIds
+                    }) {
+                        Icon(Icons.Default.SelectAll, "Select all Gallery works")
+                    }
+                    IconButton(enabled = !refreshingSelection, onClick = {
+                        val selectedWorks = visibleWorks.filter { it.work.id in selectedWorkIds }
+                        val refreshableWorks = selectedWorks.filter { it.work.sourceType.equals("x", true) && it.work.canonicalUrl.isNotBlank() }
+                        refreshSuccessCount = 0
+                        refreshFailureCount = 0
+                        refreshSkippedCount = selectedWorks.size - refreshableWorks.size
+                        refreshMessage = null
+                        if (refreshableWorks.isEmpty()) {
+                            refreshMessage = if (selectedWorks.isEmpty()) "Nothing selected" else "No refreshable X works"
+                        } else {
+                            refreshQueueIds = refreshableWorks.map { it.work.id }
+                            refreshQueueIndex = 0
+                            refreshSessionRetryCount = 0
+                            selectedWorkIds = emptySet()
+                            refreshingSelection = true
+                        }
+                    }) {
+                        Icon(Icons.Default.Refresh, "Refresh Gallery metadata")
+                    }
+                }
+                IconButton(
+                    onClick = {
+                        if (selectionMode) {
+                            selectedWorkIds = emptySet()
+                        } else {
+                            showFilters = true
+                        }
+                    }
                 ) {
-                    Text(
-                        text =
-                            "Refreshing metadata",
-                        style =
-                            MaterialTheme
-                                .typography
-                                .labelSmall
-                    )
-
-                    Text(
-                        text =
-                            "$completedCount / ${refreshQueueIds.size}",
-                        style =
-                            MaterialTheme
-                                .typography
-                                .labelSmall
+                    Icon(
+                        if (selectionMode) Icons.Default.Close else Icons.Default.FilterList,
+                        if (selectionMode) "Clear selection" else "Filter gallery",
+                        tint = if (!selectionMode && hasActiveFilters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                     )
                 }
+            }
+        }
 
+        Column(Modifier.fillMaxSize()) {
+            if (refreshingSelection && refreshQueueIds.isNotEmpty()) {
+                val completedCount = refreshQueueIndex.coerceAtMost(refreshQueueIds.size)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), Arrangement.SpaceBetween) {
+                    Text("Refreshing metadata", style = MaterialTheme.typography.labelSmall)
+                    Text("$completedCount / ${refreshQueueIds.size}", style = MaterialTheme.typography.labelSmall)
+                }
                 LinearProgressIndicator(
                     progress = {
-                        if (
-                            refreshQueueIds.isEmpty()
-                        ) {
-                            0f
-                        } else {
-                            completedCount.toFloat() /
-                                refreshQueueIds.size.toFloat()
-                        }
-                    },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(
-                                2.dp
-                            )
+                        if (refreshQueueIds.isEmpty()) 0f else completedCount.toFloat() / refreshQueueIds.size.toFloat()
+                    }, Modifier.fillMaxWidth().height(2.dp)
                 )
-            } else if (
-                !refreshMessage.isNullOrBlank()
-            ) {
-                Text(
-                    text =
-                        refreshMessage.orEmpty(),
-                    modifier =
-                        Modifier.padding(
-                            horizontal = 16.dp,
-                            vertical = 4.dp
-                        ),
-                    style =
-                        MaterialTheme
-                            .typography
-                            .labelSmall
-                )
+            } else if (!refreshMessage.isNullOrBlank()) {
+                Text(refreshMessage.orEmpty(), Modifier.padding(horizontal = 16.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall)
             }
 
             LazyVerticalGrid(
-                columns =
-                    GridCells.Adaptive(
-                        minSize = 160.dp
-                    ),
-                state =
-                    gridState,
-                modifier =
-                    Modifier
-                        .weight(
-                            1f
-                        )
-                        .fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    )
+                columns = GridCells.Adaptive(160.dp), state = gridState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-            items(
-                items =
-                    visibleWorks,
-                key = {
-                    it.work.id
-                }
-            ) { item ->
-
-                val coverMedia =
-                    item.media
-                        .minByOrNull {
-                            it.mediaIndex
-                        }
-
-                val selected =
-                    item.work.id in
-                        selectedWorkIds
-
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .background(
-                                if (
-                                    selected
-                                ) {
-                                    MaterialTheme
-                                        .colorScheme
-                                        .primaryContainer
-                                        .copy(
-                                            alpha = 0.35f
-                                        )
-                                } else {
-                                    Color.Transparent
-                                }
-                            )
-                            .combinedClickable(
-                                onClick = {
-                                    if (
-                                        selectionMode
-                                    ) {
-                                        selectedWorkIds =
-                                            if (
-                                                selected
-                                            ) {
-                                                selectedWorkIds -
-                                                    item.work.id
-                                            } else {
-                                                selectedWorkIds +
-                                                    item.work.id
-                                            }
-                                    } else {
-                                        onWorkClick(
-                                            item.work.id,
-                                            coverMedia
-                                                ?.takeUnless {
-                                                    it.mimeType
-                                                        .startsWith(
-                                                            "video/",
-                                                            ignoreCase = true
-                                                        )
-                                                }
-                                                ?.localUri
-                                        )
-                                    }
-                                },
-                                onLongClick = {
+                items(visibleWorks, key = { it.work.id }) { item ->
+                    val coverMedia = item.media.minByOrNull { it.mediaIndex }
+                    val selected = item.work.id in selectedWorkIds
+                    val visibility = item.visibilityFor(sensitivePolicy)
+                    Column(
+                        Modifier.fillMaxWidth().background(
+                            if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else Color.Transparent
+                        ).combinedClickable(
+                            onClick = {
+                                            if (selectionMode) {
                                     selectedWorkIds =
-                                        selectedWorkIds +
-                                            item.work.id
-                                }
-                            )
-                ) {
-                    coverMedia
-                        ?.let { media ->
-
-                            val localUri =
-                                Uri.parse(
-                                    media.localUri
-                                )
-
-                            if (
-                                media.mimeType
-                                    .startsWith(
-                                        "video/",
-                                        ignoreCase = true
+                                        if (selected) {
+                                            selectedWorkIds - item.work.id
+                                        } else {
+                                            selectedWorkIds + item.work.id
+                                        }
+                                } else {
+                                    onWorkClick(
+                                        item.work.id,
+                                        coverMedia
+                                            ?.takeUnless {
+                                                it.mimeType.startsWith(
+                                                    "video/",
+                                                    ignoreCase = true
+                                                )
+                                            }
+                                            ?.localUri
                                     )
+                                }
+                            },
+                            onLongClick = {
+                                selectedWorkIds =
+                                    selectedWorkIds + item.work.id
+                            }
+                        )
+                    ) {
+                        coverMedia?.let { media ->
+                            val mediaModifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(0.8f)
+                                    .then(
+                                        if (
+                                            visibility ==
+                                                ContentVisibility.BLURRED
+                                        ) {
+                                            Modifier.blur(24.dp)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                            if (
+                                media.mimeType.startsWith(
+                                    "video/",
+                                    ignoreCase = true
+                                )
                             ) {
                                 LoopingVideoPlayer(
-                                    uri =
-                                        media.localUri,
-                                    active =
-                                        true,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .aspectRatio(
-                                                0.8f
-                                            )
+                                    uri = media.localUri,
+                                    active = true,
+                                    modifier = mediaModifier
                                 )
                             } else {
                                 AsyncImage(
                                     model =
                                         ImageRequest
-                                            .Builder(
-                                                context
-                                            )
-                                            .data(
-                                                localUri
-                                            )
+                                            .Builder(context)
+                                            .data(Uri.parse(media.localUri))
                                             .build(),
-                                    contentDescription =
-                                        null,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .aspectRatio(
-                                                0.8f
-                                            ),
-                                    contentScale =
-                                        ContentScale.Fit,
+                                    contentDescription = null,
+                                    modifier = mediaModifier,
+                                    contentScale = ContentScale.Fit,
                                     onError = { state ->
                                         Log.e(
                                             "Muninn/Gallery",
                                             "Failed to load ${media.localUri}",
-                                            state
-                                                .result
-                                                .throwable
+                                            state.result.throwable
                                         )
                                     }
                                 )
                             }
                         }
+                    }
                 }
-            }
             }
         }
     }
 
-    if (
-        refreshingSelection &&
-        currentRefreshWork != null
-    ) {
-        key(
-            currentRefreshWork.work.id,
-            refreshSessionRetryCount
-        ) {
+    if (refreshingSelection && currentRefreshWork != null) {
+        key(currentRefreshWork.work.id, refreshSessionRetryCount) {
             XMetadataRefreshSession(
-                canonicalUrl =
-                currentRefreshWork
-                    .work
-                    .canonicalUrl,
-            sourceId =
-                currentRefreshWork
-                    .work
-                    .sourceId,
-            onPayload = {
-                payload ->
-
-                coroutineScope.launch {
-                    val result =
-                        refreshMetadataUseCase
-                            .refreshX(
-                                workId =
-                                    currentRefreshWork
-                                        .work
-                                        .id,
-                                payload =
-                                    payload
-                            )
-
-                    when (
-                        result
-                    ) {
-                        is RefreshCapturedWorkMetadataResult.Success -> {
-                            Log.d(
-                                "Muninn/GalleryRefresh",
-                                "success workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId}"
-                            )
-
-                            works =
-                                repository
-                                    .getAllWithMedia()
-
-                            finishRefreshItem(
-                                true
-                            )
-                        }
-
-                        is RefreshCapturedWorkMetadataResult.Failure -> {
-                            Log.e(
-                                "Muninn/GalleryRefresh",
-                                "refreshX failed workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId} url=${currentRefreshWork.work.canonicalUrl} result=$result"
-                            )
-
-                            finishRefreshItem(
-                                false
-                            )
+                canonicalUrl = currentRefreshWork.work.canonicalUrl,
+                sourceId = currentRefreshWork.work.sourceId,
+                onPayload = { payload ->
+                    coroutineScope.launch {
+                        when (refreshMetadataUseCase.refreshX(currentRefreshWork.work.id, payload)) {
+                            is RefreshCapturedWorkMetadataResult.Success -> {
+                                works = repository.getAllWithMedia()
+                                finishRefreshItem(true)
+                            }
+                            is RefreshCapturedWorkMetadataResult.Failure -> finishRefreshItem(false)
                         }
                     }
-                }
-            },
+                },
                 onFailure = {
-                    if (
-                        refreshSessionRetryCount <
-                        MAX_REFRESH_SESSION_RETRIES
-                    ) {
-                        Log.w(
-                            "Muninn/GalleryRefresh",
-                            "session retry workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId} retry=${refreshSessionRetryCount + 1}"
-                        )
-
-                        refreshSessionRetryCount =
-                            refreshSessionRetryCount + 1
-                    } else {
-                        Log.e(
-                            "Muninn/GalleryRefresh",
-                            "session failed after retry workId=${currentRefreshWork.work.id} sourceId=${currentRefreshWork.work.sourceId} url=${currentRefreshWork.work.canonicalUrl}"
-                        )
-
-                        finishRefreshItem(
-                            false
-                        )
-                    }
+                    if (refreshSessionRetryCount < MAX_REFRESH_SESSION_RETRIES) refreshSessionRetryCount++ else finishRefreshItem(false)
                 }
             )
         }
     }
 
-    if (
-        showFilters
-    ) {
+    if (showFilters) {
         GalleryFilterSheet(
-            sourceFilter =
-                sourceFilter,
-            mediaFilter =
-                mediaFilter,
-            highlightedOnly =
-                highlightedOnly,
-            contextualizedOnly =
-                contextualizedOnly,
-            sortOrder =
-                sortOrder,
-            searchQuery =
-                searchQuery,
-            hasActiveFilters =
-                hasActiveFilters,
+            searchQuery = searchQuery,
+            sourceFilter = sourceFilter,
+            mediaFilter = mediaFilter,
+            highlightedOnly = highlightedOnly,
+            contextualizedOnly = contextualizedOnly,
+            sortOrder = sortOrder,
+            hasActiveFilters = hasActiveFilters,
             onSearchQueryChange = {
-                searchQuery =
-                    it
+                searchQuery = it
             },
             onSourceFilterChange = {
-                sourceFilter =
-                    it
+                sourceFilter = it
             },
             onMediaFilterChange = {
-                mediaFilter =
-                    it
+                mediaFilter = it
             },
             onHighlightedChange = {
-                highlightedOnly =
-                    it
+                highlightedOnly = it
             },
             onContextualizedChange = {
-                contextualizedOnly =
-                    it
+                contextualizedOnly = it
             },
             onSortOrderChange = {
-                sortOrder =
-                    it
+                sortOrder = it
             },
             onClear = {
-                searchQuery =
-                    ""
-
-                sourceFilter =
-                    GallerySourceFilter.ALL
-
-                mediaFilter =
-                    GalleryMediaFilter.ALL
-
-                highlightedOnly =
-                    false
-
-                contextualizedOnly =
-                    false
-
-                sortOrder =
-                    GallerySortOrder.NEWEST
+                searchQuery = ""
+                sourceFilter = GallerySourceFilter.ALL
+                mediaFilter = GalleryMediaFilter.ALL
+                highlightedOnly = false
+                contextualizedOnly = false
+                sortOrder = GallerySortOrder.NEWEST
             },
             onDismiss = {
-                showFilters =
-                    false
+                showFilters = false
             }
         )
     }
@@ -1112,314 +619,71 @@ private fun GalleryFilterSheet(
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(
-        onDismissRequest =
-            onDismiss
-    ) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = 20.dp,
-                        end = 20.dp,
-                        bottom = 28.dp
-                    )
-                    .verticalScroll(
-                        rememberScrollState()
-                    )
+            Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp).verticalScroll(rememberScrollState())
         ) {
             Text(
-                text =
-                    "Search & filter",
-                style =
-                    MaterialTheme
-                        .typography
-                        .titleLarge,
-                fontWeight =
-                    FontWeight.SemiBold
+                text = "Search & filter",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
             )
-
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        20.dp
-                    )
-            )
-
+            Spacer(Modifier.height(20.dp))
             OutlinedTextField(
-                value =
-                    searchQuery,
-                onValueChange =
-                    onSearchQueryChange,
-                modifier =
-                    Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        "Search title, author, tags, or context"
-                    )
-                },
-                trailingIcon = {
-                    if (
-                        searchQuery.isNotBlank()
-                    ) {
-                        IconButton(
-                            onClick = {
-                                onSearchQueryChange(
-                                    ""
-                                )
-                            },
-                            modifier =
-                                Modifier.size(
-                                    40.dp
-                                )
-                        ) {
-                            Icon(
-                                imageVector =
-                                    Icons.Default.Close,
-                                contentDescription =
-                                    "Clear search",
-                                modifier =
-                                    Modifier.size(
-                                        18.dp
-                                    )
-                            )
-                        }
-                    }
-                },
-                singleLine =
-                    true
+                value = searchQuery, onValueChange = onSearchQueryChange, modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search title, author, tags, or context") }, singleLine = true
             )
-
             Spacer(
-                modifier =
-                    Modifier.height(
-                        20.dp
-                    )
+                modifier = Modifier.height(20.dp)
             )
 
             GalleryFilterSectionTitle(
-                "Source"
+                text = "Source"
             )
-
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        12.dp
-                    )
-            ) {
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_source_all,
-                    label =
-                        "All",
-                    selected =
-                        sourceFilter ==
-                            GallerySourceFilter.ALL,
-                    onClick = {
-                        onSourceFilterChange(
-                            GallerySourceFilter.ALL
-                        )
-                    }
-                )
-
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_source_pixiv,
-                    label =
-                        "Pixiv",
-                    selected =
-                        sourceFilter ==
-                            GallerySourceFilter.PIXIV,
-                    onClick = {
-                        onSourceFilterChange(
-                            GallerySourceFilter.PIXIV
-                        )
-                    }
-                )
-
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_source_x,
-                    label =
-                        "X",
-                    selected =
-                        sourceFilter ==
-                            GallerySourceFilter.X,
-                    onClick = {
-                        onSourceFilterChange(
-                            GallerySourceFilter.X
-                        )
-                    }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GalleryFilterTile(R.drawable.ic_gallery_source_all, "All", sourceFilter == GallerySourceFilter.ALL) { onSourceFilterChange(GallerySourceFilter.ALL) }
+                GalleryFilterTile(R.drawable.ic_gallery_source_pixiv, "Pixiv", sourceFilter == GallerySourceFilter.PIXIV) { onSourceFilterChange(GallerySourceFilter.PIXIV) }
+                GalleryFilterTile(R.drawable.ic_gallery_source_x, "X", sourceFilter == GallerySourceFilter.X) { onSourceFilterChange(GallerySourceFilter.X) }
             }
-
             GallerySectionSpacer()
 
             GalleryFilterSectionTitle(
-                "Media"
+                text = "Media"
             )
-
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        12.dp
-                    )
-            ) {
-                GalleryMaterialFilterTile(
-                    icon =
-                        Icons.Default.Collections,
-                    label =
-                        "All",
-                    selected =
-                        mediaFilter ==
-                            GalleryMediaFilter.ALL,
-                    onClick = {
-                        onMediaFilterChange(
-                            GalleryMediaFilter.ALL
-                        )
-                    }
-                )
-
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_image,
-                    label =
-                        "Images",
-                    selected =
-                        mediaFilter ==
-                            GalleryMediaFilter.IMAGE,
-                    onClick = {
-                        onMediaFilterChange(
-                            GalleryMediaFilter.IMAGE
-                        )
-                    }
-                )
-
-                GalleryMaterialFilterTile(
-                    icon =
-                        Icons.Default.VideoLibrary,
-                    label =
-                        "Videos",
-                    selected =
-                        mediaFilter ==
-                            GalleryMediaFilter.VIDEO,
-                    onClick = {
-                        onMediaFilterChange(
-                            GalleryMediaFilter.VIDEO
-                        )
-                    }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GalleryMaterialFilterTile(Icons.Default.Collections, "All", mediaFilter == GalleryMediaFilter.ALL) { onMediaFilterChange(GalleryMediaFilter.ALL) }
+                GalleryFilterTile(R.drawable.ic_gallery_image, "Images", mediaFilter == GalleryMediaFilter.IMAGE) { onMediaFilterChange(GalleryMediaFilter.IMAGE) }
+                GalleryMaterialFilterTile(Icons.Default.VideoLibrary, "Videos", mediaFilter == GalleryMediaFilter.VIDEO) { onMediaFilterChange(GalleryMediaFilter.VIDEO) }
             }
-
             GallerySectionSpacer()
 
             GalleryFilterSectionTitle(
-                "Properties"
+                text = "Properties"
             )
-
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        12.dp
-                    )
-            ) {
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_highlight,
-                    label =
-                        "Highlighted",
-                    selected =
-                        highlightedOnly,
-                    onClick = {
-                        onHighlightedChange(
-                            !highlightedOnly
-                        )
-                    }
-                )
-
-                GalleryMaterialFilterTile(
-                    icon =
-                        Icons.Default.StickyNote2,
-                    label =
-                        "Notes",
-                    selected =
-                        contextualizedOnly,
-                    onClick = {
-                        onContextualizedChange(
-                            !contextualizedOnly
-                        )
-                    }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GalleryFilterTile(R.drawable.ic_gallery_highlight, "Highlighted", highlightedOnly) { onHighlightedChange(!highlightedOnly) }
+                GalleryMaterialFilterTile(Icons.Default.StickyNote2, "Notes", contextualizedOnly) { onContextualizedChange(!contextualizedOnly) }
             }
-
             GallerySectionSpacer()
 
             GalleryFilterSectionTitle(
-                "Saved"
+                text = "Saved"
             )
-
-            Row(
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        12.dp
-                    )
-            ) {
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_newest,
-                    label =
-                        "Newest",
-                    selected =
-                        sortOrder ==
-                            GallerySortOrder.NEWEST,
-                    onClick = {
-                        onSortOrderChange(
-                            GallerySortOrder.NEWEST
-                        )
-                    }
-                )
-
-                GalleryFilterTile(
-                    iconRes =
-                        R.drawable
-                            .ic_gallery_oldest,
-                    label =
-                        "Oldest",
-                    selected =
-                        sortOrder ==
-                            GallerySortOrder.OLDEST,
-                    onClick = {
-                        onSortOrderChange(
-                            GallerySortOrder.OLDEST
-                        )
-                    }
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GalleryFilterTile(R.drawable.ic_gallery_newest, "Newest", sortOrder == GallerySortOrder.NEWEST) { onSortOrderChange(GallerySortOrder.NEWEST) }
+                GalleryFilterTile(R.drawable.ic_gallery_oldest, "Oldest", sortOrder == GallerySortOrder.OLDEST) { onSortOrderChange(GallerySortOrder.OLDEST) }
             }
-
             Spacer(
-                modifier =
-                    Modifier.height(
-                        24.dp
-                    )
+                modifier = Modifier.height(24.dp)
             )
 
             Button(
-                enabled =
-                    hasActiveFilters,
-                onClick =
-                    onClear,
-                modifier =
-                    Modifier.fillMaxWidth()
+                enabled = hasActiveFilters,
+                onClick = onClear,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    "Clear all"
+                    text = "Clear all"
                 )
             }
         }
@@ -1431,30 +695,17 @@ private fun GalleryFilterSectionTitle(
     text: String
 ) {
     Text(
-        text =
-            text,
-        style =
-            MaterialTheme
-                .typography
-                .labelLarge,
-        color =
-            MaterialTheme
-                .colorScheme
-                .onSurfaceVariant,
-        modifier =
-            Modifier.padding(
-                bottom = 9.dp
-            )
+        text = text,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.labelLarge,
+        modifier = Modifier.padding(bottom = 9.dp)
     )
 }
 
 @Composable
 private fun GallerySectionSpacer() {
     Spacer(
-        modifier =
-            Modifier.height(
-                20.dp
-            )
+        modifier = Modifier.height(20.dp)
     )
 }
 
@@ -1466,56 +717,37 @@ private fun GalleryMaterialFilterTile(
     onClick: () -> Unit
 ) {
     GalleryFilterTileContainer(
-        label =
-            label,
-        selected =
-            selected,
-        onClick =
-            onClick
+        label = label,
+        selected = selected,
+        onClick = onClick
     ) {
         Icon(
-            imageVector =
-                icon,
-            contentDescription =
-                label,
-            modifier =
-                Modifier.size(
-                    30.dp
-                )
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(30.dp)
         )
     }
 }
+
 @Composable
 private fun GalleryFilterTile(
-    @DrawableRes
-    iconRes: Int,
+    @DrawableRes iconRes: Int,
     label: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     GalleryFilterTileContainer(
-        label =
-            label,
-        selected =
-            selected,
-        onClick =
-            onClick
+        label = label,
+        selected = selected,
+        onClick = onClick
     ) {
         Icon(
-            painter =
-                painterResource(
-                    iconRes
-                ),
-            contentDescription =
-                label,
-            modifier =
-                Modifier.size(
-                    30.dp
-                )
+            painter = painterResource(iconRes),
+            contentDescription = label,
+            modifier = Modifier.size(30.dp)
         )
     }
 }
-
 @Composable
 private fun GalleryFilterTileContainer(
     label: String,
@@ -1524,76 +756,43 @@ private fun GalleryFilterTileContainer(
     content: @Composable () -> Unit
 ) {
     Column(
-        horizontalAlignment =
-            Alignment.CenterHorizontally,
-        modifier =
-            Modifier.width(
-                76.dp
-            )
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(76.dp)
     ) {
         Surface(
-            onClick =
-                onClick,
-            shape =
-                RoundedCornerShape(
-                    18.dp
-                ),
+            onClick = onClick,
+            shape = RoundedCornerShape(18.dp),
             color =
-                if (
-                    selected
-                ) {
-                    MaterialTheme
-                        .colorScheme
-                        .primaryContainer
+                if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    MaterialTheme
-                        .colorScheme
-                        .surfaceVariant
+                    MaterialTheme.colorScheme.surfaceVariant
                 },
             contentColor =
-                if (
-                    selected
-                ) {
-                    MaterialTheme
-                        .colorScheme
-                        .onPrimaryContainer
+                if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
                 } else {
-                    MaterialTheme
-                        .colorScheme
-                        .onSurfaceVariant
+                    MaterialTheme.colorScheme.onSurfaceVariant
                 },
-            modifier =
-                Modifier.size(
-                    68.dp
-                )
+            modifier = Modifier.size(68.dp)
         ) {
             Box(
-                contentAlignment =
-                    Alignment.Center
+                contentAlignment = Alignment.Center
             ) {
                 content()
             }
         }
 
         Spacer(
-            modifier =
-                Modifier.height(
-                    6.dp
-                )
+            modifier = Modifier.height(6.dp)
         )
 
         Text(
-            text =
-                label,
-            style =
-                MaterialTheme
-                    .typography
-                    .labelSmall,
-            maxLines =
-                1
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1
         )
     }
 }
 
-private const val MAX_REFRESH_SESSION_RETRIES =
-    1
+private const val MAX_REFRESH_SESSION_RETRIES = 1
