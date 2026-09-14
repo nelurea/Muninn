@@ -1,5 +1,7 @@
 package io.github.nelurea.muninn.discovery.model
 
+import io.github.nelurea.muninn.content.ContentRestriction
+
 data class ArtworkPreview(
     val source: DiscoverySourceId,
     val sourceItemId: String,
@@ -14,6 +16,7 @@ data class ArtworkPreview(
     val creatorAvatarUrl: String?,
 
     val tags: List<String>,
+    val restriction: ContentRestriction = ContentRestriction.UNKNOWN,
 
     val media: List<ArtworkPreviewMedia>
 )

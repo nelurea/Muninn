@@ -1,5 +1,7 @@
 package io.github.nelurea.muninn.capture.model
 
+import io.github.nelurea.muninn.content.ContentRestriction
+
 data class CaptureDraft(
     val sourceType: String,
     val sourceId: String,
@@ -17,5 +19,6 @@ data class CaptureDraft(
     val caption: String,
 
     val tags: List<String>,
+    val restriction: ContentRestriction = ContentRestriction.UNKNOWN,
     val media: List<CaptureMediaDraft>
 )

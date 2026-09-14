@@ -1,6 +1,6 @@
 package io.github.nelurea.muninn.discovery.pixiv
 
-import io.github.nelurea.muninn.discovery.model.ContentRestriction
+import io.github.nelurea.muninn.content.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

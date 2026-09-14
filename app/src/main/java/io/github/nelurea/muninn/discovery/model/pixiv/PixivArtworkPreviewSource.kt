@@ -292,6 +292,9 @@ class PixivArtworkPreviewSource(
                         body
                     ),
 
+                restriction =
+                    item.restriction,
+
                 media =
                     media
             )

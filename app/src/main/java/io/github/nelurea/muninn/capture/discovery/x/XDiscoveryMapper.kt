@@ -1,4 +1,4 @@
-﻿package io.github.nelurea.muninn.discovery.x
+package io.github.nelurea.muninn.discovery.x
 
 import io.github.nelurea.muninn.capture.web.x.XCapturePayload
 import io.github.nelurea.muninn.content.ContentRestriction
@@ -59,7 +59,11 @@ object XDiscoveryMapper {
                 payload.media.size,
 
             restriction =
-                ContentRestriction.UNKNOWN
+                if (payload.isSensitive) {
+                    ContentRestriction.SENSITIVE
+                } else {
+                    ContentRestriction.GENERAL
+                }
         )
     }
 

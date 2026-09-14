@@ -72,6 +72,9 @@ class XArtworkPreviewSource(
             tags =
                 payload.tags,
 
+            restriction =
+                item.restriction,
+
             media =
                 payload.media
                     .sortedBy {

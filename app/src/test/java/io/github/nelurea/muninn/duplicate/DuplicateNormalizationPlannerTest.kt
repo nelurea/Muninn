@@ -124,7 +124,21 @@ class DuplicateNormalizationPlannerTest {
     }
 
     private fun work(id: Long, capturedAt: String) = CapturedWorkEntity(
-        id, "pixiv", "source", "url", capturedAt, null, null, null, "author", "name", null, null, "", null
+        id,
+        "pixiv",
+        "source",
+        "url",
+        capturedAt,
+        null,
+        null,
+        null,
+        "author",
+        "name",
+        null,
+        null,
+        "",
+        "UNKNOWN",
+        null
     )
 
     private fun media(id: Long, workId: Long, index: Int, uri: String) = CapturedMediaEntity(

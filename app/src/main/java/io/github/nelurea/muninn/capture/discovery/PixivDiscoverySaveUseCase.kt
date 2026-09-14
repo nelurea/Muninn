@@ -150,6 +150,7 @@ class PixivDiscoverySaveUseCase(
                     title = preview.title,
                     caption = preview.caption ?: "",
                     tags = preview.tags,
+                    restriction = preview.restriction,
                     media = emptyList()
                 )
 

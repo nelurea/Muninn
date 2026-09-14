@@ -211,7 +211,8 @@ class SaveCaptureUseCase(
         sourceType = sourceType, sourceId = sourceId, canonicalUrl = canonicalUrl,
         capturedAt = capturedAt, publishedAt = publishedAt, discoveryMode = discoveryMode,
         discoveryQuery = discoveryQuery, authorId = authorId, authorName = authorName,
-        authorHandle = authorHandle, title = title, caption = caption, sessionId = sessionId
+        authorHandle = authorHandle, title = title, caption = caption,
+        contentRestriction = restriction.name, sessionId = sessionId
     )
 
     private fun CaptureIdentitySnapshot?.orEmptyIndices(): Set<Int> =

@@ -1,4 +1,4 @@
-﻿package io.github.nelurea.muninn.ui.discovery
+package io.github.nelurea.muninn.ui.discovery
 
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -298,7 +298,7 @@ fun DiscoveryGridItem(
             ) {
                 DiscoveryBadge(
                     text =
-                        "笆ｧ ${item.mediaCount}",
+                        "▧ ${item.mediaCount}",
                     backgroundColor =
                         Color.Black.copy(
                             alpha = 0.72f

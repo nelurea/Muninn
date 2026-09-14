@@ -32,5 +32,6 @@ data class CapturedWorkEntity(
     val title: String?,
     val caption: String,
 
+    val contentRestriction: String = "UNKNOWN",
     val sessionId: Long?
 )

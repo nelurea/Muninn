@@ -872,3 +872,17 @@ val MIGRATION_17_18 =
             )
         }
     }
+val MIGRATION_18_19 =
+    object : Migration(18, 19) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                ALTER TABLE captured_works
+                ADD COLUMN contentRestriction TEXT NOT NULL DEFAULT 'UNKNOWN'
+                """.trimIndent()
+            )
+        }
+    }

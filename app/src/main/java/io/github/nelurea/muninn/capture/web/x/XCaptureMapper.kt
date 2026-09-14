@@ -2,6 +2,7 @@ package io.github.nelurea.muninn.capture.web.x
 
 import io.github.nelurea.muninn.capture.model.CaptureDraft
 import io.github.nelurea.muninn.capture.model.CaptureMediaDraft
+import io.github.nelurea.muninn.content.ContentRestriction
 import java.io.File
 
 object XCaptureMapper {
@@ -100,6 +101,13 @@ object XCaptureMapper {
                 classifiedXTags(
                     payload
                 ),
+
+            restriction =
+                if (payload.isSensitive) {
+                    ContentRestriction.SENSITIVE
+                } else {
+                    ContentRestriction.GENERAL
+                },
 
             media =
                 media
