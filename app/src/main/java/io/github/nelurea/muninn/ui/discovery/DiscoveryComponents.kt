@@ -1,4 +1,4 @@
-package io.github.nelurea.muninn.ui.discovery
+﻿package io.github.nelurea.muninn.ui.discovery
 
 import android.util.Log
 import androidx.compose.foundation.clickable
@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import io.github.nelurea.muninn.discovery.DiscoverySaveQueueUiState
-import io.github.nelurea.muninn.discovery.model.ContentRestriction
+import io.github.nelurea.muninn.content.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
 
@@ -298,7 +298,7 @@ fun DiscoveryGridItem(
             ) {
                 DiscoveryBadge(
                     text =
-                        "▧ ${item.mediaCount}",
+                        "笆ｧ ${item.mediaCount}",
                     backgroundColor =
                         Color.Black.copy(
                             alpha = 0.72f
@@ -399,3 +399,4 @@ fun shouldLoadMore(
     return lastVisibleIndex >=
             itemCount - 4
 }
+

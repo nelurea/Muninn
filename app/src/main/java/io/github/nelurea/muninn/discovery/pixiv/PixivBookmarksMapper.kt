@@ -1,6 +1,6 @@
-package io.github.nelurea.muninn.discovery.pixiv
+﻿package io.github.nelurea.muninn.discovery.pixiv
 
-import io.github.nelurea.muninn.discovery.model.ContentRestriction
+import io.github.nelurea.muninn.content.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryCreator
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId

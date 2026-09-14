@@ -1,7 +1,7 @@
-package io.github.nelurea.muninn.discovery.x
+﻿package io.github.nelurea.muninn.discovery.x
 
 import io.github.nelurea.muninn.capture.web.x.XCapturePayload
-import io.github.nelurea.muninn.discovery.model.ContentRestriction
+import io.github.nelurea.muninn.content.ContentRestriction
 import io.github.nelurea.muninn.discovery.model.DiscoveryCreator
 import io.github.nelurea.muninn.discovery.model.DiscoveryItem
 import io.github.nelurea.muninn.discovery.model.DiscoverySourceId
@@ -222,3 +222,4 @@ object XDiscoveryMapper {
         }
     }
 }
+

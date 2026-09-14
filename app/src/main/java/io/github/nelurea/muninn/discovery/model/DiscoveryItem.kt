@@ -1,4 +1,6 @@
-package io.github.nelurea.muninn.discovery.model
+﻿package io.github.nelurea.muninn.discovery.model
+
+import io.github.nelurea.muninn.content.ContentRestriction
 
 data class DiscoveryItem(
     val source: DiscoverySourceId,
@@ -21,9 +23,3 @@ enum class DiscoverySourceId {
     X,
 }
 
-enum class ContentRestriction {
-    GENERAL,
-    R18,
-    R18G,
-    UNKNOWN
-}
