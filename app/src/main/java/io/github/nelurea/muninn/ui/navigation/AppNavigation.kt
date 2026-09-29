@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ import io.github.nelurea.muninn.ui.session.SessionDetailViewModel
 import io.github.nelurea.muninn.ui.session.SessionListScreen
 import io.github.nelurea.muninn.ui.session.SessionListViewModel
 import io.github.nelurea.muninn.ui.session.SessionStatePicker
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,7 +65,9 @@ fun AppNavigation(
     sessionRepository: SessionRepository,
     resolvedCaptureRepository: ResolvedCaptureRepository,
     capturedWorkRepository: CapturedWorkRepository,
-    mediaMoveBatchCoordinator: MediaMoveBatchCoordinator
+    mediaMoveBatchCoordinator: MediaMoveBatchCoordinator,
+    galleryContentRevision: StateFlow<Int>,
+    legacyImportInProgress: StateFlow<Boolean>
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -71,6 +75,8 @@ fun AppNavigation(
         SensitiveContentVisibilityController(context.applicationContext)
     }
     val migrationScope = rememberCoroutineScope()
+    val galleryContentRevisionValue by galleryContentRevision.collectAsState()
+    val legacyImportInProgressValue by legacyImportInProgress.collectAsState()
     var pendingInitialPreview by remember { mutableStateOf<Pair<Long, String?>?>(null) }
 
     val saveCaptureUseCase = remember {
@@ -143,6 +149,8 @@ fun AppNavigation(
             GalleryScreen(
                 repository = capturedWorkRepository,
                 sensitiveContentVisibilityController = sensitiveContentVisibilityController,
+                contentRevision = galleryContentRevisionValue,
+                importInProgress = legacyImportInProgressValue,
                 onWorkClick = { workId, initialPreviewUri ->
                     pendingInitialPreview = workId to initialPreviewUri
                     navController.navigate("capturedWorkDetail/$workId")

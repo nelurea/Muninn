@@ -42,6 +42,59 @@ class CapturedWorkRepository(
         )
     }
 
+    suspend fun importLegacyMediaBatch(
+        records: List<LegacyMediaRecord>
+    ): Int = database.withTransaction {
+        var imported = 0
+        val existingMediaUris = dao.getAllMediaLocalUris().toHashSet()
+
+        records.forEach { record ->
+            if (
+                dao.hasSourceIdentity(
+                    LEGACY_MEDIA_STORE_SOURCE,
+                    record.sourceId
+                ) || record.localUri in existingMediaUris
+            ) {
+                return@forEach
+            }
+
+            dao.insertCapture(
+                work = CapturedWorkEntity(
+                    sourceType = LEGACY_MEDIA_STORE_SOURCE,
+                    sourceId = record.sourceId,
+                    canonicalUrl = "",
+                    capturedAt = record.capturedAt,
+                    publishedAt = null,
+                    discoveryMode = null,
+                    discoveryQuery = null,
+                    authorId = LEGACY_MEDIA_STORE_SOURCE,
+                    authorName = "Saved image",
+                    authorHandle = null,
+                    title = null,
+                    caption = "",
+                    contentRestriction = "UNKNOWN",
+                    sessionId = null
+                ),
+                media = listOf(
+                    CapturedMediaEntity(
+                        workId = 0,
+                        mediaIndex = 0,
+                        localUri = record.localUri,
+                        sourceUrl = "",
+                        mimeType = record.mimeType,
+                        fileName = record.fileName,
+                        isHighlighted = false
+                    )
+                ),
+                tags = emptyList()
+            )
+            existingMediaUris += record.localUri
+            imported++
+        }
+
+        imported
+    }
+
     suspend fun getAllWithMedia():
             List<CapturedWorkWithMedia> {
         return dao.getAllWithMedia()
@@ -473,3 +526,13 @@ class CapturedWorkRepository(
         )
     }
 }
+
+data class LegacyMediaRecord(
+    val sourceId: String,
+    val localUri: String,
+    val capturedAt: String,
+    val fileName: String,
+    val mimeType: String
+)
+
+private const val LEGACY_MEDIA_STORE_SOURCE = "legacy-media-store"

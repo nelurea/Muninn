@@ -886,3 +886,90 @@ val MIGRATION_18_19 =
             )
         }
     }
+
+val MIGRATION_19_20 =
+    object : Migration(19, 20) {
+
+        override fun migrate(
+            db: SupportSQLiteDatabase
+        ) {
+            db.execSQL(
+                """
+                INSERT INTO captured_works (
+                    sourceType,
+                    sourceId,
+                    canonicalUrl,
+                    capturedAt,
+                    publishedAt,
+                    discoveryMode,
+                    discoveryQuery,
+                    authorId,
+                    authorName,
+                    authorHandle,
+                    title,
+                    caption,
+                    contentRestriction,
+                    sessionId
+                )
+                SELECT
+                    'legacy',
+                    'image-' || images.id,
+                    '',
+                    strftime(
+                        '%Y-%m-%dT%H:%M:%fZ',
+                        images.createdAt / 1000.0,
+                        'unixepoch'
+                    ),
+                    NULL,
+                    NULL,
+                    NULL,
+                    'legacy',
+                    'Saved image',
+                    NULL,
+                    NULL,
+                    '',
+                    'UNKNOWN',
+                    images.sessionId
+                FROM images
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM captured_works
+                    WHERE captured_works.sourceType = 'legacy'
+                      AND captured_works.sourceId = 'image-' || images.id
+                )
+                """.trimIndent()
+            )
+
+            db.execSQL(
+                """
+                INSERT INTO captured_media (
+                    workId,
+                    mediaIndex,
+                    localUri,
+                    sourceUrl,
+                    mimeType,
+                    fileName,
+                    isHighlighted
+                )
+                SELECT
+                    captured_works.id,
+                    0,
+                    images.imageUri,
+                    '',
+                    'image/*',
+                    '',
+                    0
+                FROM images
+                INNER JOIN captured_works
+                    ON captured_works.sourceType = 'legacy'
+                   AND captured_works.sourceId = 'image-' || images.id
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM captured_media
+                    WHERE captured_media.workId = captured_works.id
+                      AND captured_media.mediaIndex = 0
+                )
+                """.trimIndent()
+            )
+        }
+    }

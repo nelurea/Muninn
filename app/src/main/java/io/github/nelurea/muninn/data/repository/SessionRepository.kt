@@ -20,6 +20,14 @@ class SessionRepository(
     companion object {
         private const val SESSION_TIMEOUT_MS =
             10 * 60 * 1000L
+
+        private val DEFAULT_STATE_LABELS = listOf(
+            "Happy",
+            "Calm",
+            "Focused",
+            "Tired",
+            "Stressed"
+        )
     }
 
     private var activeSessionId: Long? =
@@ -157,6 +165,20 @@ class SessionRepository(
 
     suspend fun getStateVocabulary():
             List<StateVocabularyEntity> {
+        val vocabulary = dao.getStateVocabulary()
+
+        if (vocabulary.isNotEmpty()) {
+            return vocabulary
+        }
+
+        DEFAULT_STATE_LABELS.forEach { label ->
+            dao.insertStateVocabulary(
+                StateVocabularyEntity(
+                    label = label
+                )
+            )
+        }
+
         return dao.getStateVocabulary()
     }
 
@@ -216,4 +238,5 @@ class SessionRepository(
             sessionId
         )
     }
+
 }

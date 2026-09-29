@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import io.github.nelurea.muninn.capture.PendingCaptureResolver
 import io.github.nelurea.muninn.capture.ShareUrlExtractor
@@ -32,6 +33,8 @@ import io.github.nelurea.muninn.media.move.AndroidMediaMoveFileOperations
 import io.github.nelurea.muninn.media.move.MediaMoveBatchCoordinator
 import io.github.nelurea.muninn.media.move.MediaMoveRepository
 import io.github.nelurea.muninn.media.move.MediaMoveService
+import io.github.nelurea.muninn.legacy.LegacyMediaStoreImporter
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
 
@@ -47,6 +50,24 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var capturedWorkRepository: CapturedWorkRepository
     private lateinit var mediaMoveBatchCoordinator: MediaMoveBatchCoordinator
+    private lateinit var legacyMediaStoreImporter: LegacyMediaStoreImporter
+
+    private val galleryContentRevision = MutableStateFlow(0)
+    private val legacyImportInProgress = MutableStateFlow(false)
+
+    private val mediaPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                importLegacyMedia()
+            } else {
+                Log.w(
+                    "Muninn/LegacyMediaStore",
+                    "Image access was not granted; legacy gallery recovery is pending"
+                )
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +109,12 @@ class MainActivity : ComponentActivity() {
         capturedWorkRepository =
             CapturedWorkRepository(
                 database
+            )
+
+        legacyMediaStoreImporter =
+            LegacyMediaStoreImporter(
+                context = applicationContext,
+                repository = capturedWorkRepository
             )
 
         mediaMoveBatchCoordinator =
@@ -172,8 +199,50 @@ class MainActivity : ComponentActivity() {
                     capturedWorkRepository =
                         capturedWorkRepository,
                     mediaMoveBatchCoordinator =
-                        mediaMoveBatchCoordinator
+                        mediaMoveBatchCoordinator,
+                    galleryContentRevision =
+                        galleryContentRevision,
+                    legacyImportInProgress =
+                        legacyImportInProgress
                 )
+            }
+        }
+
+        recoverLegacyMedia()
+    }
+
+    private fun recoverLegacyMedia() {
+        val permission = legacyMediaStoreImporter.requiredReadPermission()
+
+        if (permission == null || legacyMediaStoreImporter.hasReadPermission()) {
+            importLegacyMedia()
+        } else {
+            mediaPermissionLauncher.launch(permission)
+        }
+    }
+
+    private fun importLegacyMedia() {
+        legacyImportInProgress.value = true
+        lifecycleScope.launch {
+            runCatching {
+                legacyMediaStoreImporter.import()
+            }.onSuccess { result ->
+                if (result.completed && result.imported > 0) {
+                    galleryContentRevision.value++
+                }
+
+                Log.i(
+                    "Muninn/LegacyMediaStore",
+                    "Scanned ${result.scanned} legacy images; imported ${result.imported}"
+                )
+            }.onFailure { error ->
+                Log.e(
+                    "Muninn/LegacyMediaStore",
+                    "Legacy gallery recovery failed",
+                    error
+                )
+            }.also {
+                legacyImportInProgress.value = false
             }
         }
     }

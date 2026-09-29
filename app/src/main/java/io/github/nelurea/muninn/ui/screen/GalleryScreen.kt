@@ -115,6 +115,8 @@ private fun CapturedWorkWithMedia.visibilityFor(
 fun GalleryScreen(
     repository: CapturedWorkRepository,
     sensitiveContentVisibilityController: SensitiveContentVisibilityController,
+    contentRevision: Int,
+    importInProgress: Boolean,
     onWorkClick: (Long, String?) -> Unit
 ) {
     val context = LocalContext.current
@@ -255,7 +257,7 @@ fun GalleryScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(contentRevision) {
         works = repository.getAllWithMedia()
         contextualizedWorkIds =
             repository.getContextualizedWorkIds()
@@ -370,6 +372,7 @@ fun GalleryScreen(
                 Text(
                     text = when {
                         selectionMode -> "${selectedWorkIds.size} selected${refreshMessage?.let { " · $it" } ?: ""}"
+                        importInProgress -> "${visibleWorks.size} works · Restoring old images…"
                         activeFilterCount == 0 -> "${visibleWorks.size} works"
                         else -> "${visibleWorks.size} works · $activeFilterCount active"
                     },
@@ -427,6 +430,11 @@ fun GalleryScreen(
         }
 
         Column(Modifier.fillMaxSize()) {
+            if (importInProgress) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(2.dp)
+                )
+            }
             if (refreshingSelection && refreshQueueIds.isNotEmpty()) {
                 val completedCount = refreshQueueIndex.coerceAtMost(refreshQueueIds.size)
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), Arrangement.SpaceBetween) {

@@ -69,6 +69,37 @@ abstract class CapturedWorkDao {
         sourceId: String
     ): CapturedWorkWithMedia?
 
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1
+            FROM captured_works
+            WHERE sourceType = :sourceType
+              AND sourceId = :sourceId
+        )
+        """
+    )
+    abstract suspend fun hasSourceIdentity(
+        sourceType: String,
+        sourceId: String
+    ): Boolean
+
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1
+            FROM captured_media
+            WHERE localUri = :localUri
+        )
+        """
+    )
+    abstract suspend fun hasMediaUri(
+        localUri: String
+    ): Boolean
+
+    @Query("SELECT localUri FROM captured_media")
+    abstract suspend fun getAllMediaLocalUris(): List<String>
+
     @Transaction
     @Query(
         """

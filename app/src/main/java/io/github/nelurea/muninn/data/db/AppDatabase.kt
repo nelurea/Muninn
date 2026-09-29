@@ -30,7 +30,7 @@ import androidx.room.RoomDatabase
         DuplicateNormalizationJournalEntity::class,
         DuplicateCleanupJournalEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
