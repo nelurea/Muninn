@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import io.github.nelurea.muninn.capture.discovery.DiscoverySaveCoordinator
@@ -70,6 +71,12 @@ fun AppNavigation(
     legacyImportInProgress: StateFlow<Boolean>
 ) {
     val navController = rememberNavController()
+    val currentBackStackEntry by
+        navController.currentBackStackEntryAsState()
+    val isAtRoot =
+        currentBackStackEntry
+            ?.destination
+            ?.route == "home"
     val context = LocalContext.current
     val sensitiveContentVisibilityController = remember {
         SensitiveContentVisibilityController(context.applicationContext)
@@ -131,6 +138,18 @@ fun AppNavigation(
         }
     }
 
+    val navigateBack: () -> Unit = {
+        when (
+            navController
+                .currentDestination
+                ?.route
+        ) {
+            "home" -> Unit
+            null -> navController.navigate("home")
+            else -> navController.popBackStack()
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = "home",
@@ -146,6 +165,8 @@ fun AppNavigation(
         }
 
         composable("gallery") {
+            BackHandler(onBack = navigateBack)
+
             GalleryScreen(
                 repository = capturedWorkRepository,
                 sensitiveContentVisibilityController = sensitiveContentVisibilityController,
@@ -169,11 +190,13 @@ fun AppNavigation(
             LaunchedEffect(backStackEntry, workId) {
                 if (pendingInitialPreview?.first == workId) pendingInitialPreview = null
             }
+            BackHandler(onBack = navigateBack)
+
             CapturedWorkDetailScreen(
                 workId = workId,
                 initialPreviewUri = initialPreviewUri,
                 repository = capturedWorkRepository,
-                onDismiss = { navController.popBackStack() },
+                onDismiss = navigateBack,
                 onSearchTag = openCapturedWorkTagInDiscovery
             )
         }
@@ -206,7 +229,7 @@ fun AppNavigation(
             SettingsScreen(
                 mediaMoveBatchCoordinator = mediaMoveBatchCoordinator,
                 migrationScope = migrationScope,
-                onBack = { navController.popBackStack() },
+                onBack = navigateBack,
                 onResolvedCapturesClick = { navController.navigate("resolvedCaptures") },
                 xUserId = xUserId.value,
                 onXLoginClick = {
@@ -224,7 +247,7 @@ fun AppNavigation(
 
         composable("resolvedCaptures") {
             val vm = remember { ResolvedCaptureViewModel(resolvedCaptureRepository) }
-            ResolvedCaptureScreen(viewModel = vm, onBack = { navController.popBackStack() })
+            ResolvedCaptureScreen(viewModel = vm, onBack = navigateBack)
         }
 
         composable(
@@ -235,7 +258,7 @@ fun AppNavigation(
             DetailScreen(
                 imageId = imageId,
                 repository = repository,
-                onDelete = { navController.popBackStack() },
+                onDelete = navigateBack,
                 onShare = { uri ->
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "image/*"
@@ -278,7 +301,7 @@ fun AppNavigation(
                 onItemClick = { item ->
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(item.canonicalUrl)))
                 },
-                onBack = { navController.popBackStack() }
+                onBack = navigateBack
             )
 
             if (showStatePicker && activeSessionId != null) {
@@ -314,5 +337,16 @@ fun AppNavigation(
                 )
             }
         }
+    }
+
+    // Compose this after NavHost so it takes precedence over Navigation's
+    // own back callback while Home is the current destination. Recovering
+    // Home also makes a previous empty back stack self-healing.
+    BackHandler(
+        enabled =
+            isAtRoot ||
+                currentBackStackEntry == null
+    ) {
+        navigateBack()
     }
 }
