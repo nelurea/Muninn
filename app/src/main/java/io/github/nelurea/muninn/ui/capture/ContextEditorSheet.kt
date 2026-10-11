@@ -39,7 +39,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -63,17 +62,6 @@ private data class AttractionDimensionUi(
     val label: String,
     val icon:
     androidx.compose.ui.graphics.vector.ImageVector
-)
-
-private data class WorkLoadedValue<T>(
-    val workId: Long,
-    val value: T
-)
-
-private data class MediaLoadedValue<T>(
-    val workId: Long,
-    val mediaId: Long?,
-    val value: T
 )
 
 private val attractionDimensions =
@@ -175,128 +163,30 @@ fun ContextEditorSheet(
         mutableIntStateOf(1)
     }
 
-    var purposeVocabulary by remember {
-        mutableStateOf<WorkLoadedValue<List<PurposeVocabularyEntity>>?>(null)
+    val state = remember(repository) {
+        ContextEditorState(RepositoryContextEditorDataSource(repository))
     }
-    var selectedPurposes by remember {
-        mutableStateOf<WorkLoadedValue<List<PurposeVocabularyEntity>>?>(null)
-    }
-    var attractionVocabulary by remember {
-        mutableStateOf<WorkLoadedValue<List<AttractionVocabularyEntity>>?>(null)
-    }
-    var selectedWorkAttractions by remember {
-        mutableStateOf<WorkLoadedValue<List<AttractionVocabularyEntity>>?>(null)
-    }
-    var selectedPageAttractions by remember {
-        mutableStateOf<MediaLoadedValue<List<AttractionVocabularyEntity>>?>(null)
-    }
-    var responseVocabulary by remember {
-        mutableStateOf<WorkLoadedValue<List<AestheticResponseVocabularyEntity>>?>(null)
-    }
-    var selectedResponses by remember {
-        mutableStateOf<WorkLoadedValue<List<AestheticResponseVocabularyEntity>>?>(null)
-    }
-    var focuses by remember {
-        mutableStateOf<MediaLoadedValue<List<MediaFocusEntity>>?>(null)
-    }
-
-    val latestWorkId by rememberUpdatedState(workId)
-    val latestMediaId by rememberUpdatedState(currentMediaId)
-
-    suspend fun loadPurpose(requestedWorkId: Long) {
-        val vocabulary = repository.getPurposeVocabulary()
-        val selected = repository.getPurposesForWork(requestedWorkId)
-        if (latestWorkId == requestedWorkId) {
-            purposeVocabulary = WorkLoadedValue(requestedWorkId, vocabulary)
-            selectedPurposes = WorkLoadedValue(requestedWorkId, selected)
-        }
-    }
-
-    suspend fun loadAttractionVocabulary(requestedWorkId: Long) {
-        val vocabulary = repository.getAttractionVocabulary()
-        if (latestWorkId == requestedWorkId) {
-            attractionVocabulary = WorkLoadedValue(requestedWorkId, vocabulary)
-        }
-    }
-
-    suspend fun loadWorkAttractions(requestedWorkId: Long) {
-        val selected = repository.getAttractionsForWork(requestedWorkId)
-        if (latestWorkId == requestedWorkId) {
-            selectedWorkAttractions = WorkLoadedValue(requestedWorkId, selected)
-            val loadedVocabulary = attractionVocabulary
-            if (loadedVocabulary?.workId == requestedWorkId) {
-                attractionVocabulary = loadedVocabulary.copy(
-                    value = (loadedVocabulary.value + selected).distinctBy { it.id }
-                )
-            }
-        }
-    }
-
-    suspend fun loadPageAttractions(requestedWorkId: Long, requestedMediaId: Long?) {
-        val selected = if (requestedMediaId == null) {
-            emptyList()
-        } else {
-            repository.getAttractionsForMedia(requestedMediaId)
-        }
-        if (latestWorkId == requestedWorkId && latestMediaId == requestedMediaId) {
-            selectedPageAttractions = MediaLoadedValue(requestedWorkId, requestedMediaId, selected)
-            val loadedVocabulary = attractionVocabulary
-            if (loadedVocabulary?.workId == requestedWorkId) {
-                attractionVocabulary = loadedVocabulary.copy(
-                    value = (loadedVocabulary.value + selected).distinctBy { it.id }
-                )
-            }
-        }
-    }
-
-    suspend fun loadResponse(requestedWorkId: Long) {
-        val vocabulary = repository.getResponseVocabulary()
-        val selected = repository.getResponsesForWork(requestedWorkId)
-        if (latestWorkId == requestedWorkId) {
-            responseVocabulary = WorkLoadedValue(requestedWorkId, vocabulary)
-            selectedResponses = WorkLoadedValue(requestedWorkId, selected)
-        }
-    }
-
-    suspend fun loadFocus(requestedWorkId: Long, requestedMediaId: Long?) {
-        val loadedFocuses = if (requestedMediaId == null) {
-            emptyList()
-        } else {
-            repository.getFocusForMedia(requestedMediaId)
-        }
-        if (latestWorkId == requestedWorkId && latestMediaId == requestedMediaId) {
-            focuses = MediaLoadedValue(requestedWorkId, requestedMediaId, loadedFocuses)
-        }
-    }
+    // Update the scope before displaying any values or starting new loads.
+    state.bindTarget(workId, currentMediaId)
 
     LaunchedEffect(selectedTab, workId, currentMediaId) {
         when (selectedTab) {
-            0 -> if (purposeVocabulary?.workId != workId || selectedPurposes?.workId != workId) {
-                loadPurpose(workId)
-            }
+            0 -> if (!state.purposeLoaded(workId)) state.loadPurpose(workId)
             1 -> {
-                if (attractionVocabulary?.workId != workId) loadAttractionVocabulary(workId)
-                if (selectedWorkAttractions?.workId != workId) loadWorkAttractions(workId)
-                if (
-                    selectedPageAttractions?.workId != workId ||
-                    selectedPageAttractions?.mediaId != currentMediaId
-                ) {
-                    loadPageAttractions(workId, currentMediaId)
+                if (!state.attractionVocabularyLoaded(workId)) state.loadAttractionVocabulary(workId)
+                if (!state.workAttractionsLoaded(workId)) state.loadWorkAttractions(workId)
+                if (!state.pageAttractionsLoaded(workId, currentMediaId)) {
+                    state.loadPageAttractions(workId, currentMediaId)
                 }
             }
-            2 -> if (responseVocabulary?.workId != workId || selectedResponses?.workId != workId) {
-                loadResponse(workId)
-            }
+            2 -> if (!state.responseLoaded(workId)) state.loadResponse(workId)
             3 -> {
-                if (attractionVocabulary?.workId != workId) loadAttractionVocabulary(workId)
-                if (
-                    selectedPageAttractions?.workId != workId ||
-                    selectedPageAttractions?.mediaId != currentMediaId
-                ) {
-                    loadPageAttractions(workId, currentMediaId)
+                if (!state.attractionVocabularyLoaded(workId)) state.loadAttractionVocabulary(workId)
+                if (!state.pageAttractionsLoaded(workId, currentMediaId)) {
+                    state.loadPageAttractions(workId, currentMediaId)
                 }
-                if (focuses?.workId != workId || focuses?.mediaId != currentMediaId) {
-                    loadFocus(workId, currentMediaId)
+                if (!state.focusesLoaded(workId, currentMediaId)) {
+                    state.loadFocus(workId, currentMediaId)
                 }
             }
         }
@@ -446,94 +336,36 @@ fun ContextEditorSheet(
                 )
             )
 
-            when (
-                selectedTab
-            ) {
-                0 -> {
-                    PurposeEditor(
-                        workId =
-                            workId,
-                        repository =
-                            repository,
-                        vocabulary =
-                            purposeVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        selected =
-                            selectedPurposes.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        onReload = {
-                            loadPurpose(workId)
-                        }
-                    )
-                }
-
-                1 -> {
-                    AttractionEditor(
-                        workId =
-                            workId,
-                        currentMediaId =
-                            currentMediaId,
-                        repository =
-                            repository,
-                        vocabulary =
-                            attractionVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        workSelected =
-                            selectedWorkAttractions.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        pageSelected =
-                            selectedPageAttractions.takeIf {
-                                it?.workId == workId && it.mediaId == currentMediaId
-                            }?.value.orEmpty(),
-                        onReloadWork = {
-                            loadWorkAttractions(workId)
-                        },
-                        onReloadPage = {
-                            loadPageAttractions(workId, currentMediaId)
-                        }
-                    )
-                }
-
-                2 -> {
-                    ResponseEditor(
-                        workId =
-                            workId,
-                        repository =
-                            repository,
-                        vocabulary =
-                            responseVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        selected =
-                            selectedResponses.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        onReload = {
-                            loadResponse(workId)
-                        }
-                    )
-                }
-
-                3 -> {
-                    FocusEditor(
-                        currentMediaId =
-                            currentMediaId,
-                        repository =
-                            repository,
-                        attractionVocabulary =
-                            attractionVocabulary.takeIf { it?.workId == workId }?.value.orEmpty(),
-                        pageAttractions =
-                            selectedPageAttractions.takeIf {
-                                it?.workId == workId && it.mediaId == currentMediaId
-                            }?.value.orEmpty(),
-                        focuses =
-                            focuses.takeIf {
-                                it?.workId == workId && it.mediaId == currentMediaId
-                            }?.value.orEmpty(),
-                        onReload = {
-                            loadFocus(workId, currentMediaId)
-                        }
-                    )
-                }
-
-                4 -> {
-                    InfoSection(
-                        capturedWork =
-                            capturedWork
-                    )
-                }
+            when (selectedTab) {
+                0 -> PurposeEditor(
+                    workId = workId,
+                    state = state,
+                    vocabulary = state.purposeVocabulary(workId),
+                    selected = state.selectedPurposes(workId)
+                )
+                1 -> AttractionEditor(
+                    workId = workId,
+                    currentMediaId = currentMediaId,
+                    state = state,
+                    vocabulary = state.attractionVocabulary(workId),
+                    workSelected = state.workAttractions(workId),
+                    pageSelected = state.pageAttractions(workId, currentMediaId)
+                )
+                2 -> ResponseEditor(
+                    workId = workId,
+                    state = state,
+                    vocabulary = state.responseVocabulary(workId),
+                    selected = state.selectedResponses(workId)
+                )
+                3 -> FocusEditor(
+                    workId = workId,
+                    currentMediaId = currentMediaId,
+                    state = state,
+                    attractionVocabulary = state.attractionVocabulary(workId),
+                    pageAttractions = state.pageAttractions(workId, currentMediaId),
+                    focuses = state.focuses(workId, currentMediaId)
+                )
+                4 -> InfoSection(capturedWork = capturedWork)
             }
         }
     }
@@ -542,12 +374,11 @@ fun ContextEditorSheet(
 @Composable
 private fun PurposeEditor(
     workId: Long,
-    repository: CapturedWorkRepository,
+    state: ContextEditorState,
     vocabulary: List<PurposeVocabularyEntity>,
-    selected: List<PurposeVocabularyEntity>,
-    onReload: suspend () -> Unit
+    selected: List<PurposeVocabularyEntity>
 ) {
-    var newLabel by remember {
+    var newLabel by remember(workId) {
         mutableStateOf("")
     }
 
@@ -586,27 +417,7 @@ private fun PurposeEditor(
                                 isSelected,
                             onClick = {
                                 scope.launch {
-                                    if (
-                                        isSelected
-                                    ) {
-                                        repository
-                                            .removePurposeFromWork(
-                                                workId =
-                                                    workId,
-                                                purposeVocabularyId =
-                                                    item.id
-                                            )
-                                    } else {
-                                        repository
-                                            .addPurposeToWork(
-                                                workId =
-                                                    workId,
-                                                label =
-                                                    item.label
-                                            )
-                                    }
-
-                                    onReload()
+                                    state.setPurpose(workId, item, isSelected)
                                 }
                             },
                             label = {
@@ -642,18 +453,9 @@ private fun PurposeEditor(
                     value.isNotBlank()
                 ) {
                     scope.launch {
-                        repository
-                            .addPurposeToWork(
-                                workId =
-                                    workId,
-                                label =
-                                    value
-                            )
-
-                        newLabel =
-                            ""
-
-                        onReload()
+                        if (state.addPurpose(workId, value) && newLabel.trim() == value) {
+                            newLabel = ""
+                        }
                     }
                 }
             }
@@ -665,24 +467,22 @@ private fun PurposeEditor(
 private fun AttractionEditor(
     workId: Long,
     currentMediaId: Long?,
-    repository: CapturedWorkRepository,
+    state: ContextEditorState,
     vocabulary: List<AttractionVocabularyEntity>,
     workSelected: List<AttractionVocabularyEntity>,
-    pageSelected: List<AttractionVocabularyEntity>,
-    onReloadWork: suspend () -> Unit,
-    onReloadPage: suspend () -> Unit
+    pageSelected: List<AttractionVocabularyEntity>
 ) {
-    var selectedDimension by remember {
+    var selectedDimension by remember(workId) {
         mutableStateOf(
             "EXPRESSION_GESTURE"
         )
     }
 
-    var pageTarget by remember {
+    var pageTarget by remember(workId) {
         mutableStateOf(false)
     }
 
-    var newLabel by remember {
+    var newLabel by remember(workId, currentMediaId) {
         mutableStateOf("")
     }
 
@@ -868,61 +668,12 @@ private fun AttractionEditor(
                         selected =
                             isSelected,
                         onClick = {
+                            val requestedPageTarget = pageTarget
                             scope.launch {
-                                if (
-                                    pageTarget
-                                ) {
-                                    val mediaId =
-                                        currentMediaId
-                                            ?: return@launch
-
-                                    if (
-                                        isSelected
-                                    ) {
-                                        repository
-                                            .removeAttractionFromMedia(
-                                                mediaId =
-                                                    mediaId,
-                                                attractionVocabularyId =
-                                                    term.id
-                                            )
-                                    } else {
-                                        repository
-                                            .addAttractionToMedia(
-                                                mediaId =
-                                                    mediaId,
-                                                dimension =
-                                                    term.dimension,
-                                                label =
-                                                    term.label
-                                            )
-                                    }
-
-                                    onReloadPage()
+                                if (requestedPageTarget) {
+                                    state.setPageAttraction(workId, currentMediaId, term, isSelected)
                                 } else {
-                                    if (
-                                        isSelected
-                                    ) {
-                                        repository
-                                            .removeAttractionFromWork(
-                                                workId =
-                                                    workId,
-                                                attractionVocabularyId =
-                                                    term.id
-                                            )
-                                    } else {
-                                        repository
-                                            .addAttractionToWork(
-                                                workId =
-                                                    workId,
-                                                dimension =
-                                                    term.dimension,
-                                                label =
-                                                    term.label
-                                            )
-                                    }
-
-                                    onReloadWork()
+                                    state.setWorkAttraction(workId, term, isSelected)
                                 }
                             }
                         },
@@ -962,41 +713,15 @@ private fun AttractionEditor(
                     return@AddTermField
                 }
 
+                val requestedPageTarget = pageTarget
+                val requestedDimension = selectedDimension
                 scope.launch {
-                    if (
-                        pageTarget
-                    ) {
-                        val mediaId =
-                            currentMediaId
-                                ?: return@launch
-
-                        repository
-                            .addAttractionToMedia(
-                                mediaId =
-                                    mediaId,
-                                dimension =
-                                    selectedDimension,
-                                label =
-                                    value
-                            )
-
-                        onReloadPage()
+                    val saved = if (requestedPageTarget) {
+                        state.addPageAttraction(workId, currentMediaId, requestedDimension, value)
                     } else {
-                        repository
-                            .addAttractionToWork(
-                                workId =
-                                    workId,
-                                dimension =
-                                    selectedDimension,
-                                label =
-                                    value
-                            )
-
-                        onReloadWork()
+                        state.addWorkAttraction(workId, requestedDimension, value)
                     }
-
-                    newLabel =
-                        ""
+                    if (saved && newLabel.trim() == value) newLabel = ""
                 }
             }
         )
@@ -1006,12 +731,11 @@ private fun AttractionEditor(
 @Composable
 private fun ResponseEditor(
     workId: Long,
-    repository: CapturedWorkRepository,
+    state: ContextEditorState,
     vocabulary: List<AestheticResponseVocabularyEntity>,
-    selected: List<AestheticResponseVocabularyEntity>,
-    onReload: suspend () -> Unit
+    selected: List<AestheticResponseVocabularyEntity>
 ) {
-    var newLabel by remember {
+    var newLabel by remember(workId) {
         mutableStateOf("")
     }
 
@@ -1050,27 +774,7 @@ private fun ResponseEditor(
                                 isSelected,
                             onClick = {
                                 scope.launch {
-                                    if (
-                                        isSelected
-                                    ) {
-                                        repository
-                                            .removeResponseFromWork(
-                                                workId =
-                                                    workId,
-                                                responseVocabularyId =
-                                                    response.id
-                                            )
-                                    } else {
-                                        repository
-                                            .addResponseToWork(
-                                                workId =
-                                                    workId,
-                                                label =
-                                                    response.label
-                                            )
-                                    }
-
-                                    onReload()
+                                    state.setResponse(workId, response, isSelected)
                                 }
                             },
                             label = {
@@ -1107,18 +811,9 @@ private fun ResponseEditor(
                     value.isNotBlank()
                 ) {
                     scope.launch {
-                        repository
-                            .addResponseToWork(
-                                workId =
-                                    workId,
-                                label =
-                                    value
-                            )
-
-                        newLabel =
-                            ""
-
-                        onReload()
+                        if (state.addResponse(workId, value) && newLabel.trim() == value) {
+                            newLabel = ""
+                        }
                     }
                 }
             }
@@ -1128,29 +823,27 @@ private fun ResponseEditor(
 
 @Composable
 private fun FocusEditor(
+    workId: Long,
     currentMediaId: Long?,
-    repository: CapturedWorkRepository,
+    state: ContextEditorState,
     attractionVocabulary: List<AttractionVocabularyEntity>,
     pageAttractions: List<AttractionVocabularyEntity>,
-    focuses: List<MediaFocusEntity>,
-    onReload: suspend () -> Unit
+    focuses: List<MediaFocusEntity>
 ) {
-    var selectedAttractionId by remember {
+    var selectedAttractionId by remember(workId, currentMediaId) {
         mutableStateOf<Long?>(
             null
         )
     }
 
-    var note by remember {
+    var note by remember(workId, currentMediaId) {
         mutableStateOf("")
     }
 
     val scope =
         rememberCoroutineScope()
 
-    LaunchedEffect(
-        currentMediaId
-    ) {
+    LaunchedEffect(workId, currentMediaId) {
         selectedAttractionId =
             null
 
@@ -1293,24 +986,14 @@ private fun FocusEditor(
                 if (
                     mediaId != null
                 ) {
+                    val requestedAttractionId = selectedAttractionId
+                    val requestedNote = note
                     scope.launch {
-                        repository
-                            .addFocusToMedia(
-                                mediaId =
-                                    mediaId,
-                                attractionVocabularyId =
-                                    selectedAttractionId,
-                                note =
-                                    note
-                            )
-
-                        selectedAttractionId =
-                            null
-
-                        note =
-                            ""
-
-                        onReload()
+                        val saved = state.addFocus(workId, mediaId, requestedAttractionId, requestedNote)
+                        if (saved && selectedAttractionId == requestedAttractionId && note == requestedNote) {
+                            selectedAttractionId = null
+                            note = ""
+                        }
                     }
                 }
             }
@@ -1368,12 +1051,7 @@ private fun FocusEditor(
                             focus.note,
                         onDelete = {
                             scope.launch {
-                                repository
-                                    .removeFocus(
-                                        focus.id
-                                    )
-
-                                onReload()
+                                state.removeFocus(workId, currentMediaId, focus)
                             }
                         }
                     )
