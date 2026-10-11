@@ -16,3 +16,7 @@ Early development.
 ## Notes
 
 Building this project while learning Android development.
+
+## Product Vision
+
+See [Muninn Product Vision](docs/product/PRODUCT_VISION.md) for the product goals and experience principles.
