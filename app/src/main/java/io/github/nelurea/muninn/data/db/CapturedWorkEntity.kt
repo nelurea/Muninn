@@ -1,5 +1,6 @@
 package io.github.nelurea.muninn.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -33,5 +34,16 @@ data class CapturedWorkEntity(
     val caption: String,
 
     val contentRestriction: String = "UNKNOWN",
-    val sessionId: Long?
+    val sessionId: Long?,
+    @ColumnInfo(defaultValue = "0")
+    val isPurposeDetour: Boolean = false,
+
+    @ColumnInfo(defaultValue = "'UNKNOWN'")
+    val sourceAvailability: String = "UNKNOWN",
+    val sourceUnavailableReason: String? = null,
+    val sourceAvailabilityCheckedAt: String? = null,
+    @ColumnInfo(defaultValue = "'UNKNOWN'")
+    val metadataRecoveryState: String = "UNKNOWN",
+    val metadataRetryAfterMs: Long? = null,
+    val metadataLastError: String? = null
 )

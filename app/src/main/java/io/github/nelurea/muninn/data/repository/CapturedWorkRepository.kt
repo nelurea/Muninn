@@ -14,6 +14,8 @@ import io.github.nelurea.muninn.data.db.CapturedWorkEntity
 import io.github.nelurea.muninn.data.db.CapturedWorkWithMedia
 import io.github.nelurea.muninn.data.db.CapturedWorkPurposeEntity
 import io.github.nelurea.muninn.data.db.PurposeVocabularyEntity
+import io.github.nelurea.muninn.data.db.SessionPurposeEntity
+import io.github.nelurea.muninn.data.db.PurposeUsageRow
 import io.github.nelurea.muninn.data.db.AestheticResponseVocabularyEntity
 import io.github.nelurea.muninn.data.db.AttractionVocabularyEntity
 import io.github.nelurea.muninn.data.db.CapturedWorkAttractionEntity
@@ -238,6 +240,7 @@ class CapturedWorkRepository(
                     purposeId
             )
         )
+        dao.markPurposeUsed(purposeId, System.currentTimeMillis())
     }
 
     suspend fun removePurposeFromWork(
@@ -515,6 +518,34 @@ class CapturedWorkRepository(
             mediaId
         )
     }
+
+    suspend fun getSessionPurpose(sessionId: Long): PurposeVocabularyEntity? =
+        dao.getSessionPurpose(sessionId)
+
+    /** Editing a Session Purpose intentionally updates the context of the entire session. */
+    suspend fun setSessionPurpose(sessionId: Long, label: String) {
+        val normalized = label.trim()
+        if (normalized.isBlank()) return
+        database.withTransaction {
+            val inserted = dao.insertPurposeVocabulary(
+                PurposeVocabularyEntity(label = normalized)
+            )
+            val purposeId = if (inserted != -1L) inserted else
+                dao.getPurposeVocabularyId(normalized) ?: return@withTransaction
+            dao.upsertSessionPurpose(SessionPurposeEntity(sessionId, purposeId))
+            dao.markPurposeUsed(purposeId, System.currentTimeMillis())
+        }
+    }
+
+    suspend fun clearSessionPurpose(sessionId: Long) = dao.clearSessionPurpose(sessionId)
+
+    suspend fun setPurposeDetour(workId: Long, detour: Boolean) =
+        dao.setPurposeDetour(workId, detour)
+
+    suspend fun isPurposeDetour(workId: Long): Boolean =
+        dao.isPurposeDetour(workId) ?: false
+
+    suspend fun getPurposeUsage(): List<PurposeUsageRow> = dao.getPurposeUsage()
 
     suspend fun refreshMetadata(
         work: CapturedWorkEntity,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,11 +26,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -110,6 +113,10 @@ fun CapturedWorkDetailScreen(
         mutableStateOf(false)
     }
 
+    var showPurposePalette by remember(workId) {
+        mutableStateOf(false)
+    }
+
     var controlsVisible by remember(
         workId
     ) {
@@ -176,18 +183,30 @@ fun CapturedWorkDetailScreen(
                 !loading &&
                 capturedWork != null
             ) {
-                FloatingActionButton(
-                    onClick = {
-                        showContextEditor =
-                            true
+                Column(horizontalAlignment = Alignment.End) {
+                    SmallFloatingActionButton(
+                        onClick = {
+                            showContextEditor = false
+                            showPurposePalette = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bookmark,
+                            contentDescription = "Quick Purpose"
+                        )
                     }
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Default.Edit,
-                        contentDescription =
-                            "Edit context"
-                    )
+                    Spacer(Modifier.height(8.dp))
+                    FloatingActionButton(
+                        onClick = {
+                            showPurposePalette = false
+                            showContextEditor = true
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit context"
+                        )
+                    }
                 }
             }
         }
@@ -678,6 +697,15 @@ fun CapturedWorkDetailScreen(
                                 refreshingMetadata =
                                     false
                             }
+                        )
+                    }
+
+                    if (showPurposePalette) {
+                        WorkPurposeQuickPalette(
+                            workId = workId,
+                            sessionId = item.work.sessionId,
+                            repository = repository,
+                            onDismiss = { showPurposePalette = false }
                         )
                     }
 

@@ -973,3 +973,56 @@ val MIGRATION_19_20 =
             )
         }
     }
+
+/** Session context is shared; explicit work purposes remain unchanged. */
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE captured_works " +
+                "ADD COLUMN isPurposeDetour INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL(
+            "ALTER TABLE purpose_vocabulary " +
+                "ADD COLUMN lastUsedAt INTEGER NOT NULL DEFAULT 0"
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `session_purposes` (
+                `sessionId` INTEGER NOT NULL,
+                `purposeVocabularyId` INTEGER NOT NULL,
+                PRIMARY KEY(`sessionId`),
+                FOREIGN KEY(`sessionId`) REFERENCES `sessions`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE,
+                FOREIGN KEY(`purposeVocabularyId`) REFERENCES `purpose_vocabulary`(`id`)
+                    ON UPDATE NO ACTION ON DELETE CASCADE
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_session_purposes_purposeVocabularyId` " +
+                "ON `session_purposes` (`purposeVocabularyId`)"
+        )
+    }
+}
+
+/** Persistent availability and per-work retry journal. Existing captures are untouched. */
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `sourceAvailability` TEXT NOT NULL DEFAULT 'UNKNOWN'")
+        db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `sourceUnavailableReason` TEXT")
+        db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `sourceAvailabilityCheckedAt` TEXT")
+        db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `metadataRecoveryState` TEXT NOT NULL DEFAULT 'UNKNOWN'")
+        db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `metadataRetryAfterMs` INTEGER")
+        db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `metadataLastError` TEXT")
+        db.query("PRAGMA table_info(`captured_works`)").use { cursor ->
+            val columnIndex = cursor.getColumnIndexOrThrow("name")
+            var hasDetour = false
+            while (cursor.moveToNext()) {
+                if (cursor.getString(columnIndex) == "isPurposeDetour") hasDetour = true
+            }
+            if (!hasDetour) {
+                db.execSQL("ALTER TABLE `captured_works` ADD COLUMN `isPurposeDetour` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+    }
+}

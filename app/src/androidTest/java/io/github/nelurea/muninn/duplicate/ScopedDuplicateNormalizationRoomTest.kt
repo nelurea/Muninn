@@ -131,11 +131,11 @@ class ScopedDuplicateNormalizationRoomTest {
         val firstWork = ordinal * 10L
         val secondWork = firstWork + 1
         sql.execSQL(
-            "INSERT INTO captured_works VALUES (?,? ,?,'url','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)",
+            "INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (?,? ,?,'url','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)",
             arrayOf(firstWork, identity.sourceType, identity.sourceId)
         )
         sql.execSQL(
-            "INSERT INTO captured_works VALUES (?,? ,?,'url','2026-01-02',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)",
+            "INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (?,? ,?,'url','2026-01-02',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)",
             arrayOf(secondWork, identity.sourceType, identity.sourceId)
         )
         repeat(groupCount) { mediaIndex ->

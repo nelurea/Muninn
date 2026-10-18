@@ -17,6 +17,7 @@ import androidx.room.RoomDatabase
         StateVocabularyEntity::class,
         SessionStateEntity::class,
         PurposeVocabularyEntity::class,
+        SessionPurposeEntity::class,
         CapturedWorkPurposeEntity::class,
         AttractionVocabularyEntity::class,
         CapturedWorkAttractionEntity::class,
@@ -30,7 +31,7 @@ import androidx.room.RoomDatabase
         DuplicateNormalizationJournalEntity::class,
         DuplicateCleanupJournalEntity::class,
     ],
-    version = 20,
+    version = 22,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

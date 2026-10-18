@@ -35,9 +35,9 @@ class DuplicateNormalizationApplyTest {
     fun appliesIdentityAtomicallyAndExcludesSharedUriFromCleanup() = runBlocking {
         val sql = database.openHelper.writableDatabase
         sql.execSQL("INSERT INTO sessions VALUES (7,1,1)")
-        sql.execSQL("INSERT INTO captured_works VALUES (10,'pixiv','x','','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)")
-        sql.execSQL("INSERT INTO captured_works VALUES (20,'pixiv','x','url','2026-01-02','published','mode','query','a','name','handle','title','caption',7)")
-        sql.execSQL("INSERT INTO captured_works VALUES (30,'pixiv','other','other','2026-01-03',NULL,NULL,NULL,'b','other',NULL,NULL,'',NULL)")
+        sql.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (10,'pixiv','x','','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)")
+        sql.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (20,'pixiv','x','url','2026-01-02','published','mode','query','a','name','handle','title','caption','UNKNOWN',7)")
+        sql.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (30,'pixiv','other','other','2026-01-03',NULL,NULL,NULL,'b','other',NULL,NULL,'','UNKNOWN',NULL)")
         sql.execSQL("INSERT INTO captured_media VALUES (101,10,0,'shared','s','image/jpeg','a.jpg',0)")
         sql.execSQL("INSERT INTO captured_media VALUES (202,20,0,'shared','s','image/jpeg','b.jpg',1)")
         sql.execSQL("INSERT INTO captured_media VALUES (203,20,1,'missing-index','s2','image/jpeg','c.jpg',0)")
@@ -46,7 +46,7 @@ class DuplicateNormalizationApplyTest {
         sql.execSQL("INSERT INTO captured_media VALUES (303,30,0,'shared','s','image/jpeg','d.jpg',0)")
         sql.execSQL("INSERT INTO captured_tags VALUES (10,0,'one')")
         sql.execSQL("INSERT INTO captured_tags VALUES (20,0,'two')")
-        sql.execSQL("INSERT INTO purpose_vocabulary VALUES (1,'reference')")
+        sql.execSQL("INSERT INTO purpose_vocabulary (id,label) VALUES (1,'reference')")
         sql.execSQL("INSERT INTO attraction_vocabulary VALUES (1,'subject','face')")
         sql.execSQL("INSERT INTO captured_work_purposes VALUES (20,1)")
         sql.execSQL("INSERT INTO captured_work_attractions VALUES (20,1)")
@@ -131,8 +131,8 @@ class DuplicateNormalizationApplyTest {
     @Test
     fun completionCasFailureRollsBackWholeIdentityTransaction() = runBlocking {
         val sql = database.openHelper.writableDatabase
-        sql.execSQL("INSERT INTO captured_works VALUES (10,'pixiv','x','canonical','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)")
-        sql.execSQL("INSERT INTO captured_works VALUES (20,'pixiv','x','duplicate','2026-01-02',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)")
+        sql.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (10,'pixiv','x','canonical','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)")
+        sql.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (20,'pixiv','x','duplicate','2026-01-02',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)")
         sql.execSQL("INSERT INTO captured_media VALUES (101,10,0,'same','s','image/jpeg','a.jpg',0)")
         sql.execSQL("INSERT INTO captured_media VALUES (202,20,0,'same','s','image/jpeg','b.jpg',1)")
         sql.execSQL("INSERT INTO duplicate_normalization_journal VALUES (1,'pixiv','x','PLANNED','VERIFIED',NULL,10,2,'{}',NULL,1,1)")
@@ -167,8 +167,8 @@ class DuplicateNormalizationApplyTest {
         db.query(query).use { cursor -> cursor.moveToFirst(); cursor.getString(0) }
 
     private fun insertMinimalPlannedIdentity(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-        db.execSQL("INSERT INTO captured_works VALUES (10,'pixiv','x','canonical','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)")
-        db.execSQL("INSERT INTO captured_works VALUES (20,'pixiv','x','duplicate','2026-01-02',NULL,NULL,NULL,'a','name',NULL,NULL,'',NULL)")
+        db.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (10,'pixiv','x','canonical','2026-01-01',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)")
+        db.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (20,'pixiv','x','duplicate','2026-01-02',NULL,NULL,NULL,'a','name',NULL,NULL,'','UNKNOWN',NULL)")
         db.execSQL("INSERT INTO captured_media VALUES (101,10,0,'same','s','image/jpeg','a.jpg',0)")
         db.execSQL("INSERT INTO captured_media VALUES (202,20,0,'same','s','image/jpeg','b.jpg',1)")
         db.execSQL("INSERT INTO duplicate_normalization_journal VALUES (1,'pixiv','x','PLANNED','VERIFIED',NULL,10,2,'{}',NULL,1,1)")

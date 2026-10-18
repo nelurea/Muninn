@@ -68,7 +68,7 @@ class RoomDuplicateCleanupPersistenceTest {
         val stale = persistence.pending().single()
         val sql = database.openHelper.writableDatabase
         sql.execSQL("UPDATE duplicate_cleanup_journal SET targetUri='current' WHERE id=1")
-        sql.execSQL("INSERT INTO captured_works VALUES (10,'test','work','', '1',NULL,NULL,NULL,'a','a',NULL,NULL,'',NULL)")
+        sql.execSQL("INSERT INTO captured_works (id,sourceType,sourceId,canonicalUrl,capturedAt,publishedAt,discoveryMode,discoveryQuery,authorId,authorName,authorHandle,title,caption,contentRestriction,sessionId) VALUES (10,'test','work','', '1',NULL,NULL,NULL,'a','a',NULL,NULL,'','UNKNOWN',NULL)")
         sql.execSQL("INSERT INTO captured_media VALUES (10,10,0,'current','','image/jpeg','current.jpg',0)")
         var deletes = 0
 

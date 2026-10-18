@@ -577,6 +577,43 @@ abstract class CapturedWorkDao {
         mediaId: Long
     ): List<MediaFocusEntity>
 
+    @Query(
+        """
+        SELECT p.* FROM purpose_vocabulary p
+        INNER JOIN session_purposes s ON s.purposeVocabularyId = p.id
+        WHERE s.sessionId = :sessionId
+        """
+    )
+    abstract suspend fun getSessionPurpose(sessionId: Long): PurposeVocabularyEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun upsertSessionPurpose(value: SessionPurposeEntity)
+
+    @Query("DELETE FROM session_purposes WHERE sessionId = :sessionId")
+    abstract suspend fun clearSessionPurpose(sessionId: Long)
+
+    @Query("UPDATE captured_works SET isPurposeDetour = :detour WHERE id = :workId")
+    abstract suspend fun setPurposeDetour(workId: Long, detour: Boolean)
+
+    @Query("SELECT isPurposeDetour FROM captured_works WHERE id = :workId")
+    abstract suspend fun isPurposeDetour(workId: Long): Boolean?
+
+    @Query("UPDATE purpose_vocabulary SET lastUsedAt = :timestamp WHERE id = :purposeId")
+    abstract suspend fun markPurposeUsed(purposeId: Long, timestamp: Long)
+
+    @Query(
+        """
+        SELECT p.id AS purposeId,
+          (SELECT COUNT(*) FROM captured_work_purposes w
+              WHERE w.purposeVocabularyId = p.id) +
+          (SELECT COUNT(*) FROM session_purposes s
+              WHERE s.purposeVocabularyId = p.id) AS useCount,
+          p.lastUsedAt AS lastUsedAt
+        FROM purpose_vocabulary p
+        """
+    )
+    abstract suspend fun getPurposeUsage(): List<PurposeUsageRow>
+
     @Update
     protected abstract suspend fun updateWorkMetadata(
         work: CapturedWorkEntity
