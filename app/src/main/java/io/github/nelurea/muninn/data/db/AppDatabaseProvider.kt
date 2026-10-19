@@ -2,6 +2,8 @@ package io.github.nelurea.muninn.data.db
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 object AppDatabaseProvider {
 
@@ -33,7 +35,17 @@ object AppDatabaseProvider {
                             MIGRATION_18_19,
                             MIGRATION_19_20,
                             MIGRATION_20_21,
-                            MIGRATION_21_22
+                            MIGRATION_21_22,
+                            MIGRATION_22_23
+                        )
+                        .addCallback(
+                            object : RoomDatabase.Callback() {
+                                override fun onCreate(db: SupportSQLiteDatabase) {
+                                    // The migration installs these for old databases; fresh
+                                    // databases need them before their first entity insert.
+                                    installDurableIdentityTriggers(db)
+                                }
+                            }
                         )
                         .build()
                         .also {

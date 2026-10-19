@@ -30,8 +30,9 @@ import androidx.room.RoomDatabase
         SaveEventMediaEntity::class,
         DuplicateNormalizationJournalEntity::class,
         DuplicateCleanupJournalEntity::class,
+        DurableIdentityEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,4 +56,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun saveEventDao(): SaveEventDao
 
     abstract fun duplicateNormalizationDao(): DuplicateNormalizationDao
+
+    abstract fun durableIdentityDao(): DurableIdentityDao
 }
