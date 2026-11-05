@@ -5,7 +5,7 @@ plugins {
 
 val stageProductionContext = tasks.register<Copy>("stageProductionContext") {
     from("../app/src/main/java/io/github/nelurea/muninn/data/context") {
-        include("RoomContextSnapshotExporter.kt", "ContextRestorePreflight.kt")
+        include("RoomContextSnapshotExporter.kt", "ContextRestorePreflight.kt", "ContextEmptyRoomRestorer.kt")
     }
     into(layout.buildDirectory.dir("generated/contextHost/main"))
 }
@@ -19,7 +19,7 @@ val stageDatabaseEntities = tasks.register<Copy>("stageDatabaseEntities") {
 
 val stageRestorePreflightTest = tasks.register<Copy>("stageRestorePreflightTest") {
     from("../app/src/androidTest/java/io/github/nelurea/muninn/data/context") {
-        include("ContextRestorePreflightTest.kt")
+        include("ContextRestorePreflightTest.kt", "ContextEmptyRoomRestorerTest.kt")
     }
     into(layout.buildDirectory.dir("generated/contextHost/androidTest"))
 }
