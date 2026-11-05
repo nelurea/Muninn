@@ -40,6 +40,10 @@ class InternalMediaStorage(
                     media.map {
                             item ->
 
+                        require(InternalMediaFileCleanup.isSafeFileName(item.fileName)) {
+                            "Invalid media file name"
+                        }
+
                         val destinationFile =
                             File(
                                 destinationDirectory,
@@ -77,19 +81,8 @@ class InternalMediaStorage(
         withContext(
             Dispatchers.IO
         ) {
-            localUris
-                .mapNotNull {
-                        rawUri ->
-
-                    Uri.parse(rawUri)
-                        .path
-                        ?.let(::File)
-                        ?.parentFile
-                }
-                .distinct()
-                .forEach {
-                    it.deleteRecursively()
-                }
+            val cleanup = InternalMediaFileCleanup(filesDir)
+            localUris.distinct().forEach(cleanup::delete)
         }
     }
 }

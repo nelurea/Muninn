@@ -3,7 +3,6 @@ package io.github.nelurea.muninn.capture.storage
 import android.content.Context
 import android.net.Uri
 import io.github.nelurea.muninn.capture.model.CaptureMediaDraft
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -54,81 +53,17 @@ class UserSelectedMediaStorage(
         }
     }
 
-    override suspend fun delete(
-        localUris: List<String>
-    ) {
-        withContext(
-            Dispatchers.IO
-        ) {
-            localUris.forEach {
-                    rawUri ->
-
-                val uri =
-                    Uri.parse(
-                        rawUri
-                    )
-
-                when (
-                    uri.scheme
-                ) {
-                    "content" -> {
-                        runCatching {
-                            appContext
-                                .contentResolver
-                                .delete(
-                                    uri,
-                                    null,
-                                    null
-                                )
-                        }
+    override suspend fun delete(localUris: List<String>) {
+        withContext(Dispatchers.IO) {
+            val internalCleanup = InternalMediaFileCleanup(appContext.filesDir)
+            localUris.distinct().forEach { rawUri ->
+                when (Uri.parse(rawUri).scheme) {
+                    "content" -> runCatching {
+                        appContext.contentResolver.delete(Uri.parse(rawUri), null, null)
                     }
-
-                    "file" -> {
-                        uri.path
-                            ?.let(
-                                ::File
-                            )
-                            ?.delete()
-                    }
+                    "file" -> internalCleanup.delete(rawUri)
                 }
             }
-
-            localUris
-                .mapNotNull {
-                        rawUri ->
-
-                    val uri =
-                        Uri.parse(
-                            rawUri
-                        )
-
-                    if (
-                        uri.scheme ==
-                        "file"
-                    ) {
-                        uri.path
-                            ?.let(
-                                ::File
-                            )
-                            ?.parentFile
-                    } else {
-                        null
-                    }
-                }
-                .distinct()
-                .forEach {
-                        directory ->
-
-                    if (
-                        directory.exists() &&
-                        directory
-                            .listFiles()
-                            ?.isEmpty() ==
-                        true
-                    ) {
-                        directory.delete()
-                    }
-                }
         }
     }
 }
