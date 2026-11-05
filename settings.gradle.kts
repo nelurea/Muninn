@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Muninn"
 include(":app")
+include(":contextTestHost")
