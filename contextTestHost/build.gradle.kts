@@ -72,4 +72,5 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.7.0")
 }
